@@ -1,0 +1,239 @@
+# API SPEC — RotationLab
+
+- REST base: `/api/v1` (same origin as the web app)
+- Realtime: Socket.IO, path `/realtime`
+- Format: JSON, UTF-8. Timestamps ISO-8601 UTC. IDs UUID strings. Coordinates integer world units (cm).
+- All schemas live in `packages/shared/src/schemas/*` (Zod). This document is the contract; the Zod files are the implementation.
+
+## 1. Conventions
+
+### 1.1 Authentication
+- Cookies set by the server:
+  - `rl_at` — access JWT, `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=900`
+  - `rl_rt` — opaque refresh token, `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=2592000`
+- Clients send `credentials: 'include'`. No tokens in `localStorage`, headers or URLs.
+- On `401 { code: "TOKEN_EXPIRED" }` the client calls `POST /auth/refresh` once, then retries the original request.
+
+### 1.2 CSRF
+All state-changing requests (`POST/PUT/PATCH/DELETE`) must send header `X-Requested-With: rotationlab` **and** the server verifies `Origin` equals `APP_ORIGIN`. Requests failing either → `403 CSRF_FAILED`.
+
+### 1.3 Pagination
+Cursor-based: `?limit=50&before=<id>` → response `{ items: [...], nextCursor: string | null }`. Max limit 100.
+
+### 1.4 Error format
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "Human-readable message", "details": [{ "path": "name", "issue": "too_short" }], "requestId": "01J…" } }
+```
+| HTTP | Codes |
+|---|---|
+| 400 | `VALIDATION_ERROR`, `BAD_REQUEST` |
+| 401 | `UNAUTHENTICATED`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` |
+| 403 | `FORBIDDEN`, `CSRF_FAILED`, `ROOM_LOCKED`, `WRONG_ROOM_PASSWORD` |
+| 404 | `NOT_FOUND` (also used instead of 403 when the caller is not a room member — avoid leaking existence) |
+| 409 | `CONFLICT`, `USERNAME_TAKEN`, `EMAIL_TAKEN`, `ALREADY_MEMBER` |
+| 410 | `INVITE_EXPIRED` |
+| 413 | `PAYLOAD_TOO_LARGE` |
+| 422 | `LIMIT_REACHED` (boards, layers, members, elements) |
+| 423 | `ACCOUNT_LOCKED` |
+| 429 | `RATE_LIMITED` (+ `Retry-After` header) |
+| 500 | `INTERNAL` |
+
+### 1.5 Common objects
+```ts
+PublicUser = { id, username, displayName, ign: string|null, avatarColor }
+Me         = PublicUser & { email, emailVerified: boolean, createdAt }
+RoomSummary= { id, name, description, role: 'OWNER'|'EDITOR'|'VIEWER', memberCount, onlineCount,
+               boardCount, lastActivityAt, thumbnailUrl: string|null, hasPassword: boolean }
+Member     = { user: PublicUser, role, joinedAt, online: boolean }
+Board      = { id, roomId, name, mapId: 'erangel'|'miramar'|'rondo', position, elementCount, updatedAt }
+Layer      = { id, boardId, name, color, position, visible, locked, seq }
+Element    = { id, boardId, layerId, type, geometry, style, props, z, seq, createdBy, updatedBy, updatedAt }
+ChatMessage= { id, roomId, author: PublicUser|null, kind: 'USER'|'SYSTEM', body,
+               ping: { boardId, x, y } | null, deleted: boolean, createdAt }
+Invite     = { id, code, url, role, maxUses, useCount, expiresAt, createdAt }
+Snapshot   = { id, boardId, name, isAuto, elementCount, createdBy: PublicUser|null, createdAt }
+```
+
+## 2. Auth
+
+| Method & path | Auth | Body | Success |
+|---|---|---|---|
+| `POST /auth/register` | – | `{ email, username, password, displayName? }` | `201 { user: Me }` + cookies |
+| `POST /auth/login` | – | `{ identifier, password }` (email or username) | `200 { user: Me }` + cookies |
+| `POST /auth/refresh` | refresh cookie | – | `204` + new cookies (rotation) |
+| `POST /auth/logout` | ✓ | – | `204`, clears cookies, revokes refresh token |
+| `POST /auth/logout-all` | ✓ | – | `204`, revokes all user's refresh tokens |
+| `GET  /auth/username-available?u=` | – | – | `200 { available: boolean }` (rate-limited) |
+| `POST /auth/verify-email` | – | `{ token }` | `204` (P1) |
+| `POST /auth/forgot-password` | – | `{ email }` | `202` always (no enumeration) (P1) |
+| `POST /auth/reset-password` | – | `{ token, password }` | `204`, revokes all sessions (P1) |
+
+Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); password 10–128 chars, not in breached list.
+
+## 3. Users
+
+| Method & path | Body | Success |
+|---|---|---|
+| `GET /me` | – | `{ user: Me }` |
+| `PATCH /me` | `{ displayName?, ign?, avatarColor? }` | `{ user: Me }` |
+| `POST /me/password` | `{ currentPassword, newPassword }` | `204`, other sessions revoked |
+| `GET /me/sessions` | – | `{ items: [{ id, userAgent, createdAt, current }] }` |
+| `DELETE /me/sessions/:id` | – | `204` |
+| `DELETE /me` | `{ password, confirm: "DELETE" }` | `204` |
+
+## 4. Rooms
+
+| Method & path | Role | Body | Success |
+|---|---|---|---|
+| `GET /rooms` | user | – | `{ items: RoomSummary[] }` |
+| `POST /rooms` | user | `{ name, description?, password?, defaultRole?, firstBoard: { name, mapId } }` | `201 { room: RoomSummary, board: Board }` |
+| `GET /rooms/:roomId` | member | – | `{ room: RoomSummary & { ownerId, isLocked, defaultRole, maxMembers }, members: Member[], boards: Board[] }` |
+| `PATCH /rooms/:roomId` | OWNER | `{ name?, description?, defaultRole?, isLocked? }` | `{ room }` |
+| `PUT /rooms/:roomId/password` | OWNER | `{ password: string \| null }` | `204` |
+| `DELETE /rooms/:roomId` | OWNER | `{ confirmName }` | `204` (soft delete) |
+| `POST /rooms/:roomId/leave` | member (not OWNER) | – | `204` |
+| `POST /rooms/:roomId/transfer` | OWNER | `{ userId, password }` | `204` |
+
+### Members
+| Method & path | Role | Body | Success |
+|---|---|---|---|
+| `GET /rooms/:roomId/members` | member | – | `{ items: Member[] }` |
+| `PATCH /rooms/:roomId/members/:userId` | OWNER | `{ role: 'EDITOR'\|'VIEWER' }` | `{ member }` + socket `member:roleChanged` |
+| `DELETE /rooms/:roomId/members/:userId` | OWNER | – | `204` + socket `member:kicked` (target disconnected) |
+
+### Invites & joining
+| Method & path | Role | Body | Success |
+|---|---|---|---|
+| `GET /rooms/:roomId/invites` | OWNER, EDITOR | – | `{ items: Invite[] }` |
+| `POST /rooms/:roomId/invites` | OWNER, EDITOR | `{ expiresIn: '1h'\|'24h'\|'7d'\|'never', maxUses?: 1..100, role?: 'EDITOR'\|'VIEWER' }` (editors can only create ≤ their own role) | `201 { invite }` |
+| `DELETE /rooms/:roomId/invites/:inviteId` | OWNER, creator | – | `204` |
+| `GET /invites/:code` | – (public, rate-limited) | – | `{ room: { name, memberCount, ownerName, hasPassword, maps: string[] }, valid: boolean }` |
+| `POST /invites/:code/accept` | user | `{ password? }` | `200 { roomId }`; errors `INVITE_EXPIRED`, `WRONG_ROOM_PASSWORD`, `ROOM_LOCKED`, `LIMIT_REACHED`, `ALREADY_MEMBER` (returns roomId) |
+
+## 5. Boards, layers, snapshots
+
+| Method & path | Role | Body | Success |
+|---|---|---|---|
+| `GET /rooms/:roomId/boards` | member | – | `{ items: Board[] }` |
+| `POST /rooms/:roomId/boards` | EDITOR+ | `{ name, mapId, duplicateFrom?: boardId }` | `201 { board }` + socket `board:created` |
+| `PATCH /boards/:boardId` | EDITOR+ | `{ name?, position? }` | `{ board }` + socket `board:updated` |
+| `DELETE /boards/:boardId` | OWNER | – | `204` + socket `board:deleted` (can't delete last board) |
+| `GET /boards/:boardId/state` | member | – | `{ board, layers: Layer[], elements: Element[], seq }` (fallback for socket; used by PNG export/SSR thumbnail) |
+| `GET /boards/:boardId/snapshots` | member | – | `{ items: Snapshot[] }` |
+| `POST /boards/:boardId/snapshots` | EDITOR+ | `{ name }` | `201 { snapshot }` |
+| `GET /snapshots/:snapshotId` | member | – | `{ snapshot, data: { layers, elements } }` |
+| `POST /snapshots/:snapshotId/restore` | EDITOR+ | – | `200 { seq }` + socket `board:reset` |
+| `DELETE /snapshots/:snapshotId` | OWNER, author | – | `204` |
+
+Layer and element mutations go through **Socket.IO only** (§7).
+
+## 6. Chat (REST part)
+| Method & path | Role | Query | Success |
+|---|---|---|---|
+| `GET /rooms/:roomId/messages` | member | `limit, before` | `{ items: ChatMessage[], nextCursor }` (newest first) |
+| `DELETE /messages/:messageId` | author or OWNER | – | `204` + socket `chat:deleted` |
+
+## 7. Realtime (Socket.IO)
+
+### 7.1 Connection
+```ts
+io(APP_ORIGIN, { path: '/realtime', withCredentials: true, transports: ['websocket'] })
+```
+Handshake middleware reads `rl_at` cookie, verifies JWT and `Origin`. Failure → `connect_error` with `data.code` = `UNAUTHENTICATED` | `TOKEN_EXPIRED`. On `TOKEN_EXPIRED` the client calls `/auth/refresh` and reconnects. Server disconnects sockets when the access token's session is revoked (checked every 5 min and on logout events via Redis pub/sub).
+
+All client→server events use **acks**: `socket.emit(event, payload, (res) => …)` where `res = { ok: true, data? } | { ok: false, code, message }`.
+
+### 7.2 Client → server
+| Event | Payload | Ack data | Notes |
+|---|---|---|---|
+| `room:join` | `{ roomId }` | `{ members: Member[], presence: Presence[], boards: Board[] }` | joins `room:{id}` |
+| `room:leave` | `{ roomId }` | – | |
+| `board:subscribe` | `{ boardId, sinceSeq?: number }` | `{ mode: 'delta', ops: Op[], seq } \| { mode: 'full', layers, elements, seq }` | leaves previous board channel |
+| `element:upsert` | `{ opId, boardId, element: ElementInput }` | `{ seq }` | EDITOR+, layer unlocked |
+| `element:delete` | `{ opId, boardId, elementId }` | `{ seq }` | |
+| `element:batch` | `{ boardId, ops: (Upsert\|Delete)[] }` (≤ 50, ≤ 64 KB) | `{ seqs: number[] }` | all-or-nothing |
+| `layer:upsert` | `{ opId, boardId, layer: LayerInput }` | `{ seq }` | EDITOR+; any EDITOR+ can lock/unlock a layer in v1 |
+| `layer:delete` | `{ opId, boardId, layerId }` | `{ seq }` | deletes its elements |
+| `layer:reorder` | `{ opId, boardId, order: layerId[] }` | `{ seq }` | |
+| `layer:clear` | `{ opId, boardId, layerId }` | `{ seq }` | |
+| `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | body trimmed 1–500 chars |
+| `chat:typing` | `{ roomId }` | – | volatile, ≤ 1 / 2 s |
+| `cursor:move` | `{ boardId, x, y }` | – (no ack, volatile) | ≤ 20 Hz |
+| `stroke:preview` | `{ boardId, tempId, points: Pt[], style }` | – volatile | only new points since last |
+| `laser:point` | `{ boardId, x, y }` | – volatile | |
+| `view:update` | `{ boardId, center: Pt, zoom }` | – volatile | only sent while ≥ 1 follower |
+| `follow:start` / `follow:stop` | `{ targetUserId }` | – | |
+| `summon` | `{ boardId }` | – | OWNER/EDITOR: asks all to follow you |
+| `presence:heartbeat` | `{ roomId, boardId, idle: boolean }` | – | every 20 s |
+
+`ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly.
+
+### 7.3 Server → client
+| Event | Payload |
+|---|---|
+| `board:op` | `{ boardId, seq, actorId, opId, op: { kind, ... } }` |
+| `board:reset` | `{ boardId, seq, reason: 'snapshot_restore' \| 'clear' }` → client resubscribes with full load |
+| `op:reject` | `{ opId, code, message }` (only if ack lost; normally via ack) |
+| `board:created` / `board:updated` / `board:deleted` | `{ board }` / `{ board }` / `{ boardId }` |
+| `chat:message` | `{ message: ChatMessage }` |
+| `chat:deleted` | `{ messageId }` |
+| `chat:typing` | `{ userId }` |
+| `presence:update` | `{ roomId, users: Presence[] }` where `Presence = { userId, boardId, idle, color }` |
+| `cursor:move` | `{ userId, boardId, x, y }` |
+| `stroke:preview` | `{ userId, boardId, tempId, points, style }` |
+| `laser:point` | `{ userId, boardId, x, y }` |
+| `view:update` | `{ userId, boardId, center, zoom }` (only to followers) |
+| `summon` | `{ userId, boardId }` |
+| `member:joined` / `member:left` | `{ member }` / `{ userId }` |
+| `member:roleChanged` | `{ userId, role }` |
+| `member:kicked` | `{ userId }` (target socket then force-disconnected) |
+| `room:updated` / `room:deleted` | `{ room }` / `{ roomId }` |
+| `error` | `{ code, message }` |
+
+### 7.4 Socket limits (per socket, token buckets in memory + Redis for per-user)
+| Event group | Limit |
+|---|---|
+| durable ops (`element:*`, `layer:*`) | 30 / s burst 60 |
+| `chat:send` | 5 / 10 s burst 5 |
+| volatile (`cursor`, `laser`, `stroke:preview`, `view`) | 40 / s combined; excess dropped silently |
+| max message size | 64 KB (`maxHttpBufferSize`) |
+| sockets per user | 5 |
+Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violations / min) → disconnect.
+
+## 8. Health & meta
+| Path | Purpose |
+|---|---|
+| `GET /api/health` | `{ status: 'ok', db: 'ok', redis: 'ok', version }` |
+| `GET /api/v1/maps` | static map registry `{ items: [{ id, name, worldSize, tileBaseUrl: { labels, clean }, maxNativeZoom, thumbnailUrl }] }` |
+| `GET /api/v1/public/demo-boards` | read-only demo boards for `/explore`: `{ items: [{ board, layers, elements }] }`, no auth, rate-limited 30 / min / IP, `Cache-Control: public, max-age=300` |
+| `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+, `image/jpeg` body ≤ 100 KB, 256×256 (server re-encodes with sharp and stores in object storage) — P1 |
+| `GET /metrics` | Prometheus, **internal network only** |
+
+## 9. Example: create a room
+```http
+POST /api/v1/rooms
+Content-Type: application/json
+X-Requested-With: rotationlab
+Cookie: rl_at=…
+
+{ "name": "Team Soul Scrims", "password": null, "defaultRole": "EDITOR",
+  "firstBoard": { "name": "Erangel – Drop A", "mapId": "erangel" } }
+```
+```json
+201
+{ "room": { "id": "0192f7…", "name": "Team Soul Scrims", "role": "OWNER", "memberCount": 1, "onlineCount": 0,
+            "boardCount": 1, "lastActivityAt": "2026-10-25T07:10:00Z", "thumbnailUrl": null, "hasPassword": false },
+  "board": { "id": "0192f8…", "roomId": "0192f7…", "name": "Erangel – Drop A", "mapId": "erangel",
+             "position": 0, "elementCount": 0, "updatedAt": "2026-10-25T07:10:00Z" } }
+```
+
+## 10. Example: draw an enemy marker
+```ts
+socket.emit('element:upsert', {
+  opId: '0192f9a1-…',
+  boardId: '0192f8…',
+  element: { id: '0192f9a2-…', boardId: '0192f8…', layerId: '0192f8c0-…', type: 'MARKER',
+             geometry: { at: [512300, 401800] }, style: { color: '#EF4444', width: 4, dashed: false, fillOpacity: 0 },
+             props: { kind: 'enemy_squad', number: 7, label: 'Bridge team' }, z: 10 }
+}, (res) => { /* { ok: true, data: { seq: 1042 } } */ });
+```
