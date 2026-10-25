@@ -23,6 +23,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (unauthenticated) router.replace(`/login?redirectTo=${encodeURIComponent(pathname)}`);
   }, [unauthenticated, pathname, router]);
 
+  // the room workspace brings its own full-screen chrome (UI_UX_SPEC §3.5)
+  if (pathname.startsWith('/rooms/')) {
+    return me.data ? (
+      children
+    ) : (
+      <p role="status" className="flex h-dvh items-center justify-center gap-2 text-text-muted">
+        <Loader2 className="size-4 animate-spin" aria-hidden /> Loading…
+      </p>
+    );
+  }
+
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex h-12 shrink-0 items-center gap-4 border-b px-4">

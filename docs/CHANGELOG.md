@@ -80,6 +80,48 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - Docs corrected: 1.02 km squares (PRD, ARCHITECTURE §5, FEATURES), measured tile size/time (ARCHITECTURE §6, TODO risks, README), `pnpm --filter map-tiles run …` everywhere.
   - New TODO Phase 9 item: gate the `/maps/[mapId]` dev page in production.
 
+- 2026-10-25 — **Phase 4: rooms, members, invites, boards** (TODO Phase 4; ROOM-1…7, BOARD-1/2, SECURITY Z1–Z3, Z6, Z7):
+  - Prisma: `rooms`, `room_members`, `room_invites`, `boards`, `layers` plus the `RoomRole` / `MapId` enums. Migration `rooms_boards` adds raw SQL:
+    - a partial unique index for **exactly one OWNER per room**, and a partial index on soft-deleted rooms;
+    - CHECKs for room name length, default role ≠ OWNER, max members 2–50, invite role ≠ OWNER, invite max uses > 0, use count ≤ max uses, Crockford invite-code format, board element count 0–5000, board/layer name length, layer hex colour.
+  - Shared:
+    - `permissions.ts`: the SECURITY §3 matrix as data, plus `can()`, `roleAtLeast()`, `minRole()`.
+    - `schemas/rooms.ts`: `RoomSummary` / `RoomDetail` / `Member` / `Board` / `Layer` / `Invite` / `InvitePreview` and every request body; `ROOM_LIMITS`, `DEFAULT_LAYERS` (Plan / Enemies / Zones), invite-code normalise/format helpers.
+  - Server:
+    - Room policy (`modules/rooms/policy.ts`): (user, room) → role from the DB, cached 30 s in Redis and invalidated on every membership change. 404 for non-members and deleted rooms, 403 for too-low roles, board → room resolution for every board route.
+    - Typed `roomEvents` bus (member joined / left / kicked / role changed, room updated / deleted, board created / updated / deleted) for Phase 5's sockets.
+  - Routes (API_SPEC §4–5):
+    - Rooms: list / create / detail / update, password, soft delete with typed confirmation, leave (not the owner), transfer (owner password).
+    - Members: list, role change, kick.
+    - Invites: list / create (editors ≤ own role) / revoke (owner or creator); public preview (30/min/IP); accept, which takes row locks on the room and the invite so `max_uses` and `max_members` hold under concurrency. Already a member → 409 `ALREADY_MEMBER` with the `roomId`. Wrong room password is rate-limited at 5 per 10 min per user+room.
+    - Boards: list / create (≤ 20; `duplicateFrom` copies layers) / rename / reorder (re-sequenced positions) / delete (owner only, never the last board) / `GET /boards/:id/state`.
+    - Room creation is limited to 10/day/user and `MAX_OWNED_ROOMS`.
+  - Web:
+    - Dashboard (UI_UX_SPEC §3.3): room cards with role, online count, members, last activity and boards; kebab menu with rename / leave / delete; search; skeletons; empty state; new-room dialog with map picker cards and password toggle; join with code.
+    - `/join/[code]` (§3.4): preview, log-in / sign-up redirect back, password prompt, all error states, already-member straight in.
+    - Room workspace shell (§3.5):
+      - top bar with room menu, board tabs (select, `1`–`9`, + new board with default name, rename / duplicate / delete, drag-and-drop reorder), member avatars, Invite, settings, panel toggle (`]`);
+      - full-bleed map of the active board, with the last board per room remembered;
+      - right panel with Members (owner: role select + kick confirmation), Layers (read-only until Phase 5/6) and a Chat placeholder;
+      - invite dialog (§3.7) and room settings dialog (§3.6: General / Security / Danger zone with transfer + typed delete).
+    - shadcn-style Dialog, DropdownMenu and Tabs on `radix-ui`.
+  - Tests:
+    - Shared: 73 (permission matrix table, invite codes, room schemas).
+    - Integration: 236, including rooms (create transaction, list scoping, identical 404 for non-member vs missing, owner-only settings, soft delete, role change with immediate cache bust, kick, leave, transfer, DB-level single-OWNER guarantee), invites (codes over 100k draws, expiry, revoke rules, preview, **10 concurrent accepts with max_uses 3 → exactly 3**, concurrent room-full, room password + its rate limit, locked room, creator-role cap, deleted room) and boards (default layers, duplicate, cross-room duplicate 404, 20-board limit, reorder, last-board guard, IDOR).
+    - **Authz matrix**: 33 routes × 5 callers (anonymous, outsider, viewer, editor, owner).
+    - Playwright **E2E-2** plus join-with-code.
+
+### Decisions (Phase 4)
+- `room_invites.role` is NOT NULL (DATABASE_SCHEMA), so an invite created without a role stores the room's `defaultRole` *at creation*. Changing the room default later does not change existing invites.
+- Invite role cap (FEATURES F2): the effective role is the lower of the invite's role and the creator's *current* role. A creator who has left the room vouches for VIEWER only.
+- `POST /invites/:code/accept` for an existing member → 409 `ALREADY_MEMBER`, with `details: [{ path: 'roomId', issue: <roomId> }]` (API_SPEC says "returns roomId" without a shape).
+- Owner `leave` → 403 `FORBIDDEN`; deleting the last board → 409 `CONFLICT`; a wrong password on transfer → 401 `INVALID_CREDENTIALS`. API_SPEC doesn't name these codes.
+- Board duplicate keeps the source board's map and ignores `mapId` in the body. It copies layers now and will copy elements once the elements table exists (Phase 5).
+- `onlineCount` is 0 and `thumbnailUrl` is null until presence (Phase 5) and thumbnails (P1). Dashboard cards show the room initial instead of a thumbnail.
+- `radix-ui` 1.8.1 added: the unified Radix package that shadcn/ui now uses (TECH_STACK lists "shadcn/ui (Radix primitives)").
+- The `localStorage` lint rule now also catches `window.localStorage`. `src/lib/prefs.ts` is the single sanctioned access point (per-device UI preferences only, wrapped in try/catch).
+- Playwright `expect` timeout raised to 20 s because `next dev` compiles each route on first visit.
+
 ### Decisions (Phase 3)
 - Integration tests use the docker-compose Postgres / Redis (CI: service containers), not Testcontainers. They run against a separate `rotationlab_test` database and Redis DB 15, truncated / flushed per test. `pnpm test` = unit only, `pnpm test:int` = integration.
 - `REFRESH_REUSE_GRACE_SEC` (default 10): a rotated token replayed within 10 s is two tabs refreshing at once → 409, no revocation. The client treats that 409 as success because the winning tab's cookies are already set.

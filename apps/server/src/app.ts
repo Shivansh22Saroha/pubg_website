@@ -20,6 +20,14 @@ import { createAuthService } from './modules/auth/service.js';
 import { createPrismaRefreshTokenStore } from './modules/auth/sessionStore.js';
 import { createSessionService } from './modules/auth/sessions.js';
 import { createTokenService } from './modules/auth/tokens.js';
+import { boardRoutes } from './modules/boards/routes.js';
+import { createBoardService } from './modules/boards/service.js';
+import { inviteRoutes } from './modules/invites/routes.js';
+import { createInviteService } from './modules/invites/service.js';
+import { createRoomEvents, type RoomEvents } from './modules/rooms/events.js';
+import { createRoomPolicy } from './modules/rooms/policy.js';
+import { roomRoutes } from './modules/rooms/routes.js';
+import { createRoomService } from './modules/rooms/service.js';
 import { userRoutes } from './modules/users/routes.js';
 import { registerCsrf } from './plugins/csrf.js';
 import { registerErrorHandler } from './plugins/errorHandler.js';
@@ -106,17 +114,37 @@ export async function buildApp({ config, prisma, redis, checks, logStream }: App
     accessTtlSec: config.ACCESS_TOKEN_TTL_SEC,
     refreshTtlDays: config.REFRESH_TOKEN_TTL_DAYS,
   });
+  const passwords = createPasswordHasher({
+    memoryCost: config.ARGON2_MEMORY_KIB,
+    timeCost: config.ARGON2_ITERATIONS,
+  });
   const auth = createAuthService({
     prisma,
     tokens,
     sessions,
     revocations,
+    passwords,
     lockout: createLockout(prisma, redis),
-    passwords: createPasswordHasher({
-      memoryCost: config.ARGON2_MEMORY_KIB,
-      timeCost: config.ARGON2_ITERATIONS,
-    }),
   });
+  const events = createRoomEvents();
+  app.decorate('roomEvents', events);
+  const policy = createRoomPolicy(prisma, redis);
+  const rooms = createRoomService({
+    prisma,
+    policy,
+    events,
+    passwords,
+    limits: { maxOwnedRooms: config.MAX_OWNED_ROOMS, maxRoomMembers: config.MAX_ROOM_MEMBERS },
+  });
+  const invites = createInviteService({
+    prisma,
+    redis,
+    policy,
+    events,
+    passwords,
+    appOrigin: config.APP_ORIGIN,
+  });
+  const boards = createBoardService({ prisma, policy, events });
 
   app.decorate('authenticate', async (request) => {
     const token = cookies.readAccess(request);
@@ -148,8 +176,19 @@ export async function buildApp({ config, prisma, redis, checks, logStream }: App
     ipHashSalt: config.IP_HASH_SALT,
   });
   await app.register(userRoutes, { prefix: '/api/v1', auth });
+  const rateLimits = config.RATE_LIMITS_ENABLED;
+  await app.register(roomRoutes, { prefix: '/api/v1', rooms, invites, boards, redis, rateLimits });
+  await app.register(inviteRoutes, { prefix: '/api/v1', invites, redis, rateLimits });
+  await app.register(boardRoutes, { prefix: '/api/v1', boards });
 
   return app;
 }
 
 export type App = Awaited<ReturnType<typeof buildApp>>;
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** REST → realtime bridge; Phase 5 subscribes (member:kicked, board:created, …) */
+    roomEvents: RoomEvents;
+  }
+}

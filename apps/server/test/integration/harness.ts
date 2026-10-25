@@ -31,7 +31,7 @@ export async function makeApp(overrides: Record<string, string> = {}) {
 export function useCleanState() {
   beforeEach(async () => {
     await prisma.$executeRawUnsafe(
-      'TRUNCATE TABLE refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
     );
     await redis.flushdb();
   });
@@ -112,7 +112,7 @@ export async function login(app: App, identifier: string, password = PASSWORD, j
 export function call(
   app: App,
   jar: Jar,
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   url: string,
   payload?: unknown,
 ) {
@@ -125,4 +125,71 @@ export function call(
       ...(payload === undefined ? {} : { payload: payload as object }),
     })
     .then((r) => jar.absorb(r));
+}
+
+// ---- room fixture ----------------------------------------------------------------------
+
+export interface RoomFixture {
+  roomId: string;
+  boardId: string;
+  owner: { id: string; jar: Jar };
+  editor: { id: string; jar: Jar };
+  viewer: { id: string; jar: Jar };
+  outsider: { id: string; jar: Jar };
+}
+
+async function newUser(app: App, name: string) {
+  const { res, jar } = await register(app, new Jar(), {
+    email: `${name}@example.com`,
+    username: name,
+  });
+  if (res.statusCode !== 201) throw new Error(`register ${name}: ${res.statusCode} ${res.body}`);
+  return { id: res.json<{ user: { id: string } }>().user.id, jar };
+}
+
+export async function createRoom(app: App, jar: Jar, body: Record<string, unknown> = {}) {
+  const res = await call(app, jar, 'POST', '/api/v1/rooms', {
+    name: 'Team Soul Scrims',
+    firstBoard: { name: 'Erangel – Plan 1', mapId: 'erangel' },
+    ...body,
+  });
+  if (res.statusCode !== 201) throw new Error(`create room: ${res.statusCode} ${res.body}`);
+  return res.json<{ room: { id: string }; board: { id: string } }>();
+}
+
+export async function invite(
+  app: App,
+  jar: Jar,
+  roomId: string,
+  body: Record<string, unknown> = {},
+) {
+  const res = await call(app, jar, 'POST', `/api/v1/rooms/${roomId}/invites`, {
+    expiresIn: '24h',
+    ...body,
+  });
+  if (res.statusCode !== 201) throw new Error(`invite: ${res.statusCode} ${res.body}`);
+  return res.json<{ invite: { id: string; code: string; url: string } }>().invite;
+}
+
+export function accept(app: App, jar: Jar, code: string, body: Record<string, unknown> = {}) {
+  return call(app, jar, 'POST', `/api/v1/invites/${code}/accept`, body);
+}
+
+/** Owner + editor + viewer in one room with one board, plus an outsider. */
+export async function setupRoom(app: App): Promise<RoomFixture> {
+  const owner = await newUser(app, 'owner');
+  const editor = await newUser(app, 'editor');
+  const viewer = await newUser(app, 'viewer');
+  const outsider = await newUser(app, 'outsider');
+  const { room, board } = await createRoom(app, owner.jar);
+  const ei = await invite(app, owner.jar, room.id, { role: 'EDITOR' });
+  const vi = await invite(app, owner.jar, room.id, { role: 'VIEWER' });
+  for (const [u, code] of [
+    [editor, ei.code],
+    [viewer, vi.code],
+  ] as const) {
+    const r = await accept(app, u.jar, code);
+    if (r.statusCode !== 200) throw new Error(`accept: ${r.statusCode} ${r.body}`);
+  }
+  return { roomId: room.id, boardId: board.id, owner, editor, viewer, outsider };
 }

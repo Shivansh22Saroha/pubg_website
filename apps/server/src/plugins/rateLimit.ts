@@ -10,7 +10,13 @@ export const LIMITS = {
   register: { max: 10, timeWindow: '1 minute' },
   registerHourly: { max: 5, windowSec: 3600 },
   usernameAvailable: { max: 20, timeWindow: '1 minute' },
+  invitePreview: { max: 30, timeWindow: '1 minute' },
+  roomCreateDaily: { max: 10, windowSec: 86_400 },
+  inviteAcceptHourly: { max: 20, windowSec: 3600 },
 } as const;
+
+/** Keys a fixed window by the authenticated user (falls back to IP). */
+export const byUser = (req: FastifyRequest) => (req.user ? `u:${req.user.id}` : `ip:${req.ip}`);
 
 /**
  * Per-IP limits backed by Redis so they hold across server instances. When disabled
@@ -41,10 +47,11 @@ export function fixedWindowLimit(
   enabled: boolean,
   name: string,
   { max, windowSec }: { max: number; windowSec: number },
+  keyOf: (request: FastifyRequest) => string = (request) => request.ip,
 ) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (!enabled) return;
-    const key = `rl:rate:${name}:${request.ip}`;
+    const key = `rl:rate:${name}:${keyOf(request)}`;
     const [[, count], [, ttl]] = (await redis.multi().incr(key).ttl(key).exec()) as [
       [null, number],
       [null, number],

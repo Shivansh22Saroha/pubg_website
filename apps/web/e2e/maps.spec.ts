@@ -1,35 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { serveFixtureTiles } from './fixtures';
 
 /**
  * E2E-10 (TESTING §6): each map loads tiles with no 404s, the labels toggle swaps the visible
  * tile URL, and the grid toggles. Tiles are served from the committed fixture set — real
  * tiles are never needed.
  */
-const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tiles');
 const MAPS = ['erangel', 'miramar', 'rondo'] as const;
-
-async function serveFixtureTiles(page: Page) {
-  const failed: string[] = [];
-  await page.route('**/tiles/**', async (route) => {
-    const { pathname } = new URL(route.request().url());
-    const rel = decodeURIComponent(pathname.replace(/^.*?\/tiles\//, ''));
-    const file = path.join(FIXTURES, rel);
-    if (!file.startsWith(FIXTURES) || !existsSync(file)) {
-      failed.push(pathname);
-      await route.fulfill({ status: 404, body: 'not found' });
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      body: readFileSync(file),
-      contentType: file.endsWith('.webp') ? 'image/webp' : 'image/jpeg',
-    });
-  });
-  return failed;
-}
 
 /** src of loaded tiles in the visible (opacity 1) base layer */
 function visibleTileSources(page: Page) {

@@ -53,12 +53,13 @@ _Status 2026-10-25: met — verified in Chrome on real tiles (all zooms −1…7
 _Status 2026-10-25: met — 59 integration tests (auth, CSRF, rate limits, cookies, secret-leak log grep, authz matrix) + E2E-1 green. Email verification / reset (AUTH-7, P1) still stubbed behind `EMAIL_ENABLED` → Phase 8._
 
 ## Phase 4 — Rooms, members, invites, boards (P0)
-- [ ] Prisma: rooms, room_members, room_invites, boards, layers (+ partial unique OWNER index).
-- [ ] `permissions.ts` + `policy.ts`; authz matrix test harness.
-- [ ] Room CRUD, members (role change, kick), invites (create/list/revoke/preview/accept with row-locked use count), boards CRUD/duplicate/reorder.
-- [ ] Web: dashboard (cards, empty state, new-room dialog, join-with-code), `/join/[code]`, room shell with board tabs (no drawing yet), room settings dialog, invite dialog, members panel.
+- [x] Prisma: rooms, room_members, room_invites, boards, layers (+ partial unique OWNER index).
+- [x] `permissions.ts` + `policy.ts`; authz matrix test harness.
+- [x] Room CRUD, members (role change, kick), invites (create/list/revoke/preview/accept with row-locked use count), boards CRUD/duplicate/reorder.
+- [x] Web: dashboard (cards, empty state, new-room dialog, join-with-code), `/join/[code]`, room shell with board tabs (no drawing yet), room settings dialog, invite dialog, members panel.
 
 **Exit:** E2E-2 (without realtime presence) passes; authz matrix green for all routes so far.
+_Status 2026-10-25: met — E2E-2 green; authz matrix 33 routes × 5 callers (165 cells) green; 236 integration tests. Board duplicate copies layers only until the elements table lands (Phase 5)._
 
 ## Phase 5 — Realtime core (P0)
 - [ ] Socket.IO server with cookie auth + Origin check, Redis adapter, typed events from shared.

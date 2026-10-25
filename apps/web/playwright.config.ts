@@ -11,6 +11,8 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  // `next dev` compiles each route on first visit (several seconds for the map/room bundles)
+  expect: { timeout: 20_000 },
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',

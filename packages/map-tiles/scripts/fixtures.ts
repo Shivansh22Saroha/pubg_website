@@ -42,5 +42,10 @@ for (const map of MAPS) {
   await solid('#20262e', 64)
     .jpeg({ quality: 60 })
     .toFile(path.join(TARGET, map, 'lowres.jpg'));
+  await solid(COLORS[map].labels, 64)
+    .jpeg({ quality: 60 })
+    .toFile(path.join(TARGET, map, 'thumb.jpg'));
 }
-console.log(`✓ wrote ${count} fixture tiles + ${MAPS.length} placeholders to ${TARGET}`);
+console.log(
+  `✓ wrote ${count} fixture tiles + low-res/thumb images for ${MAPS.length} maps to ${TARGET}`,
+);

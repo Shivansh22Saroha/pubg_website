@@ -62,8 +62,10 @@ export default tseslint.config(
           message: 'Never render HTML (SECURITY V4). Use React text nodes.',
         },
         {
-          selector: "MemberExpression[object.name='localStorage']",
-          message: 'Never store tokens in localStorage (SECURITY A5).',
+          selector:
+            "MemberExpression[object.name='localStorage'], MemberExpression[property.name='localStorage']",
+          message:
+            'Never store tokens in localStorage (SECURITY A5). UI prefs go through src/lib/prefs.ts.',
         },
       ],
     },
