@@ -93,6 +93,8 @@ cp apps/web/.env.example apps/web/.env.local
 
 # 3. Infra
 docker compose up -d postgres redis
+# port 5432/6379 already in use? put POSTGRES_PORT=5434 (and/or REDIS_PORT=…) in a root .env
+# and change DATABASE_URL / REDIS_URL in apps/server/.env to match
 
 # 4. Database
 pnpm --filter server prisma migrate dev

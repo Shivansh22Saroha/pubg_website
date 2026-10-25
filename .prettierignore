@@ -1,0 +1,10 @@
+# spec pack is authored outside the repo; keep it byte-for-byte
+docs/
+README.md
+pnpm-lock.yaml
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+next-env.d.ts

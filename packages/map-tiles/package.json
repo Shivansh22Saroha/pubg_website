@@ -1,0 +1,13 @@
+{
+  "name": "map-tiles",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "One-time CLI that downloads PUBG map art and slices it into XYZ tiles. Not deployed.",
+  "scripts": {
+    "fetch": "tsx scripts/fetch.ts",
+    "build": "tsx scripts/build.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  }
+}

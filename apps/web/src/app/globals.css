@@ -1,0 +1,121 @@
+@import 'tailwindcss';
+
+/* Design tokens — UI_UX_SPEC §2. Dark theme is the only theme in v1. */
+:root {
+  --bg: #0b0f14;
+  --surface: #121821;
+  --surface-2: #18202b;
+  --overlay: rgba(18, 24, 33, 0.88);
+  --border: #263241;
+  --text: #e6edf3;
+  --text-muted: #8b98a9;
+  --accent: #f2a900;
+  --accent-fg: #111111;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #38bdf8;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-overlay: var(--overlay);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* shadcn/ui semantic aliases, mapped onto the spec tokens */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--text-muted);
+  --color-destructive: var(--danger);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+
+  /* Drawing palette — UI_UX_SPEC §2.2 */
+  --color-draw-amber: #f2a900;
+  --color-draw-red: #ef4444;
+  --color-draw-orange: #f97316;
+  --color-draw-yellow: #facc15;
+  --color-draw-green: #22c55e;
+  --color-draw-teal: #14b8a6;
+  --color-draw-sky: #38bdf8;
+  --color-draw-indigo: #6366f1;
+  --color-draw-pink: #ec4899;
+  --color-draw-white: #f8fafc;
+
+  /* Typography — §2.3 (font variables come from next/font in layout.tsx) */
+  --font-display: var(--font-rajdhani), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Radius & elevation — §2.4 (spacing uses Tailwind's 4 px scale: 1,2,3,4,6,8,12) */
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* Motion — §2.4 */
+  --ease-hud: cubic-bezier(0, 0, 0.2, 1);
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+
+  /* Focus ring: 2 px accent + 2 px offset */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility section-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

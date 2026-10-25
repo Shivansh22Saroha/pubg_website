@@ -15,17 +15,19 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · **P0/P1/P2** = priority
 - [ ] Answer PRD §8 open questions.
 
 **Exit:** decisions written into PRD / `maps.ts` constants.
+_Status 2026-10-25: open. Doc defaults are in use and marked `TODO(phase0)` in `packages/shared/src/{maps,brand}.ts`._
 
 ## Phase 1 — Scaffold (P0)
-- [ ] pnpm workspace + Turborepo: `apps/web`, `apps/server`, `packages/shared`, `packages/map-tiles`.
-- [ ] TypeScript strict configs, ESLint, Prettier, Husky + lint-staged.
-- [ ] `docker-compose.yml` with Postgres + Redis (+ Mailpit profile).
-- [ ] Server: Fastify boot, Zod env config, pino logger, `/api/health`, error handler with standard error shape.
-- [ ] Web: Next.js App Router, Tailwind with UI_UX_SPEC tokens, fonts, shadcn init, dark layout shell.
-- [ ] Next rewrites `/api` + `/realtime` → server (dev).
-- [ ] GitHub Actions CI: install, lint, typecheck, unit tests, build.
+- [x] pnpm workspace + Turborepo: `apps/web`, `apps/server`, `packages/shared`, `packages/map-tiles`.
+- [x] TypeScript strict configs, ESLint, Prettier, Husky + lint-staged.
+- [x] `docker-compose.yml` with Postgres + Redis (+ Mailpit profile).
+- [x] Server: Fastify boot, Zod env config, pino logger, `/api/health`, error handler with standard error shape.
+- [x] Web: Next.js App Router, Tailwind with UI_UX_SPEC tokens, fonts, shadcn init, dark layout shell.
+- [x] Next rewrites `/api` + `/realtime` → server (dev).
+- [x] GitHub Actions CI: install, lint, typecheck, unit tests, build.
 
 **Exit:** `pnpm dev` shows a styled placeholder page calling `/api/health` successfully; CI green.
+_Status 2026-10-25: met locally (lint, typecheck, 32 tests, build all pass; page shows db/redis ok). CI workflow written but not yet run on GitHub — no remote configured._
 
 ## Phase 2 — Map tiles & map viewer (P0)
 - [ ] `map-tiles fetch`: sparse clone + `git lfs pull` 6 files, SHA-256 verify.
