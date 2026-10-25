@@ -22,11 +22,12 @@ Real-time collaborative BGMI/PUBG tactical map sandbox. The full spec lives in `
 
 ## Commands
 
-| Command                                      | What                                                                        |
-| -------------------------------------------- | --------------------------------------------------------------------------- |
-| `docker compose up -d postgres redis`        | dev infra                                                                   |
-| `pnpm dev`                                   | web (3000) + server (4000) in watch mode                                    |
-| `pnpm lint` / `pnpm typecheck` / `pnpm test` | checks (all must pass at end of phase)                                      |
-| `pnpm test:int` / `pnpm test:e2e`            | integration (Postgres + Redis) / Playwright — also required at end of phase |
-| `pnpm build`                                 | production build                                                            |
-| `pnpm format`                                | Prettier write                                                              |
+| Command                                      | What                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `docker compose up -d postgres redis`        | dev infra                                                                                   |
+| `pnpm dev`                                   | web (3000) + server (4000) in watch mode                                                    |
+| `pnpm lint` / `pnpm typecheck` / `pnpm test` | checks (all must pass at end of phase)                                                      |
+| `pnpm test:int` / `pnpm test:e2e`            | integration (Postgres + Redis) / Playwright on a prod build — also required at end of phase |
+| `pnpm test:e2e:dev`                          | Playwright against the running `pnpm dev` servers                                           |
+| `pnpm build`                                 | production build                                                                            |
+| `pnpm format`                                | Prettier write                                                                              |

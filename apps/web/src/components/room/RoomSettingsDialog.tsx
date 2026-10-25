@@ -10,7 +10,14 @@ import { FieldError, Input, Label } from '@/components/ui/input';
 import { NativeSelect, Textarea } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError } from '@/lib/api';
-import { useDeleteRoom, useSetRoomPassword, useTransferRoom, useUpdateRoom } from '@/lib/rooms';
+import {
+  useBans,
+  useDeleteRoom,
+  useSetRoomPassword,
+  useTransferRoom,
+  useUnban,
+  useUpdateRoom,
+} from '@/lib/rooms';
 
 const errMsg = (err: unknown) => (err instanceof ApiError ? err.message : 'Something went wrong');
 
@@ -200,6 +207,7 @@ export function RoomSettingsDialog({
                 }}
               />
             </label>
+            <BlockedUsers roomId={room.id} />
             <FieldError id="security-error">
               {error?.tab === 'security' ? error.message : undefined}
             </FieldError>
@@ -295,5 +303,52 @@ export function RoomSettingsDialog({
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Kicked-and-blocked users (room_bans) with Unban. */
+function BlockedUsers({ roomId }: { roomId: string }) {
+  const bans = useBans(roomId, true);
+  const unban = useUnban(roomId);
+  return (
+    <section className="flex flex-col gap-2" aria-labelledby="blocked-heading">
+      <h3 id="blocked-heading" className="text-sm font-medium">
+        Blocked users
+      </h3>
+      {!bans.data ? (
+        <p className="text-xs text-text-muted">Loading…</p>
+      ) : bans.data.length === 0 ? (
+        <p className="text-xs text-text-muted">
+          Nobody is blocked. Kick with “block” to stop someone rejoining.
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {bans.data.map((b) => (
+            <li
+              key={b.user.id}
+              className="flex items-center justify-between gap-2 py-1 text-sm"
+              data-testid="ban-row"
+            >
+              <span className="truncate">
+                {b.user.displayName} <span className="text-text-muted">@{b.user.username}</span>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={unban.isPending}
+                onClick={() => {
+                  unban.mutate(b.user.id, {
+                    onSuccess: () => toast.success(`${b.user.displayName} can join again`),
+                    onError: (err) => toast.error(errMsg(err)),
+                  });
+                }}
+              >
+                Unban
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

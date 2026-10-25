@@ -162,6 +162,11 @@ export function createInviteService(d: InviteServiceDeps) {
         ]);
 
       if (await policy.roleOf(room.id, user.id)) throw alreadyMember(room.id);
+      // kicked-and-blocked: deliberately generic, no hint that a ban exists
+      const banned = await prisma.roomBan.findUnique({
+        where: { roomId_userId: { roomId: room.id, userId: user.id } },
+      });
+      if (banned) throw new AppError('FORBIDDEN', "You can't join this room");
       if (!inviteUsable(invite))
         throw new AppError('INVITE_EXPIRED', 'This invite is no longer valid');
       if (room.isLocked) throw new AppError('ROOM_LOCKED', "This room isn't accepting new members");

@@ -43,7 +43,8 @@ Cursor-based: `?limit=50&before=<id>` → response `{ items: [...], nextCursor: 
 PublicUser = { id, username, displayName, ign: string|null, avatarColor }
 Me         = PublicUser & { email, emailVerified: boolean, createdAt }
 RoomSummary= { id, name, description, role: 'OWNER'|'EDITOR'|'VIEWER', memberCount, onlineCount,
-               boardCount, lastActivityAt, thumbnailUrl: string|null, hasPassword: boolean }
+               boardCount, lastActivityAt, thumbnailUrl: string|null, hasPassword: boolean,
+               primaryMapId: 'erangel'|'miramar'|'rondo' /* map of the most recently updated board */ }
 Member     = { user: PublicUser, role, joinedAt, online: boolean }
 Board      = { id, roomId, name, mapId: 'erangel'|'miramar'|'rondo', position, elementCount, updatedAt }
 Layer      = { id, boardId, name, color, position, visible, locked, seq }
@@ -99,16 +100,18 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 |---|---|---|---|
 | `GET /rooms/:roomId/members` | member | – | `{ items: Member[] }` |
 | `PATCH /rooms/:roomId/members/:userId` | OWNER | `{ role: 'EDITOR'\|'VIEWER' }` | `{ member }` + socket `member:roleChanged` |
-| `DELETE /rooms/:roomId/members/:userId` | OWNER | – | `204` + socket `member:kicked` (target disconnected) |
+| `DELETE /rooms/:roomId/members/:userId` | OWNER | `{ ban?: boolean }` (optional body) | `204` + socket `member:kicked` (target disconnected); `ban: true` also blocks rejoining |
+| `GET /rooms/:roomId/bans` | OWNER | – | `{ items: [{ user: PublicUser, bannedBy: PublicUser\|null, createdAt }] }` |
+| `DELETE /rooms/:roomId/bans/:userId` | OWNER | – | `204` (unban); `404` if not banned |
 
 ### Invites & joining
 | Method & path | Role | Body | Success |
 |---|---|---|---|
 | `GET /rooms/:roomId/invites` | OWNER, EDITOR | – | `{ items: Invite[] }` |
-| `POST /rooms/:roomId/invites` | OWNER, EDITOR | `{ expiresIn: '1h'\|'24h'\|'7d'\|'never', maxUses?: 1..100, role?: 'EDITOR'\|'VIEWER' }` (editors can only create ≤ their own role) | `201 { invite }` |
+| `POST /rooms/:roomId/invites` | OWNER, EDITOR | `{ expiresIn: '1h'\|'24h'\|'7d'\|'never', maxUses?: 1..100, role?: 'EDITOR'\|'VIEWER' }` (editors can only create ≤ their own role). Without `role`, the room's `defaultRole` **at creation time** is stored on the invite. | `201 { invite }` |
 | `DELETE /rooms/:roomId/invites/:inviteId` | OWNER, creator | – | `204` |
 | `GET /invites/:code` | – (public, rate-limited) | – | `{ room: { name, memberCount, ownerName, hasPassword, maps: string[] }, valid: boolean }` |
-| `POST /invites/:code/accept` | user | `{ password? }` | `200 { roomId }`; errors `INVITE_EXPIRED`, `WRONG_ROOM_PASSWORD`, `ROOM_LOCKED`, `LIMIT_REACHED`, `ALREADY_MEMBER` (returns roomId) |
+| `POST /invites/:code/accept` | user | `{ password? }` | `200 { roomId }`; errors `INVITE_EXPIRED`, `WRONG_ROOM_PASSWORD`, `ROOM_LOCKED`, `LIMIT_REACHED`, `ALREADY_MEMBER` (`409`, `details: [{ path: 'roomId', issue: <roomId> }]`); a banned user gets `403 FORBIDDEN` (generic message). The joining role is the lower of the invite's role and its creator's current role. |
 
 ## 5. Boards, layers, snapshots
 
@@ -142,6 +145,15 @@ io(APP_ORIGIN, { path: '/realtime', withCredentials: true, transports: ['websock
 Handshake middleware reads `rl_at` cookie, verifies JWT and `Origin`. Failure → `connect_error` with `data.code` = `UNAUTHENTICATED` | `TOKEN_EXPIRED`. On `TOKEN_EXPIRED` the client calls `/auth/refresh` and reconnects. Server disconnects sockets when the access token's session is revoked (checked every 5 min and on logout events via Redis pub/sub).
 
 All client→server events use **acks**: `socket.emit(event, payload, (res) => …)` where `res = { ok: true, data? } | { ok: false, code, message }`.
+
+Implementation notes (Phase 5A):
+- `connect_error` codes: `UNAUTHENTICATED`, `TOKEN_EXPIRED`, `FORBIDDEN` (Origin ≠ `APP_ORIGIN`), `LIMIT_REACHED` (> 5 sockets per user). In production the cookie is `__Host-rl_at`.
+- Logout, logout-all, password change, session revoke and refresh-token theft disconnect the affected sessions' sockets on every instance (Redis adapter). Kick sends `member:kicked` to the target, then disconnects their sockets for that room.
+- `board:subscribe` / durable ops require a prior `room:join` on that socket (`FORBIDDEN` otherwise); boards of rooms you aren't a member of are `NOT_FOUND`.
+- `element:batch` broadcasts one `board:op` per op (consecutive seqs). Deleting an element that is already gone still gets a seq (no-op) so every client converges.
+- Locked layer → `FORBIDDEN`; element outside the map → `VALIDATION_ERROR`; > 5 000 elements or > 10 layers → `LIMIT_REACHED`; last layer → `CONFLICT`.
+- A resent `opId` (same user, within 10 min) returns the original seq(s) and is not re-applied or re-broadcast.
+- Volatile events are dropped silently when invalid, over the cap, or not on the board the socket subscribed to; `stroke:preview` only flows from roles that can draw; `view:update` goes only to sockets that sent `follow:start` for that user.
 
 ### 7.2 Client → server
 | Event | Payload | Ack data | Notes |

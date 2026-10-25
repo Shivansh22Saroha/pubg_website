@@ -1,9 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../../src/app.js';
 import {
+  accept,
   call,
   CSRF,
   invite,
+  Jar,
+  register,
   makeApp,
   PASSWORD,
   setupRoom,
@@ -27,6 +30,8 @@ interface Ctx {
   spareBoardId: string;
   inviteCode: string;
   inviteId: string;
+  /** a former member the owner kicked with `ban: true` */
+  bannedId: string;
 }
 
 interface Row {
@@ -229,6 +234,20 @@ const MATRIX: Row[] = [
     expect: room(403, 403, 204),
   },
 
+  // ---- bans (kick + block) ----------------------------------------------------------
+  {
+    method: 'GET',
+    url: '/api/v1/rooms/:roomId/bans',
+    request: ({ f }) => ({ url: `/api/v1/rooms/${f.roomId}/bans` }),
+    expect: room(403, 403, 200),
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/rooms/:roomId/bans/:userId',
+    request: ({ f, bannedId }) => ({ url: `/api/v1/rooms/${f.roomId}/bans/${bannedId}` }),
+    expect: room(403, 403, 204),
+  },
+
   // ---- invites -----------------------------------------------------------------------
   {
     method: 'GET',
@@ -314,11 +333,21 @@ async function context(): Promise<Ctx> {
     mapId: 'rondo',
   });
   const inv = await invite(app, f.owner.jar, f.roomId);
+  const banned = await register(app, new Jar(), {
+    email: 'banned@example.com',
+    username: 'banned',
+  });
+  const bannedId = banned.res.json<{ user: { id: string } }>().user.id;
+  await accept(app, banned.jar, inv.code);
+  await call(app, f.owner.jar, 'DELETE', `/api/v1/rooms/${f.roomId}/members/${bannedId}`, {
+    ban: true,
+  });
   return {
     f,
     spareBoardId: spare.json<{ board: { id: string } }>().board.id,
     inviteCode: inv.code,
     inviteId: inv.id,
+    bannedId,
   };
 }
 

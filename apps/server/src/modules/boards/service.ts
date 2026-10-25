@@ -13,6 +13,7 @@ import type { AuthUser } from '../../lib/policy.js';
 import type { RoomEvents } from '../rooms/events.js';
 import { fromMapId, toBoard, toLayer } from '../rooms/mappers.js';
 import type { RoomPolicy } from '../rooms/policy.js';
+import { toElement } from '../elements/service.js';
 import { defaultLayerRows, touchRoom } from '../rooms/service.js';
 
 export interface BoardServiceDeps {
@@ -57,7 +58,7 @@ export function createBoardService(d: BoardServiceDeps) {
         const source = body.duplicateFrom
           ? await tx.board.findFirst({
               where: { id: body.duplicateFrom, roomId },
-              include: { layers: { orderBy: { position: 'asc' } } },
+              include: { layers: { orderBy: { position: 'asc' } }, elements: true },
             })
           : null;
         if (body.duplicateFrom && !source)
@@ -74,21 +75,40 @@ export function createBoardService(d: BoardServiceDeps) {
             createdBy: user.id,
           },
         });
+        if (!source) {
+          await tx.layer.createMany({ data: defaultLayerRows(id) });
+          return created;
+        }
+        // duplicate: copy layers and elements with fresh ids (FEATURES F4)
+        const layerIds = new Map(source.layers.map((l) => [l.id, newId()]));
         await tx.layer.createMany({
-          data: source
-            ? source.layers.map((l) => ({
-                id: newId(),
-                boardId: id,
-                name: l.name,
-                color: l.color,
-                position: l.position,
-                visible: l.visible,
-                locked: l.locked,
-                seq: 0n,
-              }))
-            : defaultLayerRows(id),
+          data: source.layers.map((l) => ({
+            id: layerIds.get(l.id) ?? newId(),
+            boardId: id,
+            name: l.name,
+            color: l.color,
+            position: l.position,
+            visible: l.visible,
+            locked: l.locked,
+            seq: 0n,
+          })),
         });
-        return created;
+        await tx.element.createMany({
+          data: source.elements.map((e) => ({
+            id: newId(),
+            boardId: id,
+            layerId: layerIds.get(e.layerId) ?? e.layerId,
+            type: e.type,
+            geometry: e.geometry as Prisma.InputJsonValue,
+            style: e.style as Prisma.InputJsonValue,
+            props: e.props as Prisma.InputJsonValue,
+            z: e.z,
+            seq: 0n,
+            createdBy: user.id,
+            updatedBy: user.id,
+          })),
+        });
+        return tx.board.update({ where: { id }, data: { elementCount: source.elements.length } });
       });
       const dto = toBoard(board);
       await touchRoom(prisma, roomId);
@@ -148,17 +168,17 @@ export function createBoardService(d: BoardServiceDeps) {
       events.emit('board:deleted', { roomId: board.roomId, boardId });
     },
 
-    /** REST fallback of `board:subscribe` (API_SPEC §5); elements arrive in Phase 5. */
+    /** REST fallback of `board:subscribe` (API_SPEC §5) — used by PNG export / thumbnails. */
     async state(user: AuthUser, boardId: string): Promise<BoardState> {
       const { board } = await policy.requireBoard(user, boardId, 'room.view');
-      const layers = await prisma.layer.findMany({
-        where: { boardId },
-        orderBy: { position: 'asc' },
-      });
+      const [layers, elements] = await Promise.all([
+        prisma.layer.findMany({ where: { boardId }, orderBy: { position: 'asc' } }),
+        prisma.element.findMany({ where: { boardId }, orderBy: [{ z: 'asc' }, { seq: 'asc' }] }),
+      ]);
       return {
         board: toBoard(board),
         layers: layers.map(toLayer),
-        elements: [],
+        elements: elements.map(toElement),
         seq: Number(board.lastSeq),
       };
     },

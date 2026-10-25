@@ -306,3 +306,69 @@ describe('members (ROOM-2, ROOM-5)', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('kick + block (room_bans)', () => {
+  it('a banned user cannot rejoin through any invite (generic 403) until unbanned', async () => {
+    const f = await setupRoom(app);
+    const res = await call(
+      app,
+      f.owner.jar,
+      'DELETE',
+      `/api/v1/rooms/${f.roomId}/members/${f.viewer.id}`,
+      { ban: true },
+    );
+    expect(res.statusCode).toBe(204);
+    const bans = await call(app, f.owner.jar, 'GET', `/api/v1/rooms/${f.roomId}/bans`);
+    expect(bans.json()).toMatchObject({
+      items: [{ user: { id: f.viewer.id }, bannedBy: { id: f.owner.id } }],
+    });
+
+    const inv = await call(app, f.owner.jar, 'POST', `/api/v1/rooms/${f.roomId}/invites`, {
+      expiresIn: '1h',
+    });
+    const code = inv.json<{ invite: { code: string } }>().invite.code;
+    const blocked = await call(app, f.viewer.jar, 'POST', `/api/v1/invites/${code}/accept`, {});
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.json()).toMatchObject({
+      error: { code: 'FORBIDDEN', message: "You can't join this room" },
+    });
+
+    expect(
+      (await call(app, f.owner.jar, 'DELETE', `/api/v1/rooms/${f.roomId}/bans/${f.viewer.id}`))
+        .statusCode,
+    ).toBe(204);
+    expect(
+      (await call(app, f.owner.jar, 'DELETE', `/api/v1/rooms/${f.roomId}/bans/${f.viewer.id}`))
+        .statusCode,
+    ).toBe(404);
+    expect(
+      (await call(app, f.viewer.jar, 'POST', `/api/v1/invites/${code}/accept`, {})).statusCode,
+    ).toBe(200);
+  });
+
+  it('a plain kick (no ban) still lets the user rejoin, as FEATURES F2 allows', async () => {
+    const f = await setupRoom(app);
+    await call(app, f.owner.jar, 'DELETE', `/api/v1/rooms/${f.roomId}/members/${f.viewer.id}`);
+    const inv = await call(app, f.owner.jar, 'POST', `/api/v1/rooms/${f.roomId}/invites`, {
+      expiresIn: '1h',
+    });
+    const code = inv.json<{ invite: { code: string } }>().invite.code;
+    expect(
+      (await call(app, f.viewer.jar, 'POST', `/api/v1/invites/${code}/accept`, {})).statusCode,
+    ).toBe(200);
+  });
+
+  it('room summaries carry the map of the most recently updated board', async () => {
+    const f = await setupRoom(app);
+    const list = async () =>
+      (await call(app, f.owner.jar, 'GET', '/api/v1/rooms')).json<{
+        items: { primaryMapId: string }[];
+      }>().items[0]?.primaryMapId;
+    expect(await list()).toBe('erangel');
+    await call(app, f.owner.jar, 'POST', `/api/v1/rooms/${f.roomId}/boards`, {
+      name: 'R',
+      mapId: 'rondo',
+    });
+    expect(await list()).toBe('rondo');
+  });
+});

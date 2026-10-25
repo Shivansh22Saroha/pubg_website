@@ -30,6 +30,8 @@ model User {
   memberships      RoomMember[]
   ownedRooms       Room[]         @relation("RoomOwner")
   createdInvites   RoomInvite[]   @relation("InviteCreator")
+  bans             RoomBan[]      @relation("BannedUser")
+  bansIssued       RoomBan[]      @relation("BanIssuer")
 
   @@map("users")
 }
@@ -101,6 +103,7 @@ model Room {
   members        RoomMember[]
   invites        RoomInvite[]
   boards         Board[]
+  bans           RoomBan[]
 
   @@index([ownerId])
   @@map("rooms")
@@ -153,6 +156,8 @@ model Board {
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   room         Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   layers       Layer[]
+  elements     Element[]
+  ops          BoardOp[]
 
   @@index([roomId, position])
   @@map("boards")
@@ -169,8 +174,73 @@ model Layer {
   seq       BigInt
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  elements  Element[]
 
   @@index([boardId, position])
   @@map("layers")
+}
+
+/// kicked-and-blocked users; invite accept rejects them (Phase 4 follow-up)
+model RoomBan {
+  roomId    String   @map("room_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  bannedBy  String?  @map("banned_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation("BannedUser", fields: [userId], references: [id], onDelete: Cascade)
+  issuer    User?    @relation("BanIssuer", fields: [bannedBy], references: [id], onDelete: SetNull)
+
+  @@id([roomId, userId])
+  @@map("room_bans")
+}
+
+enum ElementType {
+  STROKE
+  LINE
+  ARROW
+  CIRCLE
+  POLYGON
+  TEXT
+  MARKER
+}
+
+model Element {
+  id        String      @id @db.Uuid
+  boardId   String      @map("board_id") @db.Uuid
+  layerId   String      @map("layer_id") @db.Uuid
+  type      ElementType
+  /// world units (cm); shape per type — DATABASE_SCHEMA §4
+  geometry  Json
+  style     Json
+  props     Json        @default("{}")
+  z         Int         @default(0)
+  /// board seq of the last write (LWW)
+  seq       BigInt
+  createdBy String?     @map("created_by") @db.Uuid
+  updatedBy String?     @map("updated_by") @db.Uuid
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  board     Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  layer     Layer       @relation(fields: [layerId], references: [id], onDelete: Cascade)
+
+  @@index([boardId])
+  @@index([layerId])
+  @@map("elements")
+}
+
+/// short-lived replay log for delta resync (24 h / last 1 000 per board)
+model BoardOp {
+  boardId   String   @map("board_id") @db.Uuid
+  seq       BigInt
+  opId      String   @map("op_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  kind      String   @db.VarChar(24)
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, seq])
+  @@index([createdAt])
+  @@map("board_ops")
 }

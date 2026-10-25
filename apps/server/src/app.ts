@@ -20,6 +20,8 @@ import { createAuthService } from './modules/auth/service.js';
 import { createPrismaRefreshTokenStore } from './modules/auth/sessionStore.js';
 import { createSessionService } from './modules/auth/sessions.js';
 import { createTokenService } from './modules/auth/tokens.js';
+import { createBoardOpsService } from './modules/elements/service.js';
+import { createRealtime, disconnectSessions } from './realtime/server.js';
 import { boardRoutes } from './modules/boards/routes.js';
 import { createBoardService } from './modules/boards/service.js';
 import { inviteRoutes } from './modules/invites/routes.js';
@@ -47,6 +49,8 @@ export interface AppDeps {
   checks?: HealthChecks;
   /** send logs here instead of stdout (tests capture them to prove no secrets leak) */
   logStream?: LogStream;
+  /** attach Socket.IO (default true; REST-only unit tests turn it off) */
+  realtime?: boolean;
 }
 
 // SECURITY §7: never log credentials, cookies or tokens — even if a future log call includes them.
@@ -73,7 +77,14 @@ function loggerOptions(config: Config, stream?: LogStream): FastifyServerOptions
     : base;
 }
 
-export async function buildApp({ config, prisma, redis, checks, logStream }: AppDeps) {
+export async function buildApp({
+  config,
+  prisma,
+  redis,
+  checks,
+  logStream,
+  realtime: withRealtime = true,
+}: AppDeps) {
   const app = Fastify({
     logger: loggerOptions(config, logStream),
     trustProxy: config.TRUST_PROXY,
@@ -98,7 +109,11 @@ export async function buildApp({ config, prisma, redis, checks, logStream }: App
     audience: config.JWT_AUDIENCE,
     ttlSec: config.ACCESS_TOKEN_TTL_SEC,
   });
-  const revocations = createRevocationList(redis, config.ACCESS_TOKEN_TTL_SEC);
+  // late-bound: realtime is created after the services that revoke sessions
+  let dropSessions: (sids: string[]) => void = () => undefined;
+  const revocations = createRevocationList(redis, config.ACCESS_TOKEN_TTL_SEC, (sids) => {
+    dropSessions(sids);
+  });
   const sessions = createSessionService({
     store: createPrismaRefreshTokenStore(prisma),
     ttlDays: config.REFRESH_TOKEN_TTL_DAYS,
@@ -145,6 +160,7 @@ export async function buildApp({ config, prisma, redis, checks, logStream }: App
     appOrigin: config.APP_ORIGIN,
   });
   const boards = createBoardService({ prisma, policy, events });
+  const boardOps = createBoardOpsService({ prisma, redis, policy });
 
   app.decorate('authenticate', async (request) => {
     const token = cookies.readAccess(request);
@@ -180,6 +196,28 @@ export async function buildApp({ config, prisma, redis, checks, logStream }: App
   await app.register(roomRoutes, { prefix: '/api/v1', rooms, invites, boards, redis, rateLimits });
   await app.register(inviteRoutes, { prefix: '/api/v1', invites, redis, rateLimits });
   await app.register(boardRoutes, { prefix: '/api/v1', boards });
+
+  // ---- realtime (Socket.IO on the same HTTP server, path /realtime) -------------------
+  if (withRealtime) {
+    const realtime = createRealtime({
+      app,
+      redis,
+      appOrigin: config.APP_ORIGIN,
+      accessCookieName: cookies.accessName,
+      tokens,
+      revocations,
+      policy,
+      rooms,
+      boardOps,
+      events,
+    });
+    dropSessions = (sids) => {
+      disconnectSessions(realtime.io, sids);
+    };
+    app.addHook('preClose', async () => {
+      await realtime.close();
+    });
+  }
 
   return app;
 }

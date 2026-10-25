@@ -95,6 +95,7 @@ function MembersList({
   const setRole = useSetMemberRole(roomId);
   const kick = useKickMember(roomId);
   const [kickTarget, setKickTarget] = useState<Member | null>(null);
+  const [ban, setBan] = useState(false);
   const manage = can(role, 'room.manage');
   const fail = (err: unknown) =>
     toast.error(err instanceof ApiError ? err.message : 'Something went wrong');
@@ -140,6 +141,7 @@ function MembersList({
                   variant="ghost"
                   className="text-danger"
                   onClick={() => {
+                    setBan(false);
                     setKickTarget(m);
                   }}
                 >
@@ -163,6 +165,17 @@ function MembersList({
             title="Remove member"
             description={`${kickTarget.user.displayName} will lose access to this room immediately.`}
           >
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="accent-[var(--accent)]"
+                checked={ban}
+                onChange={(e) => {
+                  setBan(e.target.checked);
+                }}
+              />
+              Also block them from rejoining with an invite
+            </label>
             <div className="flex justify-end gap-2">
               <Button
                 variant="ghost"
@@ -176,12 +189,15 @@ function MembersList({
                 variant="destructive"
                 disabled={kick.isPending}
                 onClick={() => {
-                  kick.mutate(kickTarget.user.id, {
-                    onSuccess: () => {
-                      setKickTarget(null);
+                  kick.mutate(
+                    { userId: kickTarget.user.id, ban },
+                    {
+                      onSuccess: () => {
+                        setKickTarget(null);
+                      },
+                      onError: fail,
                     },
-                    onError: fail,
-                  });
+                  );
                 }}
               >
                 Remove

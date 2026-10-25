@@ -35,3 +35,6 @@ packages/map-tiles/.cache/
 # playwright
 apps/web/test-results/
 apps/web/playwright-report/
+
+# E2E production build
+apps/web/.next-e2e/

@@ -21,7 +21,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 **Rules**
 - Room creation also creates the first board + 3 default layers (Plan `#F2A900`, Enemies `#EF4444`, Zones `#F8FAFC`).
 - Exactly one Owner. Owner cannot leave without transferring ownership or deleting the room.
-- Default role for new joiners is the room's `defaultRole` unless the invite specifies a role.
+- An invite's role is fixed when the invite is **created**: the role given in the request, or else the room's `defaultRole` at that moment. Changing the room default later does not change existing invites.
 - Member limit counted at accept time inside a transaction.
 - `lastActivityAt` updated on any durable op (debounced to once per minute per room).
 
@@ -30,7 +30,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - Invite created by an Editor who is later downgraded to Viewer remains valid but capped at Viewer role.
 
 **AC**
-- A kicked user's open tab loses access within 1 s and cannot rejoin via an old invite (kicked users must get a new invite; old invites still work → acceptable in v1, owner can revoke).
+- A kicked user's open tab loses access within 1 s (sockets get `member:kicked` and are disconnected). A plain kick lets them rejoin with any still-valid invite. **Kick + block** (`ban: true`) adds a `room_bans` row: invite accept then refuses them with a generic `403 FORBIDDEN` until the owner unbans them (Room settings → Security → Blocked users).
 
 ---
 

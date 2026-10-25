@@ -9,6 +9,7 @@ All primary keys are **UUID** (UUIDv7 generated in app code for time-ordering; `
 users 1──* refresh_tokens
 users 1──* room_members *──1 rooms
 rooms 1──* room_invites
+rooms 1──* room_bans *──1 users
 rooms 1──* boards 1──* layers 1──* elements
                   boards 1──* board_ops
                   boards 1──* snapshots
@@ -101,6 +102,15 @@ Constraint: exactly one OWNER per room — partial unique index `UNIQUE (room_id
 | revoked_at | timestamptz | NULL |
 | created_at | timestamptz | NOT NULL |
 Index `(room_id)`.
+
+### 3.6b `room_bans` (kick + block)
+| Column | Type | Constraints |
+|---|---|---|
+| room_id | uuid | FK → rooms CASCADE |
+| user_id | uuid | FK → users CASCADE |
+| banned_by | uuid | NULL FK → users SET NULL, CHECK ≠ user_id |
+| created_at | timestamptz | NOT NULL |
+PK `(room_id, user_id)`. Written by `DELETE /rooms/:roomId/members/:userId { ban: true }`; checked by invite accept.
 
 ### 3.7 `boards`
 | Column | Type | Constraints |

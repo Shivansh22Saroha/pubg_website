@@ -111,6 +111,51 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
     - **Authz matrix**: 33 routes × 5 callers (anonymous, outsider, viewer, editor, owner).
     - Playwright **E2E-2** plus join-with-code.
 
+- 2026-10-25 — **Phase 5A: realtime core, server side** (TODO Phase 5; RT-1, RT-3, RT-5, RT-6 server half, RT-7; SECURITY Z1, Z4, Z5, T2, §6):
+  - Schema: `elements` (+ `ElementType` enum), `board_ops` (PK board_id+seq), `room_bans`. Migrations `realtime_bans` + `realtime_checks`, with CHECKs for geometry/style/props size, seq ≥ 0, op kind, and ban ≠ self.
+  - Shared:
+    - `schemas/elements.ts`: discriminated union per element type with the SECURITY V2 limits, `elementWithinWorld` against the board's map size, `LayerInput`.
+    - `realtime.ts`: every API_SPEC §7.2/7.3 event as a Zod schema, typed `ClientToServerEvents` / `ServerToClientEvents`, ack types, `BoardOp`, `Presence` + 12 presence colours.
+  - Socket.IO 4.8 on the Fastify HTTP server: `/realtime`, websocket-only, `maxHttpBufferSize` 64 KB, perMessageDeflate. Redis adapter on duplicated ioredis clients.
+    - Handshake: Origin = `APP_ORIGIN`, access cookie (`__Host-rl_at` in prod), JWT + revoked-sid check, ≤ 5 sockets per user (counted cluster-wide). `connect_error.data.code` is `UNAUTHENTICATED` / `TOKEN_EXPIRED` / `FORBIDDEN` / `LIMIT_REACHED`.
+  - Handlers, each with an ack (`{ ok, data } | { ok:false, code, message }`), Zod validation, and a role re-check through the Redis-cached room policy on every event:
+    - rooms & presence: `room:join` / `room:leave`; presence as a Redis hash per room (field per socket, 60 s TTL, heartbeat, tabs counted once, idle = idle in every tab, unique colour among online users) with `presence:update` broadcasts;
+    - boards: `board:subscribe` (leaves the previous board; delta from `board_ops` when contiguous, else a full snapshot read at REPEATABLE READ);
+    - durable ops: `element:upsert/delete/batch` and `layer:upsert/delete/reorder/clear`;
+    - follow & summon: `follow:start/stop`, `summon` (OWNER/EDITOR);
+    - volatile: `cursor:move`, `stroke:preview` (drawers only), `laser:point`, `view:update` (followers only).
+  - Board-ops service: one transaction per message — row-lock the board, consecutive seqs, apply, write `board_ops`, keep `element_count` exact (5 000 cap), all-or-nothing batches, locked layers rejected, ≤ 10 layers, never the last layer. Last-writer-wins by seq. opId dedupe per user in Redis (10 min) returns the original seqs without re-applying or re-broadcasting.
+  - Per-socket token buckets: durable 30/s burst 60, chat 5/10 s, volatile 40/s combined (silently dropped). 10 durable/chat violations in a minute → disconnect.
+  - REST → realtime bridge for every Phase 4 event, across instances via the adapter:
+    - board created / updated / deleted (subscribers leave the deleted board's channel);
+    - member joined / left / roleChanged; room updated / deleted;
+    - **kick**: `member:kicked` to the target, then its sockets for that room are disconnected;
+    - logout, logout-all, password change, session revoke and refresh theft disconnect those sessions' sockets.
+  - Board duplicate now copies elements (new ids, layer mapping) in the same transaction. `GET /boards/:id/state` returns elements.
+  - Jobs: node-cron prune of `board_ops` (older than 24 h, or beyond the last 1 000 per board) every 15 min, on a single leader via a Redis lock.
+  - `scripts/realtime-smoke.ts`: two clients against `pnpm dev`, draws 100 elements, prints latency. **Measured on loopback against the dev server: ack round trip p50 27.3 ms / p95 40.4 ms / max 58.3 ms; broadcast to the second client p50 27.3 ms / p95 40.4 ms.**
+  - Tests: 361 integration tests in total:
+    - realtime: 38 (every TESTING §4 realtime row, plus locked layers, geometry/bounds, 5 000 cap, batch atomicity, layer ops, presence, follow/summon, volatile cap, role downgrade, logout disconnects, board events, **two server instances sharing Redis**, duplicate-with-elements, prune job, leader lock);
+    - **socket authz matrix**: 18 events × 5 callers (74 cells; anonymous callers get no socket at all);
+    - kick + block and `primaryMapId` tests;
+    - REST authz matrix now 35 routes.
+- 2026-10-25 — Phase 4 follow-ups:
+  - FEATURES F2 / API_SPEC now say an invite's role is fixed at creation.
+  - **Kick + block**: `room_bans`, `DELETE …/members/:userId { ban?: true }`, `GET /rooms/:roomId/bans`, `DELETE /rooms/:roomId/bans/:userId`, invite accept → generic 403 for banned users. UI: "Also block them from rejoining" in the kick dialog; Room settings → Security → Blocked users with Unban.
+  - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
+  - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
+
+### Decisions (Phase 5A)
+- Durable ops and `board:subscribe` require `room:join` on the same socket first (`FORBIDDEN` otherwise). Ephemeral events only flow on the board the socket is subscribed to.
+- `element:batch` broadcasts one `board:op` per op rather than a new batched event, so clients have a single apply path.
+- Deleting an element that is already gone is a successful no-op *with a seq*, so concurrent deletes converge without a client-side rollback.
+- Layers created via `layer:upsert` are appended at the end; ordering only changes through `layer:reorder`. `position` in `LayerInput` is accepted but ignored on create.
+- Error codes on sockets reuse the REST set: locked layer and viewer writes → `FORBIDDEN`; an element whose `boardId` differs from the message → `BAD_REQUEST`.
+- Session revocation fan-out uses the Socket.IO Redis adapter (`io.in('session:…').disconnectSockets()`), not a separate pub/sub channel. There is no periodic 5-minute token re-check yet: every revocation path disconnects immediately, and access JWTs are not re-verified on a long-lived socket. Revisit in Phase 10.
+- The volatile cap is a 40/s token bucket per socket. `socket.volatile` may additionally drop packets while a receiver is still flushing, which is intended for cursors.
+- Chat events (`chat:send`, `chat:typing`) have their contracts in `packages/shared` but no handlers until Phase 7, so they are not in the socket authz matrix yet.
+- Dependencies (TECH_STACK): socket.io 4.8.4, @socket.io/redis-adapter 8.3.0, node-cron 3.0.3, socket.io-client 4.8.4 (server tests + smoke script), @types/node-cron 3.0.11.
+
 ### Decisions (Phase 4)
 - `room_invites.role` is NOT NULL (DATABASE_SCHEMA), so an invite created without a role stores the room's `defaultRole` *at creation*. Changing the room default later does not change existing invites.
 - Invite role cap (FEATURES F2): the effective role is the lower of the invite's role and the creator's *current* role. A creator who has left the room vouches for VIEWER only.

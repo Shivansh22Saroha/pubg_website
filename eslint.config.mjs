@@ -12,6 +12,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
+      '**/.next-e2e/**',
       '**/.turbo/**',
       '**/coverage/**',
       '**/next-env.d.ts',
@@ -79,6 +80,14 @@ export default tseslint.config(
       '@typescript-eslint/unbound-method': 'off',
       // tests read storage to assert it stays empty
       'no-restricted-syntax': 'off',
+      // socket acks / wire payloads are inspected loosely in tests
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'off',
     },
   },
   prettier,

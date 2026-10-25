@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "prepare": "husky",
     "test:e2e": "turbo run test:e2e",
-    "test:int": "turbo run test:int"
+    "test:int": "turbo run test:int",
+    "test:e2e:dev": "pnpm --filter web test:e2e:dev"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [

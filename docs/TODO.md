@@ -62,15 +62,16 @@ _Status 2026-10-25: met — 59 integration tests (auth, CSRF, rate limits, cooki
 _Status 2026-10-25: met — E2E-2 green; authz matrix 33 routes × 5 callers (165 cells) green; 236 integration tests. Board duplicate copies layers only until the elements table lands (Phase 5)._
 
 ## Phase 5 — Realtime core (P0)
-- [ ] Socket.IO server with cookie auth + Origin check, Redis adapter, typed events from shared.
-- [ ] `room:join/leave`, presence (Redis hash + heartbeat), `presence:update`.
-- [ ] `board:subscribe` (full + delta), elements table, board_ops log, seq allocation txn, opId dedupe.
-- [ ] `element:upsert/delete/batch`, `layer:*` handlers with validation, limits, lock checks.
-- [ ] Per-socket rate limiting; kick/role change → socket enforcement.
+- [x] Socket.IO server with cookie auth + Origin check, Redis adapter, typed events from shared.
+- [x] `room:join/leave`, presence (Redis hash + heartbeat), `presence:update`.
+- [x] `board:subscribe` (full + delta), elements table, board_ops log, seq allocation txn, opId dedupe.
+- [x] `element:upsert/delete/batch`, `layer:*` handlers with validation, limits, lock checks.
+- [x] Per-socket rate limiting; kick/role change → socket enforcement.
 - [ ] Web: socket singleton, `boardStore` (optimistic, ack, reject rollback, LWW), reconnect & resync, sync indicator.
 - [ ] Element renderer layer (canvas renderer + marker divIcons) — render from store.
 
 **Exit:** realtime integration tests (TESTING §4) green; two browsers see each other's programmatically created elements.
+_Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 74-cell socket authz matrix) green, two-instance Redis-adapter test green, `scripts/realtime-smoke.ts` p50 27 ms / p95 40 ms on loopback. **5B (client)** — the two unchecked web items — is the next run._
 
 ## Phase 6 — Drawing tools (P0)
 - [ ] Tool framework (pointer handling, drafts, cursor per tool, Esc cancel).

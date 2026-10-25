@@ -1,6 +1,6 @@
 'use client';
 
-import type { RoomSummary } from '@rotationlab/shared';
+import { MAPS, type RoomSummary } from '@rotationlab/shared';
 import { Lock, MoreVertical, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/api';
 import { useDeleteRoom, useLeaveRoom, useUpdateRoom } from '@/lib/rooms';
-import { RoleBadge, timeAgo } from './bits';
+import { MapThumb, RoleBadge, timeAgo } from './bits';
 
 /** Dashboard room card (UI_UX_SPEC §3.3). Thumbnails (P1) fall back to the room initial. */
 export function RoomCard({ room }: { room: RoomSummary }) {
@@ -34,8 +34,11 @@ export function RoomCard({ room }: { room: RoomSummary }) {
   return (
     <article className="group relative overflow-hidden rounded-panel border bg-surface transition-colors hover:border-accent/60">
       <Link href={`/rooms/${room.id}`} className="block" aria-label={`Open room ${room.name}`}>
-        <div className="flex aspect-[16/9] items-center justify-center bg-[linear-gradient(135deg,var(--surface-2),var(--bg))] font-display text-4xl font-bold text-text-muted">
-          {Array.from(room.name)[0]?.toUpperCase()}
+        <div className="relative aspect-[16/9]">
+          <MapThumb mapId={room.primaryMapId} variant="preview" className="size-full opacity-80" />
+          <span className="absolute bottom-2 left-2 rounded-full bg-overlay px-2 py-0.5 text-[11px] font-medium">
+            {MAPS[room.primaryMapId].name}
+          </span>
         </div>
         <div className="flex flex-col gap-1.5 p-4">
           <h3 className="flex items-center gap-1.5 truncate font-display text-lg font-bold">

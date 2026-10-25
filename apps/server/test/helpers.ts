@@ -39,7 +39,7 @@ export async function unitApp(checks: HealthChecks) {
   const config = testConfig({ RATE_LIMITS_ENABLED: 'false' });
   const prisma = new PrismaClient({ datasourceUrl: config.DATABASE_URL });
   const redis = new Redis(config.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 0 });
-  const app = await buildApp({ config, prisma, redis, checks });
+  const app = await buildApp({ config, prisma, redis, checks, realtime: false });
   app.addHook('onClose', () => {
     redis.disconnect();
   });

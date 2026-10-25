@@ -7,15 +7,26 @@ import { cn } from '@/lib/utils';
 
 const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 
-/** 256 px map thumbnail from the tile build; falls back to a labelled tile if missing. */
-export function MapThumb({ mapId, className }: { mapId: MapId; className?: string }) {
+/**
+ * Map image from the tile build — 256 px `thumb` or 1024 px `preview` — with a labelled
+ * fallback when tiles aren't installed.
+ */
+export function MapThumb({
+  mapId,
+  className,
+  variant = 'thumb',
+}: {
+  mapId: MapId;
+  className?: string;
+  variant?: 'thumb' | 'preview';
+}) {
   const [failed, setFailed] = useState(false);
   return (
     <div className={cn('relative overflow-hidden bg-surface-2', className)}>
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element -- static tile asset, no optimisation wanted
         <img
-          src={`${tilesBase}/${MAPS[mapId].thumbnail}`}
+          src={`${tilesBase}/${variant === 'preview' ? MAPS[mapId].preview : MAPS[mapId].thumbnail}`}
           alt=""
           className="size-full object-cover"
           onError={() => {

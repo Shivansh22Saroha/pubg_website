@@ -7,13 +7,19 @@ const key = (sid: string) => `rl:revoked-sid:${sid}`;
  * password change, refresh-token theft) its sid is remembered for one access-token lifetime so
  * those JWTs stop working immediately instead of up to 15 min later.
  */
-export function createRevocationList(redis: Redis, accessTtlSec: number) {
+export function createRevocationList(
+  redis: Redis,
+  accessTtlSec: number,
+  /** called after revoking — realtime drops the sessions' sockets on every instance */
+  onRevoke: (sids: string[]) => void = () => undefined,
+) {
   return {
     async revoke(sids: string[]): Promise<void> {
       if (sids.length === 0) return;
       const pipe = redis.multi();
       for (const sid of sids) pipe.set(key(sid), '1', 'EX', accessTtlSec);
       await pipe.exec();
+      onRevoke(sids);
     },
     async isRevoked(sid: string): Promise<boolean> {
       return (await redis.exists(key(sid))) === 1;

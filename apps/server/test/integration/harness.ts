@@ -1,9 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import type { LightMyRequestResponse } from 'fastify';
-import { afterAll, beforeEach, inject } from 'vitest';
+import type { AddressInfo } from 'node:net';
+import type { ClientToServerEvents, ServerToClientEvents } from '@rotationlab/shared';
+import { io as ioClient, type Socket as ClientSocketBase } from 'socket.io-client';
+import { afterAll, afterEach, beforeEach, inject } from 'vitest';
 import { buildApp, type App } from '../../src/app.js';
-import { CSRF, captureLogs, testConfig } from '../helpers.js';
+import { APP_ORIGIN, CSRF, captureLogs, testConfig } from '../helpers.js';
 
 export { CSRF };
 
@@ -31,7 +35,7 @@ export async function makeApp(overrides: Record<string, string> = {}) {
 export function useCleanState() {
   beforeEach(async () => {
     await prisma.$executeRawUnsafe(
-      'TRUNCATE TABLE layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
     );
     await redis.flushdb();
   });
@@ -193,3 +197,124 @@ export async function setupRoom(app: App): Promise<RoomFixture> {
   }
   return { roomId: room.id, boardId: board.id, owner, editor, viewer, outsider };
 }
+
+// ---- realtime ----------------------------------------------------------------------------
+
+export type ClientSocket = ClientSocketBase<ServerToClientEvents, ClientToServerEvents>;
+
+const openSockets: ClientSocket[] = [];
+afterEach(() => {
+  for (const s of openSockets.splice(0)) s.disconnect();
+});
+
+/** Starts the app's HTTP server (Socket.IO rides on it) on a random port. */
+export async function listen(app: App): Promise<string> {
+  if (!app.server.listening) await app.listen({ port: 0, host: '127.0.0.1' });
+  const addr = app.server.address() as AddressInfo;
+  return `http://127.0.0.1:${addr.port}`;
+}
+
+export function cookieHeader(jar: Jar): string {
+  return Object.entries(jar.cookies)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join('; ');
+}
+
+/** Connects like the browser would: websocket, cookies, Origin. Rejects with the connect_error. */
+export function connect(
+  url: string,
+  jar: Jar | null,
+  opts: { origin?: string; cookie?: string } = {},
+): Promise<ClientSocket> {
+  const headers: Record<string, string> = { origin: opts.origin ?? APP_ORIGIN };
+  const cookie = opts.cookie ?? (jar ? cookieHeader(jar) : '');
+  if (cookie) headers.cookie = cookie;
+  const socket: ClientSocket = ioClient(url, {
+    path: '/realtime',
+    transports: ['websocket'],
+    forceNew: true,
+    reconnection: false,
+    extraHeaders: headers,
+  });
+  openSockets.push(socket);
+  return new Promise((resolve, reject) => {
+    socket.once('connect', () => {
+      resolve(socket);
+    });
+    socket.once('connect_error', (err: Error & { data?: { code?: string } }) => {
+      reject(err);
+    });
+  });
+}
+
+/** emit + ack with a timeout; returns the raw ack `{ ok, data } | { ok:false, code }`. */
+export function ack(
+  socket: ClientSocket,
+  event: string,
+  payload: unknown,
+): Promise<{ ok: boolean; code?: string; message?: string; data?: any }> {
+  return (
+    socket.timeout(5000) as unknown as { emitWithAck: (e: string, p: unknown) => Promise<any> }
+  ).emitWithAck(event, payload);
+}
+
+/** Resolves with the next `event` (or rejects after `ms`). */
+export function nextEvent<T = any>(socket: ClientSocket, event: string, ms = 3000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`timed out waiting for ${event}`));
+    }, ms);
+    (socket as unknown as { once: (e: string, f: (p: T) => void) => void }).once(event, (p: T) => {
+      clearTimeout(timer);
+      resolve(p);
+    });
+  });
+}
+
+/** Records every `event` the socket receives. */
+export function collect<T = any>(socket: ClientSocket, event: string): T[] {
+  const seen: T[] = [];
+  (socket as unknown as { on: (e: string, f: (p: T) => void) => void }).on(event, (p: T) =>
+    seen.push(p),
+  );
+  return seen;
+}
+
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** room:join + board:subscribe; returns the full board state from the ack. */
+export async function joinBoard(socket: ClientSocket, roomId: string, boardId: string) {
+  const j = await ack(socket, 'room:join', { roomId });
+  if (!j.ok) throw new Error(`room:join ${j.code}`);
+  const s = await ack(socket, 'board:subscribe', { boardId });
+  if (!s.ok) throw new Error(`board:subscribe ${s.code}`);
+  return s.data as {
+    mode: 'full';
+    layers: { id: string; name: string }[];
+    elements: any[];
+    seq: number;
+  };
+}
+
+export const STYLE = { color: '#F2A900', width: 4, dashed: false, fillOpacity: 0 } as const;
+
+export function arrow(boardId: string, layerId: string, over: Record<string, unknown> = {}) {
+  return {
+    id: randomUUID(),
+    boardId,
+    layerId,
+    type: 'ARROW',
+    geometry: {
+      points: [
+        [10_000, 10_000],
+        [200_000, 300_000],
+      ],
+    },
+    style: STYLE,
+    props: {},
+    z: 0,
+    ...over,
+  };
+}
+
+export const opId = () => randomUUID();

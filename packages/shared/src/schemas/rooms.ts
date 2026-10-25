@@ -61,6 +61,8 @@ export const RoomSummarySchema = z.object({
   lastActivityAt: z.iso.datetime(),
   thumbnailUrl: z.string().nullable(),
   hasPassword: z.boolean(),
+  /** map of the most recently updated board (dashboard card preview) */
+  primaryMapId: MapIdSchema,
 });
 export type RoomSummary = z.infer<typeof RoomSummarySchema>;
 
@@ -194,6 +196,16 @@ export const TransferRoomBodySchema = z.strictObject({
   password: z.string().min(1).max(512),
 });
 export const UpdateMemberBodySchema = z.strictObject({ role: AssignableRoleSchema });
+/** DELETE /rooms/:roomId/members/:userId — optional body; `ban` also blocks rejoining. */
+export const KickMemberBodySchema = z.strictObject({ ban: z.boolean().optional() }).nullish(); // Fastify passes null when no body is sent
+
+export const RoomBanSchema = z.object({
+  user: PublicUserSchema,
+  bannedBy: PublicUserSchema.nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type RoomBan = z.infer<typeof RoomBanSchema>;
+export const RoomBansResponseSchema = z.object({ items: z.array(RoomBanSchema) });
 
 export const INVITE_EXPIRY = ['1h', '24h', '7d', 'never'] as const;
 export const CreateInviteBodySchema = z.strictObject({

@@ -148,7 +148,9 @@ The PUBG repo states assets must be used under the **PUBG Developer Terms of Use
 | `pnpm build` | Production build of all apps |
 | `pnpm test` | Unit tests (no services needed) |
 | `pnpm test:int` | Integration tests (needs `docker compose up -d postgres redis`; uses db `rotationlab_test`) |
-| `pnpm test:e2e` | Playwright E2E (uses committed fixture tiles; locally reuses `pnpm dev` on :3000) |
+| `pnpm test:e2e` | Playwright E2E against a fresh production build (web :3200, API :4200) — fixture tiles, own servers |
+| `pnpm test:e2e:dev` | Same tests against the running `pnpm dev` servers (:3000 / :4000) — faster loop |
+| `pnpm --filter server exec tsx scripts/realtime-smoke.ts` | Two socket clients against `pnpm dev`: draws 100 elements, prints latency |
 | `pnpm lint` / `pnpm typecheck` | ESLint / tsc across the monorepo |
 | `pnpm --filter server prisma studio` | DB browser |
 

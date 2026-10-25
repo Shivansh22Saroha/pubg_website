@@ -8,3 +8,4 @@ dist/
 .turbo/
 coverage/
 next-env.d.ts
+.next-e2e/

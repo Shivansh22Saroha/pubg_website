@@ -8,10 +8,12 @@ import {
   DeleteRoomBodySchema,
   InviteResponseSchema,
   InvitesResponseSchema,
+  KickMemberBodySchema,
   MemberResponseSchema,
   MembersResponseSchema,
   RoomDetailResponseSchema,
   RoomInviteParamsSchema,
+  RoomBansResponseSchema,
   RoomListResponseSchema,
   RoomMemberParamsSchema,
   RoomParamsSchema,
@@ -147,9 +149,30 @@ export const roomRoutes: FastifyPluginCallbackZod<RoomRouteDeps> = (app, deps, d
 
   app.delete(
     '/rooms/:roomId/members/:userId',
+    { config: user, schema: { params: RoomMemberParamsSchema, body: KickMemberBodySchema } },
+    async (req, reply) => {
+      await rooms.kick(
+        requireUser(req),
+        req.params.roomId,
+        req.params.userId,
+        req.body?.ban ?? false,
+      );
+      return reply.status(204).send();
+    },
+  );
+
+  // ---- bans (kick + block) -----------------------------------------------------------
+  app.get(
+    '/rooms/:roomId/bans',
+    { config: user, schema: { params, response: { 200: RoomBansResponseSchema } } },
+    async (req) => ({ items: await rooms.bans(requireUser(req), req.params.roomId) }),
+  );
+
+  app.delete(
+    '/rooms/:roomId/bans/:userId',
     { config: user, schema: { params: RoomMemberParamsSchema } },
     async (req, reply) => {
-      await rooms.kick(requireUser(req), req.params.roomId, req.params.userId);
+      await rooms.unban(requireUser(req), req.params.roomId, req.params.userId);
       return reply.status(204).send();
     },
   );

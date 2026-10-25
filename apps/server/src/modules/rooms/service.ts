@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, Room } from '@prisma/client';
+import type { MapId as MapIdRow, Prisma, PrismaClient, Room } from '@prisma/client';
 import {
   DEFAULT_LAYERS,
   type AssignableRole,
@@ -6,6 +6,7 @@ import {
   type CreateRoomBodySchema,
   type Member,
   type RoomDetail,
+  type RoomBan,
   type RoomDetailResponse,
   type RoomSummary,
   type UpdateRoomBodySchema,
@@ -16,7 +17,7 @@ import { newId } from '../../lib/ids.js';
 import type { AuthUser } from '../../lib/policy.js';
 import type { PasswordHasher } from '../auth/passwords.js';
 import type { RoomEvents } from './events.js';
-import { fromMapId, toBoard, toMember } from './mappers.js';
+import { fromMapId, toBoard, toMapId, toMember, toPublicUser } from './mappers.js';
 import type { RoomPolicy } from './policy.js';
 
 export interface RoomServiceDeps {
@@ -27,8 +28,15 @@ export interface RoomServiceDeps {
   limits: { maxOwnedRooms: number; maxRoomMembers: number };
 }
 
-type RoomWithCounts = Room & { _count: { members: number; boards: number } };
-const withCounts = { _count: { select: { members: true, boards: true } } } as const;
+type RoomWithCounts = Room & {
+  _count: { members: number; boards: number };
+  boards: { mapId: MapIdRow }[];
+};
+const withCounts = {
+  _count: { select: { members: true, boards: true } },
+  // most recently updated board → dashboard card preview (primaryMapId)
+  boards: { select: { mapId: true }, orderBy: { updatedAt: 'desc' }, take: 1 },
+} as const;
 
 const assignable = (role: Room['defaultRole']): AssignableRole =>
   role === 'VIEWER' ? 'VIEWER' : 'EDITOR';
@@ -45,6 +53,7 @@ function summary(room: RoomWithCounts, role: RoomSummary['role']): RoomSummary {
     lastActivityAt: room.lastActivityAt.toISOString(),
     thumbnailUrl: null, // board thumbnails are P1
     hasPassword: room.passwordHash !== null,
+    primaryMapId: toMapId(room.boards[0]?.mapId ?? 'ERANGEL'),
   };
 }
 
@@ -281,14 +290,46 @@ export function createRoomService(d: RoomServiceDeps) {
       return toMember(updated);
     },
 
-    /** ROOM-5: kick (Phase 5 force-disconnects the target's sockets on `member:kicked`). */
-    async kick(user: AuthUser, roomId: string, targetId: string): Promise<void> {
+    /**
+     * ROOM-5: kick; `ban` also blocks rejoining through any invite. Realtime force-disconnects
+     * the target's sockets on `member:kicked` (SECURITY Z5).
+     */
+    async kick(user: AuthUser, roomId: string, targetId: string, ban = false): Promise<void> {
       await policy.requireRoom(user, roomId, 'room.manage');
       const target = await requireTarget(roomId, targetId);
       if (target.role === 'OWNER') throw new AppError('FORBIDDEN', 'The owner cannot be removed');
-      await prisma.roomMember.delete({ where: { roomId_userId: { roomId, userId: targetId } } });
+      await prisma.$transaction(async (tx) => {
+        await tx.roomMember.delete({ where: { roomId_userId: { roomId, userId: targetId } } });
+        if (ban) {
+          await tx.roomBan.upsert({
+            where: { roomId_userId: { roomId, userId: targetId } },
+            create: { roomId, userId: targetId, bannedBy: user.id },
+            update: {},
+          });
+        }
+      });
       await policy.bust(roomId, [targetId]);
       events.emit('member:kicked', { roomId, userId: targetId });
+    },
+
+    async bans(user: AuthUser, roomId: string): Promise<RoomBan[]> {
+      await policy.requireRoom(user, roomId, 'room.manage');
+      const rows = await prisma.roomBan.findMany({
+        where: { roomId },
+        include: { user: true, issuer: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return rows.map((b) => ({
+        user: toPublicUser(b.user),
+        bannedBy: b.issuer ? toPublicUser(b.issuer) : null,
+        createdAt: b.createdAt.toISOString(),
+      }));
+    },
+
+    async unban(user: AuthUser, roomId: string, targetId: string): Promise<void> {
+      await policy.requireRoom(user, roomId, 'room.manage');
+      const { count } = await prisma.roomBan.deleteMany({ where: { roomId, userId: targetId } });
+      if (count === 0) throw new AppError('NOT_FOUND', 'Ban not found');
     },
   };
 }

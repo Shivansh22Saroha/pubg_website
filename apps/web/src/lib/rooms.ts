@@ -8,6 +8,7 @@ import {
   InviteResponseSchema,
   InvitesResponseSchema,
   MemberResponseSchema,
+  RoomBansResponseSchema,
   RoomDetailResponseSchema,
   RoomListResponseSchema,
   RoomResponseSchema,
@@ -25,6 +26,7 @@ export const keys = {
   rooms: ['rooms'] as const,
   room: (id: string) => ['room', id] as const,
   invites: (id: string) => ['room', id, 'invites'] as const,
+  bans: (id: string) => ['room', id, 'bans'] as const,
   boardState: (id: string) => ['board', id, 'state'] as const,
 };
 
@@ -130,9 +132,34 @@ export function useSetMemberRole(roomId: string) {
 }
 
 export function useKickMember(roomId: string) {
-  return useRoomMutation(roomId, (userId: string) =>
-    api(`/rooms/${roomId}/members/${userId}`, { method: 'DELETE' }),
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, ban }: { userId: string; ban: boolean }) =>
+      api(`/rooms/${roomId}/members/${userId}`, { method: 'DELETE', body: { ban } }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: keys.room(roomId) }),
+        qc.invalidateQueries({ queryKey: keys.bans(roomId) }),
+      ]);
+    },
+  });
+}
+
+export function useBans(roomId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.bans(roomId),
+    enabled,
+    queryFn: async ({ signal }) =>
+      (await api(`/rooms/${roomId}/bans`, { schema: RoomBansResponseSchema, signal })).items,
+  });
+}
+
+export function useUnban(roomId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api(`/rooms/${roomId}/bans/${userId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.bans(roomId) }),
+  });
 }
 
 export function useCreateInvite(roomId: string) {
