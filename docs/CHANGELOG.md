@@ -174,7 +174,7 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 - Deleting an element that is already gone is a successful no-op *with a seq*, so concurrent deletes converge without a client-side rollback.
 - Layers created via `layer:upsert` are appended at the end; ordering only changes through `layer:reorder`. `position` in `LayerInput` is accepted but ignored on create.
 - Error codes on sockets reuse the REST set: locked layer and viewer writes → `FORBIDDEN`; an element whose `boardId` differs from the message → `BAD_REQUEST`.
-- Session revocation fan-out uses the Socket.IO Redis adapter (`io.in('session:…').disconnectSockets()`), not a separate pub/sub channel. There is no periodic 5-minute token re-check yet: every revocation path disconnects immediately, and access JWTs are not re-verified on a long-lived socket. Revisit in Phase 10.
+- Session revocation fan-out uses the Socket.IO Redis adapter (`io.in('session:…').disconnectSockets()`), not a separate pub/sub channel. There is no periodic 5-minute token re-check: every revocation path disconnects immediately, and (since the 5A follow-ups) a socket is closed with `TOKEN_EXPIRED` 60 s after its access token expires.
 - The volatile cap is a 40/s token bucket per socket. `socket.volatile` may additionally drop packets while a receiver is still flushing, which is intended for cursors.
 - Chat events (`chat:send`, `chat:typing`) have their contracts in `packages/shared` but no handlers until Phase 7, so they are not in the socket authz matrix yet.
 - Dependencies (TECH_STACK): socket.io 4.8.4, @socket.io/redis-adapter 8.3.0, node-cron 3.0.3, socket.io-client 4.8.4 (server tests + smoke script), @types/node-cron 3.0.11.
