@@ -29,6 +29,38 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - GitHub Actions CI: install (frozen lockfile), lint + Prettier check, typecheck, unit tests, build.
   - Tests (Vitest): 32 tests across shared (schemas, constants), server (config, error handler, health via `fastify.inject`) and web (`HealthStatus` with Testing Library + jsdom).
 
+- 2026-10-25 — **Phase 2: map tiles & map viewer** (TODO Phase 2; MAP-1, MAP-2, MAP-3, MAP-4):
+  - `map-tiles run fetch` (pure Node, works in PowerShell / cmd / Git Bash): checks git + git-lfs, does a sparse, shallow, blobless clone of `pubg/api-assets` into `packages/map-tiles/.cache/` (gitignored), then `git lfs pull`s only the 6 high-res files. The 3 low-res files are ordinary blobs. Each LFS file's SHA-256 and size are verified against the pointer `oid` read from the commit. Formats are detected by magic bytes (`file-type`); `Rondo_Main_Low_Res.png` is confirmed to be JPEG. Writes `.cache/sources.json` with the pinned commit `32b13b5`.
+  - `map-tiles run build`: measures every image with sharp and decodes with `limitInputPixels` = the measured pixel count. Requires square art and pads right/bottom to 256·2^k when needed. Processes one image at a time with sharp's cache off. Writes WebP q82 XYZ tiles (`layout: 'google'` → `{z}/{y}/{x}.webp`), checks the tile count is complete, and writes 1024 px preview, 256 px thumb and low-res JPEG placeholders plus `out/manifest.json` (sourceSize, paddedSize, maxNativeZoom, sha256, tileCount, bytes). Accepts an optional map list.
+  - `map-tiles run copy-dev` copies `out/` to `apps/web/public/tiles` (gitignored). `map-tiles run fixtures` generates the committed fixture set in `apps/web/e2e/fixtures/tiles`: 126 solid-colour tiles at z0–2 plus placeholders, 225 KB.
+  - `packages/shared`: `maps.ts` is now the full registry (`MAPS`, `MapConfig`, `isMapId`, `tileWorldSize`) filled from the manifest, with the Phase 0 markers kept. New `coords.ts` provides `gridRef` (`"F-M 4,7"`), `gridLines`, `distanceMetres`, `pathLengthMetres`, `travelTimeSeconds`, `formatMetres` and `formatDuration`.
+  - Web `lib/coords.ts`: custom `CRS.Simple` with `Transformation(256/T, 0, 256/T, 0)`, where T = worldSize scaled by any padding; `toLatLng` / `fromLatLng` / `worldBounds`.
+  - Web map, client-only (`next/dynamic`, `ssr: false`):
+    - `MapCanvas`: react-leaflet with labels and clean tile layers both mounted and swapped by opacity, so there is no blank flash (`N`, or the HUD button). The 819 px low-res `ImageOverlay` sits in a pane below the tiles. Also `maxBounds` (+10 %), zoom −1…maxNativeZoom+2 in 0.5 steps.
+    - `GridLayer`: 1-square major lines plus 1/10 minor lines from zoom 3, on one canvas renderer in a `grid` pane (z 350), toggled with `Shift+G` or the HUD button.
+    - `GridLabels`: A–H / I–P letters as React text nodes, pinned to the map edge or the viewport edge, and following zoom animations.
+    - `MapHud`: cursor grid ref + metres, labels / grid toggles, zoom −/+, fit.
+  - Dev page `/maps/[mapId]` (statically generated for the 3 maps, `noindex`) with a map switcher.
+  - Tests: shared 25 (coords per TESTING §3: corners, 102 000 boundary, far edge, sub-squares, distance / time formatting; registry consistency), web 10 (CRS projection, y-down, native scale, round trip at zoom −1…7, padding), and Playwright **E2E-10** for all three maps (fixture tiles served by request interception → no 404s, labels toggle swaps the visible tile URL, grid toggles, HUD readout). CI now runs E2E against the production build.
+
+### Fixed
+- 2026-10-25 — README / DEPLOYMENT: `pnpm --filter map-tiles fetch` runs pnpm's built-in `fetch` command, not our script. They now say `pnpm --filter map-tiles run fetch` / `run build`.
+
+### Map tile build results (pubg/api-assets@32b13b5, 2026-10-25)
+| Map | Source art | Padded | maxNativeZoom | Tiles (labels + clean) | Tile size on disk |
+|---|---|---|---|---|---|
+| Erangel | 8192 × 8192 | 8192 (none) | 5 | 1 365 + 1 365 = 2 730 | 24.0 MB |
+| Miramar | 8192 × 8192 | 8192 (none) | 5 | 2 730 | 33.5 MB |
+| Rondo | 8192 × 8192 | 8192 (none) | 5 | 2 730 | 36.1 MB |
+Total 8 190 tiles, 93.6 MB (≈ 113 MB of `out/` including previews). Fetch took 134 s and the build ~22 s on this machine. That is far below the spec's "0.5–1.5 GB, 5–15 min" estimate, because 8192 px art only needs z0–5. At 816 000 cm per side, one source pixel ≈ 0.996 m.
+
+### Decisions (Phase 2)
+- Pure world-unit math (`gridRef`, distance, travel time) lives in `packages/shared/src/coords.ts` so the server can reuse it, for example in chat ping messages. Only the Leaflet CRS glue lives in `apps/web/src/lib/coords.ts`.
+- Both base variants are always mounted, which preloads both, as UI_UX_SPEC §5 asks. This doubles tile traffic in exchange for an instant labels toggle.
+- Tile paths in the registry are relative to `NEXT_PUBLIC_TILES_BASE_URL`.
+- E2E serves fixture tiles via Playwright request interception, so it works whether or not real tiles are present. Locally it reuses the `pnpm dev` server on :3000, because Next 16 allows only one `next dev` per app. CI runs `next start` on :3100.
+- New dependencies, all from TECH_STACK: leaflet 1.9.4, react-leaflet 5.0.0, @types/leaflet 1.9.22, sharp 0.35.5, file-type 22.2.0, @playwright/test 1.64.1.
+
 ### Decisions (Phase 1)
 - Zod **4.x** for the whole monorepo (TECH_STACK allows 3 or 4).
 - Next.js **16.x** (TECH_STACK allows 15 or 16).

@@ -101,8 +101,10 @@ pnpm --filter server prisma migrate dev
 pnpm --filter server prisma db seed
 
 # 5. Map tiles (one-time, ~5–15 min)
-pnpm --filter map-tiles fetch      # downloads the 6 high-res PNGs via Git LFS
-pnpm --filter map-tiles build      # writes WebP tiles to packages/map-tiles/out/
+pnpm --filter map-tiles run fetch      # downloads the 6 high-res PNGs via Git LFS (`fetch` alone is a pnpm built-in)
+pnpm --filter map-tiles run build      # writes WebP tiles to packages/map-tiles/out/ (~25 s)
+pnpm --filter map-tiles run copy-dev   # copies them to apps/web/public/tiles (gitignored)
+# then open http://localhost:3000/maps/erangel
 
 # 6. Run everything
 pnpm dev
@@ -145,7 +147,7 @@ The PUBG repo states assets must be used under the **PUBG Developer Terms of Use
 | `pnpm dev` | Runs web + server in watch mode |
 | `pnpm build` | Production build of all apps |
 | `pnpm test` | Unit + integration tests |
-| `pnpm test:e2e` | Playwright E2E (needs running stack) |
+| `pnpm test:e2e` | Playwright E2E (uses committed fixture tiles; locally reuses `pnpm dev` on :3000) |
 | `pnpm lint` / `pnpm typecheck` | ESLint / tsc across the monorepo |
 | `pnpm --filter server prisma studio` | DB browser |
 

@@ -16,6 +16,7 @@ Real-time collaborative BGMI/PUBG tactical map sandbox. The full spec lives in `
 
 - Unresolved Phase 0 decisions use the defaults in the docs and are marked with `// TODO(phase0): …` comments. Search for `TODO(phase0)` before launch.
 - Version policy: `docs/TECH_STACK.md` lists target majors; stay on them. Resolved versions are recorded in `docs/CHANGELOG.md`.
+- The monorepo is on **Zod 4**. When adding `fastify-type-provider-zod` (≥ 5 supports Zod 4; we use 7.x) or `@hookform/resolvers` (≥ 5.x for Zod 4) — or any other Zod integration — pick a version whose peer range includes `zod@4`.
 - Booleans from env use `z.enum(['true','false']).transform(...)`, never `z.coerce.boolean()`.
 - Layering on the server: route/handler → service → Prisma. Policies are called from services.
 

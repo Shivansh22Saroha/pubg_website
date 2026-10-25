@@ -148,8 +148,8 @@ app.example.com {
 
 ## 4. Map tiles deployment (one-time per tile version)
 ```bash
-pnpm --filter map-tiles fetch
-pnpm --filter map-tiles build                  # → packages/map-tiles/out/
+pnpm --filter map-tiles run fetch      # `fetch` alone is a built-in pnpm command
+pnpm --filter map-tiles run build              # → packages/map-tiles/out/
 rclone sync packages/map-tiles/out r2:rotationlab-tiles/v1 \
   --header-upload "Cache-Control: public, max-age=31536000, immutable" \
   --transfers 32

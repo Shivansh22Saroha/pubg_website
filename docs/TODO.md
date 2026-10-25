@@ -30,15 +30,16 @@ _Status 2026-10-25: open. Doc defaults are in use and marked `TODO(phase0)` in `
 _Status 2026-10-25: met locally (lint, typecheck, 32 tests, build all pass; page shows db/redis ok). CI workflow written but not yet run on GitHub — no remote configured._
 
 ## Phase 2 — Map tiles & map viewer (P0)
-- [ ] `map-tiles fetch`: sparse clone + `git lfs pull` 6 files, SHA-256 verify.
-- [ ] `map-tiles build`: magic-byte detection, size check/padding, WebP XYZ tiles (`layout: 'google'`), previews, thumbnails, `manifest.json`.
-- [ ] `packages/shared/maps.ts` registry from manifest values.
-- [ ] `lib/coords.ts`: custom CRS, world↔LatLng, gridRef, distance + unit tests.
-- [ ] `MapCanvas` (client-only) with tile layer, labels/clean toggle, low-res placeholder, maxBounds.
-- [ ] Grid layer (major + minor), HUD cursor readout, zoom controls, fit button.
-- [ ] Standalone `/maps/[mapId]` dev page to eyeball all 3 maps.
+- [x] `map-tiles fetch`: sparse clone + `git lfs pull` 6 files, SHA-256 verify.
+- [x] `map-tiles build`: magic-byte detection, size check/padding, WebP XYZ tiles (`layout: 'google'`), previews, thumbnails, `manifest.json`.
+- [x] `packages/shared/maps.ts` registry from manifest values.
+- [x] `lib/coords.ts`: custom CRS, world↔LatLng, gridRef, distance + unit tests.
+- [x] `MapCanvas` (client-only) with tile layer, labels/clean toggle, low-res placeholder, maxBounds.
+- [x] Grid layer (major + minor), HUD cursor readout, zoom controls, fit button.
+- [x] Standalone `/maps/[mapId]` dev page to eyeball all 3 maps.
 
 **Exit:** all three maps pan/zoom smoothly at all zoom levels; grid refs match known locations; E2E-10 passes.
+_Status 2026-10-25: met — verified in Chrome on real tiles (all zooms −1…7, no tile 404s, instant labels swap, grid on the art edges); E2E-10 green in dev and CI (build) mode. Grid letters vs in-game still a Phase 0 item._
 
 ## Phase 3 — Auth (P0)
 - [ ] Prisma schema: users, refresh_tokens (+ migration with citext & CHECKs).

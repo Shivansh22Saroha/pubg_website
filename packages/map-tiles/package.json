@@ -7,7 +7,13 @@
   "scripts": {
     "fetch": "tsx scripts/fetch.ts",
     "build": "tsx scripts/build.ts",
+    "copy-dev": "tsx scripts/copy-dev.ts",
+    "fixtures": "tsx scripts/fixtures.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "file-type": "^22.2.0",
+    "sharp": "^0.35.5"
   }
 }

@@ -28,3 +28,10 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 *.log
+
+# map-tiles download cache
+packages/map-tiles/.cache/
+
+# playwright
+apps/web/test-results/
+apps/web/playwright-report/
