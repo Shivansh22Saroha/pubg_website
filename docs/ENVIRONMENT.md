@@ -47,6 +47,9 @@ Generate secrets with: `openssl rand -base64 48`
 | `DEMO_BOARD_IDS` | – | `uuid1,uuid2,uuid3` | boards exposed read-only at `/explore` |
 | `SENTRY_DSN` | – | | error tracking |
 | `METRICS_TOKEN` | – | | if set, `/metrics` requires `Authorization: Bearer` (in addition to internal-only routing) |
+| `RATE_LIMITS_ENABLED` | – | `true` | `false` only for local E2E convenience (repeated registrations); refused when `NODE_ENV=production`. Integration tests always run with limits on |
+| `REFRESH_REUSE_GRACE_SEC` | – | `10` | a rotated refresh token presented again within this window is a concurrent refresh (two tabs) → `409`, not theft; after it → whole family revoked |
+| `TEST_DATABASE_URL` / `TEST_REDIS_URL` | tests only | `postgresql://…/rotationlab_test` / `redis://…/15` | integration tests; default = derived from `DATABASE_URL` / `REDIS_URL` (db `rotationlab_test`, Redis DB 15) |
 | `SEED_DEV_PASSWORD` | dev only | `devpassword123!` | password for seeded users; seeding refuses to run in production |
 
 ## 2. Web (`apps/web/.env.local`)

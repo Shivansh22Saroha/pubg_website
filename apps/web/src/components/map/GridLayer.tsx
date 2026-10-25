@@ -7,11 +7,11 @@ import { useMap } from 'react-leaflet';
 import { toLatLng } from '@/lib/coords';
 
 export const GRID_PANE = 'grid';
-/** Minor (≈100 m) lines appear from this zoom up (≈25 px apart at zoom 3). */
-export const MINOR_GRID_MIN_ZOOM = 3;
+/** Minor lines (1/10 square ≈ 102 m) appear from maxNativeZoom − 1 up (FEATURES F3). */
+export const minorGridMinZoom = (maxNativeZoom: number) => maxNativeZoom - 1;
 
 const MAJOR_STYLE: L.PolylineOptions = { color: '#E6EDF3', opacity: 0.6, weight: 1.25 };
-const MINOR_STYLE: L.PolylineOptions = { color: '#E6EDF3', opacity: 0.2, weight: 1 };
+const MINOR_STYLE: L.PolylineOptions = { color: '#E6EDF3', opacity: 0.3, weight: 1 };
 
 function lines(
   worldSize: number,
@@ -29,12 +29,21 @@ function lines(
 }
 
 /** Major 1-square lines always; minor 1/10 lines at high zoom. Drawn on one canvas in its own pane. */
-export function GridLayer({ worldSize, cells }: { worldSize: number; cells: number }) {
+export function GridLayer({
+  worldSize,
+  cells,
+  maxNativeZoom,
+}: {
+  worldSize: number;
+  cells: number;
+  maxNativeZoom: number;
+}) {
   const map = useMap();
 
   useEffect(() => {
     const renderer = L.canvas({ pane: GRID_PANE, padding: 0.5 });
     const majorPositions = gridLines(worldSize, cells);
+    // same W/80 lattice as the major lines, minus every 10th (those are major) — always aligned
     const minorPositions = gridLines(worldSize, cells * SUB_CELLS).filter(
       (_, i) => i % SUB_CELLS !== 0,
     );
@@ -42,7 +51,7 @@ export function GridLayer({ worldSize, cells }: { worldSize: number; cells: numb
     const minor = lines(worldSize, minorPositions, MINOR_STYLE, renderer);
 
     const sync = () => {
-      if (map.getZoom() >= MINOR_GRID_MIN_ZOOM) minor.addTo(map);
+      if (map.getZoom() >= minorGridMinZoom(maxNativeZoom)) minor.addTo(map);
       else minor.remove();
     };
     sync();
@@ -53,7 +62,7 @@ export function GridLayer({ worldSize, cells }: { worldSize: number; cells: numb
       minor.remove();
       renderer.remove(); // the canvas outlives its polylines unless removed explicitly
     };
-  }, [map, worldSize, cells]);
+  }, [map, worldSize, cells, maxNativeZoom]);
 
   return null;
 }

@@ -15,15 +15,49 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: rl
+          POSTGRES_PASSWORD: rl_ci_pw
+          POSTGRES_DB: rotationlab
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rl -d rotationlab" --health-interval 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
+
     env:
       NEXT_TELEMETRY_DISABLED: '1'
-      # build-time public config for the web app (no secrets)
-      NEXT_PUBLIC_APP_ORIGIN: http://localhost:3000
+      # web build-time public config (no secrets)
+      NEXT_PUBLIC_APP_ORIGIN: http://localhost:3100
       NEXT_PUBLIC_API_BASE: /api/v1
       NEXT_PUBLIC_SOCKET_PATH: /realtime
       NEXT_PUBLIC_TILES_BASE_URL: /tiles
       INTERNAL_API_URL: http://localhost:4000
+      # server (integration tests + the API Playwright starts). CI-only throwaway secrets.
+      NODE_ENV: test
+      PORT: '4000'
+      APP_ORIGIN: http://localhost:3100
+      DATABASE_URL: postgresql://rl:rl_ci_pw@localhost:5432/rotationlab?schema=public
+      REDIS_URL: redis://localhost:6379/0
+      TEST_DATABASE_URL: postgresql://rl:rl_ci_pw@localhost:5432/rotationlab_test?schema=public
+      TEST_REDIS_URL: redis://localhost:6379/15
+      JWT_SECRET: ci-only-jwt-secret-not-used-anywhere-else-0123456789
+      JWT_ISSUER: rotationlab
+      JWT_AUDIENCE: rotationlab-web
+      COOKIE_SECURE: 'false'
+      IP_HASH_SALT: ci-only-ip-hash-salt-0123456789
+      TRUST_PROXY: 'false'
+      ARGON2_MEMORY_KIB: '4096'
+      ARGON2_ITERATIONS: '1'
+
     steps:
       - uses: actions/checkout@v4
 
@@ -46,13 +80,19 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Migrate database
+        run: pnpm --filter server exec prisma migrate deploy
+
+      - name: Integration tests (Postgres + Redis)
+        run: pnpm test:int
+
       - name: Build
         run: pnpm build
 
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install --with-deps chromium
 
-      - name: E2E (fixture tiles, production build)
+      - name: E2E (fixture tiles, real API)
         run: pnpm test:e2e
 
       - name: Upload Playwright report

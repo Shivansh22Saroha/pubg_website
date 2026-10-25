@@ -39,7 +39,7 @@ Give a team **one shared, persistent, zoomable map** where everyone can draw, pl
 ### 4.1 In scope — v1 (MVP)
 1. **Accounts** — sign up, log in, log out, edit profile, change password, delete account.
 2. **Rooms** — create, rename, delete; invite via link or code; optional room password; join; leave; kick; roles Owner / Editor / Viewer; max **16 members** per room.
-3. **Maps** — Erangel, Miramar, Rondo from PUBG PC art; smooth pan/zoom; labelled / unlabelled base-layer toggle; grid overlay (8×8 km, 1 km squares); minimap.
+3. **Maps** — Erangel, Miramar, Rondo from PUBG PC art; smooth pan/zoom; labelled / unlabelled base-layer toggle; grid overlay (8×8 squares of 1.02 km — the maps are 816 000 cm = 8.16 km per side); minimap.
 4. **Boards** — each room holds up to **20 boards**; a board = one map + a set of layers + drawings. Create, rename, duplicate, delete, reorder.
 5. **Layers** — up to 10 per board; show/hide, lock, rename, reorder, color.
 6. **Drawing tools** — select/move, pen, line, arrow, circle, polygon, text, eraser, undo/redo, clear layer.
@@ -157,7 +157,7 @@ IDs are referenced in FEATURES.md, TESTING.md and TODO.md.
 
 ## 7. Assumptions and constraints
 - Map art comes from the PUBG `api-assets` repo and is used under PUBG's Terms of Use (see README §5). Non-commercial.
-- PUBG world size for 8×8 km maps is 816 000 cm per side; all three v1 maps are 8×8 km. Verify Rondo's size before release.
+- PUBG world size for the "8×8 km" maps is 816 000 cm (8.16 km) per side, so each of the 8×8 grid squares is 102 000 cm = 1.02 km and each 1/10 sub-square is 102 m. All three v1 maps use this size. Verify Rondo's size before release.
 - PC map art can differ slightly from BGMI; the UI shows a one-line notice.
 
 ## 8. Open questions

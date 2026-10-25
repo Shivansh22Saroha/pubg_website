@@ -43,6 +43,54 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - Dev page `/maps/[mapId]` (statically generated for the 3 maps, `noindex`) with a map switcher.
   - Tests: shared 25 (coords per TESTING §3: corners, 102 000 boundary, far edge, sub-squares, distance / time formatting; registry consistency), web 10 (CRS projection, y-down, native scale, round trip at zoom −1…7, padding), and Playwright **E2E-10** for all three maps (fixture tiles served by request interception → no 404s, labels toggle swaps the visible tile URL, grid toggles, HUD readout). CI now runs E2E against the production build.
 
+- 2026-10-25 — **Phase 3: auth** (TODO Phase 3; AUTH-1…4, AUTH-6; SECURITY A1–A8, Z1 harness, V1/V3/V5, T3, §6, §7):
+  - Prisma models `users`, `refresh_tokens`, `email_tokens` + migration `auth`. The migration adds raw SQL for `CREATE EXTENSION citext` and these CHECKs: username format, avatar hex colour, failed-login count ≥ 0, token-hash hex, email-token purpose. IDs are UUIDv7 from app code, with `gen_random_uuid()` as the DB fallback.
+  - Shared Zod schemas (`schemas/auth.ts`, `text.ts`): register, login, username check, `PublicUser` / `Me`, `PATCH /me`, password change, sessions. `cleanText` (NFC, strip control characters, trim), lengths in code points, hex colour, cookie names, CSRF header, plus password rules / strength helpers for the UI.
+  - Server services:
+    - argon2id (`@node-rs/argon2`, cost from env, NFC-normalised input, dummy verify for unknown users).
+    - Password policy (10–128 chars) plus a breached-password check against the bundled NCSC top-100k list. Only the 9 125 entries with 10–128 chars are kept, lower-cased, 42 KB gzipped, with a reproducible `scripts/build-breached-list.ts`.
+    - `jose` HS256 access tokens (claims sub/sid/iss/aud/iat/exp only; `JWT_SECRET_PREVIOUS` accepted for verification).
+    - Refresh-token sessions: 256-bit opaque, SHA-256 at rest, rotated on every use with a `SELECT … FOR UPDATE` row lock. Reuse of a rotated token revokes the family; the revocation is committed before the error is raised.
+    - Login lockout: 5 failures → 15 min, doubling, capped at 24 h. Postgres is the source of truth and Redis mirrors it.
+    - Redis "revoked sid" list, so logout / logout-all / password change / theft kill access JWTs immediately.
+  - Routes `/api/v1/auth/{register,login,refresh,logout,logout-all,username-available}` and `/api/v1/me`, `PATCH /me`, `POST /me/password`, `GET /me/sessions`, `DELETE /me/sessions/:id`, all with schemas from `packages/shared` via fastify-type-provider-zod 7.
+  - Plugins:
+    - `@fastify/cookie`: API_SPEC §1.1 attributes; with `COOKIE_SECURE` the access cookie is `__Host-rl_at` and the refresh cookie `__Secure-rl_rt`.
+    - CSRF: exact `Origin` = `APP_ORIGIN` and `X-Requested-With: rotationlab` on every non-GET; a missing Origin is rejected.
+    - `@fastify/rate-limit` on Redis: global 300/min/IP, login 10/min, register 10/min + 5/hour (second fixed window), username check 20/min.
+    - Policy layer (`lib/policy.ts`): every route must declare `config.access` (`public` | `user`), or the server refuses to start.
+    - Wider pino redaction.
+  - Web:
+    - `/login` and `/register` (react-hook-form + zodResolver, 400 ms debounced username check, strength meter + rules list, inline field errors, generic credential error, spinner).
+    - `lib/api.ts`: credentials included, CSRF header, typed `ApiError`, one shared refresh call for concurrent 401s, retry once.
+    - Next 16 `src/proxy.ts` guard for `/dashboard`, `/rooms`, `/settings`, with a safe `redirectTo` (single leading `/`, no `//`, backslash, control characters or auth-page loops).
+    - Silent session restore on `/login`, a protected `/dashboard` placeholder, and a user menu with log out / log out all devices.
+    - TanStack Query + sonner providers.
+  - Tests:
+    - Shared: 42, web: 40.
+    - Server unit: 39 (token service incl. alg=none / previous secret, rotation + reuse + grace on an in-memory store, password policy, argon2id, lockout curve).
+    - Server integration: 59 on real Postgres + Redis (register / duplicates / validation, login by email and username, generic error, lockout, `/me`, `TOKEN_EXPIRED`, refresh rotation, theft revocation, 409 concurrent refresh, logout, logout-all, password change, sessions, CSRF, rate limits with `Retry-After`, dev and production cookie attributes).
+    - A **log-grep test** proving no token, password or cookie value appears in logs, response bodies or URLs. It was mutation-checked: a deliberately logged token makes it fail.
+    - **Authz matrix harness**: fails if any route lacks a row.
+    - Playwright **E2E-1**: also checks httpOnly cookies, empty local/session storage, no token in any URL, silent restore and an off-site `redirectTo`.
+  - CI: Postgres 17 + Redis 7 service containers, `prisma migrate deploy`, `pnpm test:int`; E2E starts the real API (`tsx`) and `next dev`.
+- 2026-10-25 — Phase 2 follow-ups:
+  - Minor grid lines confirmed at W/80 = 10 200 cm and aligned with the major lines (new unit test).
+  - Minor lines now start at zoom `maxNativeZoom − 1` with 30 % opacity, as FEATURES F3 specifies (Phase 2 had used zoom 3 / 20 %).
+  - Docs corrected: 1.02 km squares (PRD, ARCHITECTURE §5, FEATURES), measured tile size/time (ARCHITECTURE §6, TODO risks, README), `pnpm --filter map-tiles run …` everywhere.
+  - New TODO Phase 9 item: gate the `/maps/[mapId]` dev page in production.
+
+### Decisions (Phase 3)
+- Integration tests use the docker-compose Postgres / Redis (CI: service containers), not Testcontainers. They run against a separate `rotationlab_test` database and Redis DB 15, truncated / flushed per test. `pnpm test` = unit only, `pnpm test:int` = integration.
+- `REFRESH_REUSE_GRACE_SEC` (default 10): a rotated token replayed within 10 s is two tabs refreshing at once → 409, no revocation. The client treats that 409 as success because the winning tab's cookies are already set.
+- Access JWTs are revoked immediately (Redis sid list for one token lifetime), not after up to 15 min.
+- `POST /auth/logout` is `public` and accepts either cookie, so logging out works with an expired access token; it is idempotent.
+- The client refreshes on `UNAUTHENTICATED` as well as `TOKEN_EXPIRED` (see "spec issues" in the Phase 3 report), and `/login` attempts a silent refresh first.
+- `RATE_LIMITS_ENABLED` env (cannot be `false` in production), for repeatable local E2E.
+- Email verification / password reset (AUTH-7, P1): only the `email_tokens` table and the `EMAIL_ENABLED` flag exist. The routes and pages are deferred to Phase 8. "Forgot password?" is shown as inert text.
+- `DELETE /me` (account deletion) stays in Phase 8 with the ownership-transfer rules.
+- New dependencies (all in TECH_STACK): `@node-rs/argon2` 2.2.2, `jose` 6.2.13, `@fastify/cookie` 11.1.3, `@fastify/rate-limit` 11.2.1, `uuid` 14.0.3, `@tanstack/react-query` 5.104.5, `react-hook-form` 7.91.0, `@hookform/resolvers` 6.0.0 (Zod 4 compatible), `sonner` 2.0.8.
+
 ### Fixed
 - 2026-10-25 — README / DEPLOYMENT: `pnpm --filter map-tiles fetch` runs pnpm's built-in `fetch` command, not our script. They now say `pnpm --filter map-tiles run fetch` / `run build`.
 

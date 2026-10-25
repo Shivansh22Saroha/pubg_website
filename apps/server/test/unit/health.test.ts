@@ -1,9 +1,9 @@
 import { HealthResponseSchema } from '@rotationlab/shared';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildApp, type App } from '../src/app.js';
-import type { HealthChecks } from '../src/routes/health.js';
+import type { App } from '../../src/app.js';
+import type { HealthChecks } from '../../src/routes/health.js';
+import { unitApp } from '../helpers.js';
 
-const config = { NODE_ENV: 'test', LOG_LEVEL: 'silent', TRUST_PROXY: false } as const;
 const ok = () => Promise.resolve();
 const fail = () => Promise.reject(new Error('down'));
 
@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 async function getHealth(checks: HealthChecks) {
-  app = await buildApp({ config, checks });
+  app = await unitApp(checks);
   return app.inject({ method: 'GET', url: '/api/health' });
 }
 

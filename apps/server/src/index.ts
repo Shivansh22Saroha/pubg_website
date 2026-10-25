@@ -8,17 +8,7 @@ const config = loadConfig();
 const prisma = createPrisma(config.DATABASE_URL);
 const redis = createRedis(config.REDIS_URL);
 
-const app = await buildApp({
-  config,
-  checks: {
-    db: async () => {
-      await prisma.$queryRaw`SELECT 1`;
-    },
-    redis: async () => {
-      await redis.ping();
-    },
-  },
-});
+const app = await buildApp({ config, prisma, redis });
 
 redis.on('error', (err) => {
   app.log.warn({ err: err.message }, 'redis connection error');

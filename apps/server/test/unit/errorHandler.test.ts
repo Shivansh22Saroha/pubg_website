@@ -1,23 +1,23 @@
 import { ApiErrorBodySchema } from '@rotationlab/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { buildApp, type App } from '../src/app.js';
-import { AppError } from '../src/lib/errors.js';
-
-const config = { NODE_ENV: 'test', LOG_LEVEL: 'silent', TRUST_PROXY: false } as const;
+import type { App } from '../../src/app.js';
+import { AppError } from '../../src/lib/errors.js';
+import { CSRF, unitApp } from '../helpers.js';
 
 let app: App;
 beforeEach(async () => {
-  app = await buildApp({ config, checks: { db: async () => {}, redis: async () => {} } });
-  app.get('/boom', () => {
+  app = await unitApp({ db: async () => {}, redis: async () => {} });
+  const pub = { config: { access: 'public' } } as const;
+  app.get('/boom', pub, () => {
     throw new Error('secret internal detail');
   });
-  app.get('/forbidden', () => {
+  app.get('/forbidden', pub, () => {
     throw new AppError('FORBIDDEN', 'Not allowed');
   });
   app.post(
     '/echo',
-    { schema: { body: z.object({ name: z.string().min(3) }).strict() } },
+    { ...pub, schema: { body: z.object({ name: z.string().min(3) }).strict() } },
     (req) => req.body,
   );
 });
@@ -48,7 +48,12 @@ describe('error handler', () => {
   });
 
   it('returns 400 VALIDATION_ERROR with field details for bad bodies', async () => {
-    const res = await app.inject({ method: 'POST', url: '/echo', payload: { name: 'ab' } });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/echo',
+      headers: CSRF,
+      payload: { name: 'ab' },
+    });
     expect(res.statusCode).toBe(400);
     const body = ApiErrorBodySchema.parse(res.json());
     expect(body.error.code).toBe('VALIDATION_ERROR');
@@ -59,6 +64,7 @@ describe('error handler', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/echo',
+      headers: CSRF,
       payload: { name: 'alice', admin: true },
     });
     expect(res.statusCode).toBe(400);
@@ -68,6 +74,7 @@ describe('error handler', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/echo',
+      headers: CSRF,
       payload: { name: 'x'.repeat(101 * 1024) },
     });
     expect(res.statusCode).toBe(413);

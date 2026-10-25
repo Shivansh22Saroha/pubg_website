@@ -36,7 +36,10 @@ export const healthRoutes: FastifyPluginCallbackZod<{ checks: HealthChecks }> = 
 ) => {
   app.get(
     '/api/health',
-    { schema: { response: { 200: HealthResponseSchema, 503: HealthResponseSchema } } },
+    {
+      config: { access: 'public' },
+      schema: { response: { 200: HealthResponseSchema, 503: HealthResponseSchema } },
+    },
     async (_request, reply) => {
       const [db, redis] = await Promise.all([probe(checks.db), probe(checks.redis)]);
       const status = db === 'ok' && redis === 'ok' ? 'ok' : 'degraded';

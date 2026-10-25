@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Locally reuse the regular dev server (Next allows only one `next dev` per app); CI serves the build.
-const PORT = process.env.CI ? 3100 : 3000;
-
 const isCI = Boolean(process.env.CI);
+// Locally reuse the regular `pnpm dev` servers (Next allows only one `next dev` per app).
+// CI starts its own: API on :4000, web on :3100 (its APP_ORIGIN is set in the workflow).
+const PORT = isCI ? 3100 : 3000;
 
 export default defineConfig({
   testDir: './e2e',
@@ -16,11 +16,20 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    // CI runs after `pnpm build`, so serve the production build; locally use the dev server.
-    command: isCI ? `pnpm exec next start --port ${PORT}` : `pnpm exec next dev --port ${PORT}`,
-    url: `http://localhost:${PORT}/maps/erangel`,
-    reuseExistingServer: !isCI,
-    timeout: 180_000,
-  },
+  webServer: [
+    {
+      // API (needs Postgres + Redis + a migrated DB)
+      command: 'pnpm --dir ../server exec tsx --env-file-if-exists=.env src/index.ts',
+      url: 'http://localhost:4000/api/health',
+      reuseExistingServer: !isCI,
+      timeout: 120_000,
+    },
+    {
+      // dev server in CI too: its /api + /realtime rewrites stand in for Caddy
+      command: `pnpm exec next dev --port ${PORT}`,
+      url: `http://localhost:${PORT}/`,
+      reuseExistingServer: !isCI,
+      timeout: 180_000,
+    },
+  ],
 });

@@ -76,7 +76,7 @@ rotationlab/
 - pnpm (via `corepack enable`)
 - Docker + Docker Compose (for Postgres and Redis)
 - `git-lfs` (only needed once, to download the high-res map art)
-- ~3 GB free disk for raw map images + generated tiles
+- ~1 GB free disk for raw map images (~650 MB) + generated tiles (~115 MB)
 
 ### Steps
 
@@ -100,7 +100,7 @@ docker compose up -d postgres redis
 pnpm --filter server prisma migrate dev
 pnpm --filter server prisma db seed
 
-# 5. Map tiles (one-time, ~5–15 min)
+# 5. Map tiles (one-time, ~3 min: mostly the download)
 pnpm --filter map-tiles run fetch      # downloads the 6 high-res PNGs via Git LFS (`fetch` alone is a pnpm built-in)
 pnpm --filter map-tiles run build      # writes WebP tiles to packages/map-tiles/out/ (~25 s)
 pnpm --filter map-tiles run copy-dev   # copies them to apps/web/public/tiles (gitignored)
@@ -146,7 +146,8 @@ The PUBG repo states assets must be used under the **PUBG Developer Terms of Use
 |---|---|
 | `pnpm dev` | Runs web + server in watch mode |
 | `pnpm build` | Production build of all apps |
-| `pnpm test` | Unit + integration tests |
+| `pnpm test` | Unit tests (no services needed) |
+| `pnpm test:int` | Integration tests (needs `docker compose up -d postgres redis`; uses db `rotationlab_test`) |
 | `pnpm test:e2e` | Playwright E2E (uses committed fixture tiles; locally reuses `pnpm dev` on :3000) |
 | `pnpm lint` / `pnpm typecheck` | ESLint / tsc across the monorepo |
 | `pnpm --filter server prisma studio` | DB browser |

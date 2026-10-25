@@ -1,4 +1,6 @@
-// Models arrive in Phase 3+ (DATABASE_SCHEMA.md). Phase 1 only needs the connection for /api/health.
+// DATABASE_SCHEMA.md. Raw-SQL additions Prisma can't express (citext extension, CHECKs,
+// partial indexes) live in the migration files — keep them when regenerating.
+// IDs are UUIDv7 generated in app code (src/lib/ids.ts); gen_random_uuid() is only a fallback.
 
 generator client {
   provider = "prisma-client-js"
@@ -7,4 +9,62 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String         @unique @db.Citext
+  username         String         @unique @db.Citext
+  displayName      String         @map("display_name") @db.VarChar(32)
+  ign              String?        @db.VarChar(32)
+  avatarColor      String         @default("#38BDF8") @map("avatar_color") @db.Char(7)
+  passwordHash     String         @map("password_hash")
+  emailVerifiedAt  DateTime?      @map("email_verified_at") @db.Timestamptz(6)
+  failedLoginCount Int            @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?      @map("locked_until") @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  refreshTokens    RefreshToken[]
+  emailTokens      EmailToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  /// SHA-256 (hex) of the opaque token; the raw token is never stored
+  tokenHash   String        @unique @map("token_hash") @db.Char(64)
+  /// rotation family = session id (`sid` claim); reuse of a rotated token revokes the family
+  familyId    String        @map("family_id") @db.Uuid
+  replacedBy  String?       @map("replaced_by") @db.Uuid
+  userAgent   String?       @map("user_agent") @db.VarChar(256)
+  ipHash      String?       @map("ip_hash") @db.Char(64)
+  expiresAt   DateTime      @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime?     @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacement RefreshToken? @relation("Rotation", fields: [replacedBy], references: [id], onDelete: SetNull)
+  replaces    RefreshToken? @relation("Rotation")
+
+  @@unique([replacedBy])
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+/// verification + password reset tokens (P1, behind EMAIL_ENABLED)
+model EmailToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  purpose   String    @db.VarChar(16)
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_tokens")
 }

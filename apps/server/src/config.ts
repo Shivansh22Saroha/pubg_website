@@ -43,6 +43,13 @@ export const EnvSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
     EMAIL_ENABLED: bool.default(false),
+    /** Rate limits (SECURITY §6). Only for local E2E/dev convenience — forced on in production. */
+    RATE_LIMITS_ENABLED: bool.default(true),
+    /**
+     * A rotated refresh token presented again within this many seconds is treated as a
+     * concurrent refresh (two tabs), not theft: 409, no family revocation.
+     */
+    REFRESH_REUSE_GRACE_SEC: z.coerce.number().int().min(0).max(60).default(10),
     SENTRY_DSN: optionalString,
     METRICS_TOKEN: optionalString,
   })
@@ -52,6 +59,20 @@ export const EnvSchema = z
         code: 'custom',
         path: ['COOKIE_SECURE'],
         message: 'COOKIE_SECURE must be true in production',
+      });
+    }
+    if (e.NODE_ENV === 'production' && !e.RATE_LIMITS_ENABLED) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RATE_LIMITS_ENABLED'],
+        message: 'rate limits cannot be disabled in production',
+      });
+    }
+    if (e.COOKIE_SECURE && e.COOKIE_DOMAIN) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['COOKIE_DOMAIN'],
+        message: 'must be empty when COOKIE_SECURE=true (the __Host- cookie prefix forbids Domain)',
       });
     }
   });

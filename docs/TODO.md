@@ -30,8 +30,8 @@ _Status 2026-10-25: open. Doc defaults are in use and marked `TODO(phase0)` in `
 _Status 2026-10-25: met locally (lint, typecheck, 32 tests, build all pass; page shows db/redis ok). CI workflow written but not yet run on GitHub — no remote configured._
 
 ## Phase 2 — Map tiles & map viewer (P0)
-- [x] `map-tiles fetch`: sparse clone + `git lfs pull` 6 files, SHA-256 verify.
-- [x] `map-tiles build`: magic-byte detection, size check/padding, WebP XYZ tiles (`layout: 'google'`), previews, thumbnails, `manifest.json`.
+- [x] `pnpm --filter map-tiles run fetch`: sparse clone + `git lfs pull` 6 files, SHA-256 verify.
+- [x] `pnpm --filter map-tiles run build`: magic-byte detection, size check/padding, WebP XYZ tiles (`layout: 'google'`), previews, thumbnails, `manifest.json`.
 - [x] `packages/shared/maps.ts` registry from manifest values.
 - [x] `lib/coords.ts`: custom CRS, world↔LatLng, gridRef, distance + unit tests.
 - [x] `MapCanvas` (client-only) with tile layer, labels/clean toggle, low-res placeholder, maxBounds.
@@ -42,14 +42,15 @@ _Status 2026-10-25: met locally (lint, typecheck, 32 tests, build all pass; page
 _Status 2026-10-25: met — verified in Chrome on real tiles (all zooms −1…7, no tile 404s, instant labels swap, grid on the art edges); E2E-10 green in dev and CI (build) mode. Grid letters vs in-game still a Phase 0 item._
 
 ## Phase 3 — Auth (P0)
-- [ ] Prisma schema: users, refresh_tokens (+ migration with citext & CHECKs).
-- [ ] argon2id service, breached-password check, token service (jose), refresh rotation + reuse detection.
-- [ ] Routes: register, login, refresh, logout, logout-all, username-available, `/me`, `PATCH /me`.
-- [ ] Cookie config, CSRF (Origin + header) plugin, rate limits (Redis store), lockout.
-- [ ] Web: login/register pages, API client with refresh-on-401, middleware guard with safe `redirectTo`.
-- [ ] Tests: unit + integration per TESTING §3/§4 (Auth, CSRF, rate limits).
+- [x] Prisma schema: users, refresh_tokens (+ migration with citext & CHECKs).
+- [x] argon2id service, breached-password check, token service (jose), refresh rotation + reuse detection.
+- [x] Routes: register, login, refresh, logout, logout-all, username-available, `/me`, `PATCH /me`.
+- [x] Cookie config, CSRF (Origin + header) plugin, rate limits (Redis store), lockout.
+- [x] Web: login/register pages, API client with refresh-on-401, middleware guard with safe `redirectTo`.
+- [x] Tests: unit + integration per TESTING §3/§4 (Auth, CSRF, rate limits).
 
 **Exit:** E2E-1 passes; security tests for auth pass.
+_Status 2026-10-25: met — 59 integration tests (auth, CSRF, rate limits, cookies, secret-leak log grep, authz matrix) + E2E-1 green. Email verification / reset (AUTH-7, P1) still stubbed behind `EMAIL_ENABLED` → Phase 8._
 
 ## Phase 4 — Rooms, members, invites, boards (P0)
 - [ ] Prisma: rooms, room_members, room_invites, boards, layers (+ partial unique OWNER index).
@@ -102,6 +103,7 @@ _Status 2026-10-25: met — verified in Chrome on real tiles (all zooms −1…7
 
 ## Phase 9 — Landing, explore mode, responsive, a11y (P1)
 - [ ] Landing page + footer attribution/notice "PC map art — BGMI may differ".
+- [ ] Gate or remove the `/maps/[mapId]` dev page in production (env flag).
 - [ ] `/explore` read-only demo boards.
 - [ ] Tablet layout (bottom toolbar, bottom sheet), phone view + chat mode, touch gestures.
 - [ ] Coach-mark onboarding tour.
@@ -141,7 +143,7 @@ _Status 2026-10-25: met — verified in Chrome on real tiles (all zooms −1…7
 
 ## Known risks / watch list
 - Licensing of PUBG map art for a public site (Phase 0).
-- Very large source PNGs (~95–122 MB each) → tile build needs ~4–8 GB RAM; run locally, not in CI.
+- Large source PNGs (~90–116 MB each, 8192×8192) → tile build takes ≈ 25 s and < 1 GB RAM locally; still run it locally, not in CI (needs the ≈ 650 MB LFS download). CI uses the committed fixture tiles.
 - `Rondo_Main_Low_Res.png` is JPEG-encoded despite `.png` name — handle by magic bytes.
 - Next.js rewrites may not proxy websocket upgrades reliably in dev → use direct socket URL fallback.
 - Leaflet 2.0 is a breaking rewrite — stay on 1.9.x for v1.

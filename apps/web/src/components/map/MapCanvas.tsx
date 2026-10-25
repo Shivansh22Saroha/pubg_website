@@ -120,7 +120,9 @@ export default function MapCanvas({ mapId }: { mapId: MapId }) {
           />
           {/* between tiles (200) and future drawing overlays (400) */}
           <Pane name={GRID_PANE} style={{ zIndex: 350 }}>
-            {grid && <GridLayer worldSize={worldSize} cells={gridCells} />}
+            {grid && (
+              <GridLayer worldSize={worldSize} cells={gridCells} maxNativeZoom={maxNativeZoom} />
+            )}
           </Pane>
         </MapContainer>
       </div>

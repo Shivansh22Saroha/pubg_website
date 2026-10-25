@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:int": "vitest run --config vitest.integration.config.ts"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"

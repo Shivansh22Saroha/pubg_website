@@ -27,6 +27,33 @@
     "test:e2e": {
       "dependsOn": ["^build"],
       "cache": false
+    },
+    "test:int": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
-  }
+  },
+  "globalPassThroughEnv": [
+    "CI",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "TEST_DATABASE_URL",
+    "TEST_REDIS_URL",
+    "APP_ORIGIN",
+    "JWT_SECRET",
+    "JWT_ISSUER",
+    "JWT_AUDIENCE",
+    "COOKIE_SECURE",
+    "IP_HASH_SALT",
+    "TRUST_PROXY",
+    "NODE_ENV",
+    "PORT",
+    "ARGON2_MEMORY_KIB",
+    "ARGON2_ITERATIONS",
+    "RATE_LIMITS_ENABLED",
+    "NEXT_PUBLIC_*",
+    "INTERNAL_API_URL",
+    "NEXT_TELEMETRY_DISABLED",
+    "REFRESH_REUSE_GRACE_SEC"
+  ]
 }

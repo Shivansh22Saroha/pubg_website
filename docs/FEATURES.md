@@ -38,7 +38,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 **Rules**
 - Base layers: `labels` (from `*_Main_High_Res`) and `clean` (from `*_Main_No_Text_High_Res`). Toggle `N`. Choice stored per user in `localStorage` (try/catch).
 - Initial view: fit whole map. Max zoom = `maxNativeZoom + 2` (over-zoom with upscaled tiles for precise placement).
-- Grid overlay: 8×8 major lines every 1 km labelled A–H (top) / I–P (left), drawn as a Leaflet canvas layer; at zoom ≥ `maxNativeZoom − 1`, minor lines every 100 m appear at 30 % opacity.
+- Grid overlay: 8×8 major lines every 102 000 cm (1.02 km) labelled A–H (top) / I–P (left), drawn as a Leaflet canvas layer; at zoom ≥ `maxNativeZoom − 1`, minor lines every 10 200 cm (≈ 102 m, 1/10 of a square) appear at 30 % opacity.
 - HUD shows cursor grid ref `F-M 4,7` + metres from top-left.
 - Sea / out-of-bounds: `maxBounds` with 10 % padding, `maxBoundsViscosity: 0.8`.
 - While tiles load, show the 819 px low-res image as an `ImageOverlay` under the tile layer.

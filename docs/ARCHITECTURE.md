@@ -111,7 +111,7 @@ middleware.ts         # redirects unauthenticated users away from (app) routes
 ## 5. Map rendering & coordinate system ⭐
 
 ### 5.1 World units
-All persisted geometry uses **PUBG world units = centimetres**, origin top-left, x → east, y → south, range `0 … mapSize` where `mapSize = 816000` for Erangel, Miramar and Rondo (8×8 km). This matches PUBG telemetry, so future replay overlays need no conversion.
+All persisted geometry uses **PUBG world units = centimetres**, origin top-left, x → east, y → south, range `0 … mapSize` where `mapSize = 816000` for Erangel, Miramar and Rondo (nominally "8×8 km"; strictly 8.16 km per side). This matches PUBG telemetry, so future replay overlays need no conversion.
 
 ### 5.2 Map registry (`packages/shared/src/maps.ts`)
 ```ts
@@ -141,7 +141,7 @@ const bounds = L.latLngBounds([0, 0], [W, W]);
 Note the **`{z}/{y}/{x}`** order — this is what `sharp`'s `layout: 'google'` writes.
 
 ### 5.4 Grid reference
-`gridRef(x, y)`: column = `'ABCDEFGH'[floor(x / (W/8))]`, row = `'IJKLMNOP'[floor(y / (W/8))]` → e.g. `"F-M"`. Sub-square to 100 m shown as `F-M 4,7`. Verify letter scheme in game before release; it is a constant in `maps.ts`.
+`gridRef(x, y)`: column = `'ABCDEFGH'[floor(x / (W/8))]`, row = `'IJKLMNOP'[floor(y / (W/8))]` → e.g. `"F-M"`. With W = 816 000 a square is 102 000 cm (1.02 km). Sub-square = 1/10 of a square (10 200 cm ≈ 102 m), shown as `F-M 4,7`; minor grid lines use the same W/80 spacing so they stay aligned with the major squares. Verify letter scheme in game before release; it is a constant in `maps.ts`.
 
 ### 5.5 Distance
 `metres = hypot(dx, dy) / 100`. Travel-time estimates use `SPEEDS = { foot: 6, vehicle: 22 }` m/s (configurable estimates, labelled "approx." in UI).
@@ -159,7 +159,7 @@ Note the **`{z}/{y}/{x}`** order — this is what `sharp`'s `layout: 'google'` w
 3. **upload** — `rclone sync out/ r2:rotationlab-tiles/` (or copy into `apps/web/public/tiles` for local dev).
    Tiles are immutable → `Cache-Control: public, max-age=31536000, immutable`; version path (`/tiles/v1/...`) when regenerating.
 
-Expected output: ~6 tile sets × a few thousand tiles; roughly 0.5–1.5 GB total as WebP.
+Measured output (Oct 2026, api-assets@32b13b5): all six source images are 8192×8192 px (no padding), so maxNativeZoom = 5 and each tile set is 1 365 tiles (z0–5). 6 sets = 8 190 tiles, ≈ 94 MB WebP q82 (≈ 113 MB with previews). `fetch` ≈ 2–3 min (≈ 650 MB LFS download); `build` ≈ 25 s on a desktop CPU, peak RAM well under 1 GB.
 
 ## 7. Realtime sync model ⭐
 

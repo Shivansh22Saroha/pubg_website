@@ -1,6 +1,8 @@
 import { ATTRIBUTION_TEXT, BGMI_NOTICE, PRODUCT_NAME } from '@rotationlab/shared';
 import { Crosshair } from 'lucide-react';
+import Link from 'next/link';
 import { HealthStatus } from '@/components/HealthStatus';
+import { buttonVariants } from '@/components/ui/button';
 
 // Phase 1 placeholder — the real landing page arrives in Phase 9 (UI_UX_SPEC §3.1).
 export default function HomePage() {
@@ -11,11 +13,19 @@ export default function HomePage() {
           <Crosshair className="size-[18px] text-accent" aria-hidden />
           {PRODUCT_NAME}
         </span>
+        <nav className="ml-auto flex items-center gap-2">
+          <Link href="/login" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            Log in
+          </Link>
+          <Link href="/register" className={buttonVariants({ variant: 'accent', size: 'sm' })}>
+            Get started
+          </Link>
+        </nav>
       </header>
 
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-8 px-4 py-12">
         <div className="text-center">
-          <p className="section-label mb-2 text-xs text-accent">Phase 1 · Scaffold</p>
+          <p className="section-label mb-2 text-xs text-accent">Early access</p>
           <h1 className="font-display text-[32px] leading-tight font-bold">
             Plan your rotations together.
           </h1>

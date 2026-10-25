@@ -68,5 +68,16 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // tests: fixtures and stubs make these noisy; production code keeps them
+    files: ['**/test/**/*.{ts,tsx}', '**/e2e/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+      // tests read storage to assert it stays empty
+      'no-restricted-syntax': 'off',
+    },
+  },
   prettier,
 );

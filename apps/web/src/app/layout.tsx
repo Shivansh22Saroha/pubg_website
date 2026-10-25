@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono, Rajdhani } from 'next/font/google';
 import type { ReactNode } from 'react';
 import '@/env';
 import './globals.css';
+import { Providers } from './providers';
 
 const rajdhani = Rajdhani({
   subsets: ['latin'],
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`dark ${rajdhani.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="min-h-dvh bg-bg text-text">{children}</body>
+      <body className="min-h-dvh bg-bg text-text">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

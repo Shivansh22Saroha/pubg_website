@@ -56,6 +56,17 @@ describe('gridLines', () => {
     expect(major.at(-1)).toBe(W);
     expect(gridLines(W, 80)).toHaveLength(81);
   });
+
+  it('spaces minor lines W/80 = 10 200 cm (not 10 000) and aligns every 10th with a major line', () => {
+    const major = gridLines(W, 8);
+    const minor = gridLines(W, 80);
+    for (let i = 1; i < minor.length; i++) {
+      expect((minor[i] ?? 0) - (minor[i - 1] ?? 0)).toBeCloseTo(10_200);
+    }
+    major.forEach((m, k) => {
+      expect(minor[k * 10]).toBe(m);
+    });
+  });
 });
 
 describe('distance & travel time', () => {
