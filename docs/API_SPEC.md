@@ -146,7 +146,12 @@ Handshake middleware reads `rl_at` cookie, verifies JWT and `Origin`. Failure �
 
 All client→server events use **acks**: `socket.emit(event, payload, (res) => …)` where `res = { ok: true, data? } | { ok: false, code, message }`.
 
-Implementation notes (Phase 5A):
+Implementation notes (Phase 5A/5B):
+- **Join before subscribe:** `board:subscribe` and every durable op need a prior `room:join` on the same socket (`FORBIDDEN` otherwise).
+- **Batch broadcasts:** `element:batch` emits one `board:op` per op (consecutive seqs) — clients have a single apply path.
+- **Idempotent delete:** deleting an element that no longer exists succeeds as a no-op *with its own seq*, so concurrent deletes converge without rollbacks.
+- **`summon`** uses the `board.edit` permission (OWNER/EDITOR).
+- **Session expiry:** on connect the server emits `session { expiresAt }` (epoch ms of the access token's `exp`); clients refresh ~60 s before it and reconnect. A socket still open 60 s after `exp` gets `error { code: 'TOKEN_EXPIRED' }` and is disconnected (`io server disconnect`); the client refreshes and reconnects with a delta resync.
 - `connect_error` codes: `UNAUTHENTICATED`, `TOKEN_EXPIRED`, `FORBIDDEN` (Origin ≠ `APP_ORIGIN`), `LIMIT_REACHED` (> 5 sockets per user). In production the cookie is `__Host-rl_at`.
 - Logout, logout-all, password change, session revoke and refresh-token theft disconnect the affected sessions' sockets on every instance (Redis adapter). Kick sends `member:kicked` to the target, then disconnects their sockets for that room.
 - `board:subscribe` / durable ops require a prior `room:join` on that socket (`FORBIDDEN` otherwise); boards of rooms you aren't a member of are `NOT_FOUND`.
@@ -163,8 +168,8 @@ Implementation notes (Phase 5A):
 | `board:subscribe` | `{ boardId, sinceSeq?: number }` | `{ mode: 'delta', ops: Op[], seq } \| { mode: 'full', layers, elements, seq }` | leaves previous board channel |
 | `element:upsert` | `{ opId, boardId, element: ElementInput }` | `{ seq }` | EDITOR+, layer unlocked |
 | `element:delete` | `{ opId, boardId, elementId }` | `{ seq }` | |
-| `element:batch` | `{ boardId, ops: (Upsert\|Delete)[] }` (≤ 50, ≤ 64 KB) | `{ seqs: number[] }` | all-or-nothing |
-| `layer:upsert` | `{ opId, boardId, layer: LayerInput }` | `{ seq }` | EDITOR+; any EDITOR+ can lock/unlock a layer in v1 |
+| `element:batch` | `{ boardId, ops: ({ opId, kind: 'upsert', element: ElementInput } \| { opId, kind: 'delete', elementId })[] }` (1–50 ops, ≤ 64 KB) | `{ seqs: number[] }` (one per op, consecutive) | all-or-nothing; broadcast as **one `board:op` per op** |
+| `layer:upsert` | `{ opId, boardId, layer: LayerInput }` | `{ seq }` | EDITOR+ for unlocked layers; **lock/unlock, and any edit or delete of a locked layer, is OWNER-only** (`FORBIDDEN`) |
 | `layer:delete` | `{ opId, boardId, layerId }` | `{ seq }` | deletes its elements |
 | `layer:reorder` | `{ opId, boardId, order: layerId[] }` | `{ seq }` | |
 | `layer:clear` | `{ opId, boardId, layerId }` | `{ seq }` | |
@@ -175,7 +180,7 @@ Implementation notes (Phase 5A):
 | `laser:point` | `{ boardId, x, y }` | – volatile | |
 | `view:update` | `{ boardId, center: Pt, zoom }` | – volatile | only sent while ≥ 1 follower |
 | `follow:start` / `follow:stop` | `{ targetUserId }` | – | |
-| `summon` | `{ boardId }` | – | OWNER/EDITOR: asks all to follow you |
+| `summon` | `{ boardId }` | – | asks all to follow you; permission `board.edit` (OWNER/EDITOR) |
 | `presence:heartbeat` | `{ roomId, boardId, idle: boolean }` | – | every 20 s |
 
 `ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly.

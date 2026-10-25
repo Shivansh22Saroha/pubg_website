@@ -67,11 +67,11 @@ _Status 2026-10-25: met — E2E-2 green; authz matrix 33 routes × 5 callers (16
 - [x] `board:subscribe` (full + delta), elements table, board_ops log, seq allocation txn, opId dedupe.
 - [x] `element:upsert/delete/batch`, `layer:*` handlers with validation, limits, lock checks.
 - [x] Per-socket rate limiting; kick/role change → socket enforcement.
-- [ ] Web: socket singleton, `boardStore` (optimistic, ack, reject rollback, LWW), reconnect & resync, sync indicator.
-- [ ] Element renderer layer (canvas renderer + marker divIcons) — render from store.
+- [x] Web: socket singleton, `boardStore` (optimistic, ack, reject rollback, LWW), reconnect & resync, sync indicator.
+- [x] Element renderer layer (canvas renderer + marker divIcons) — render from store.
 
 **Exit:** realtime integration tests (TESTING §4) green; two browsers see each other's programmatically created elements.
-_Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 74-cell socket authz matrix) green, two-instance Redis-adapter test green, `scripts/realtime-smoke.ts` p50 27 ms / p95 40 ms on loopback. **5B (client)** — the two unchecked web items — is the next run._
+_Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 74-cell socket authz matrix) green, two-instance Redis-adapter test green, `scripts/realtime-smoke.ts` p50 27 ms / p95 40 ms on loopback. **5B (client) done** — exit met: two browsers see each other's elements live (E2E: 20 elements < 1 s + move, presence + cursors, offline queue, API kill/restart, kick); 1 000-element pan avg 18.6 ms/frame (headless); 369 integration tests, 12 E2E, smoke p50 21 ms / p95 27 ms._
 
 ## Phase 6 — Drawing tools (P0)
 - [ ] Tool framework (pointer handling, drafts, cursor per tool, Esc cancel).
@@ -86,7 +86,7 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 **Exit:** E2E-3, E2E-5, E2E-8, E2E-9 pass; 1 000-element perf benchmark within target.
 
 ## Phase 7 — Collaboration extras & chat (P0/P1)
-- [ ] Live cursors (20 Hz throttle, fade), presence dots on board tabs.
+- [x] Live cursors (20 Hz throttle, fade), presence dots on board tabs. _(done early in Phase 5B)_
 - [ ] Chat: send, history pagination, system messages, delete, unread badge.
 - [ ] Map pings (📍 button, Alt+click), ping chip fly-to + pulse.
 - [ ] Laser pointer (P1), follow & summon (P1).

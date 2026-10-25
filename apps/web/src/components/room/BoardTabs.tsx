@@ -18,6 +18,7 @@ import { Input, Label } from '@/components/ui/input';
 import { ApiError } from '@/lib/api';
 import { useCreateBoard, useDeleteBoard, useUpdateBoard } from '@/lib/rooms';
 import { cn } from '@/lib/utils';
+import { usePresenceStore } from '@/stores/presenceStore';
 
 type DialogState =
   { kind: 'new' } | { kind: 'rename'; board: Board } | { kind: 'delete'; board: Board } | null;
@@ -109,6 +110,7 @@ export function BoardTabs({
               >
                 <MapIcon className="size-3.5" aria-hidden />
                 <span className="max-w-40 truncate">{b.name}</span>
+                <BoardPresenceDots boardId={b.id} />
               </button>
               {canManage && (
                 <DropdownMenu>
@@ -289,5 +291,27 @@ export function BoardTabs({
         )}
       </Dialog>
     </>
+  );
+}
+
+/** Small dots in the presence colours of everyone currently on this board (UI_UX_SPEC §3.5). */
+function BoardPresenceDots({ boardId }: { boardId: string }) {
+  const users = usePresenceStore((s) => s.users);
+  const here = Object.values(users).filter((u) => u.boardId === boardId);
+  if (here.length === 0) return null;
+  return (
+    <span
+      className="flex -space-x-1"
+      aria-label={`${here.length} here`}
+      data-testid="board-presence"
+    >
+      {here.slice(0, 4).map((u) => (
+        <span
+          key={u.userId}
+          className="size-2 rounded-full ring-1 ring-bg"
+          style={{ backgroundColor: u.color }}
+        />
+      ))}
+    </span>
   );
 }

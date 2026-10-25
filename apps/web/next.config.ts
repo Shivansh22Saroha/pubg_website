@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
+  // always defined, so `=== 'true'` folds at build time and dead debug code is dropped
+  env: { NEXT_PUBLIC_E2E_DEBUG: process.env.NEXT_PUBLIC_E2E_DEBUG ?? 'false' },
   // separate output for the E2E build so it never mixes with `pnpm build`
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   // Dev (and E2E builds): proxy API + realtime through Next so the browser sees one origin and

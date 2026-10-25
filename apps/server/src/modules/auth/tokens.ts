@@ -50,8 +50,8 @@ export function createTokenService(cfg: TokenConfig, now: () => number = Date.no
         .sign(current);
     },
 
-    /** Throws AppError TOKEN_EXPIRED or UNAUTHENTICATED. */
-    async verify(token: string): Promise<AccessClaims> {
+    /** Throws AppError TOKEN_EXPIRED or UNAUTHENTICATED. `exp` is epoch seconds. */
+    async verify(token: string): Promise<AccessClaims & { exp: number }> {
       let payload: JWTPayload;
       try {
         ({ payload } = await verifyWith(token, current));
@@ -66,11 +66,11 @@ export function createTokenService(cfg: TokenConfig, now: () => number = Date.no
           throw mapError(err);
         }
       }
-      const { sub, sid } = payload;
-      if (typeof sub !== 'string' || typeof sid !== 'string') {
+      const { sub, sid, exp } = payload;
+      if (typeof sub !== 'string' || typeof sid !== 'string' || typeof exp !== 'number') {
         throw new AppError('UNAUTHENTICATED', 'Invalid access token');
       }
-      return { sub, sid };
+      return { sub, sid, exp };
     },
   };
 }

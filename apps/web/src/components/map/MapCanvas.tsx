@@ -1,9 +1,9 @@
 'use client';
 
 import 'leaflet/dist/leaflet.css';
-import { MAPS, type MapId } from '@rotationlab/shared';
+import { MAPS, type MapId, type Pt } from '@rotationlab/shared';
 import type L from 'leaflet';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ImageOverlay, MapContainer, Pane, TileLayer } from 'react-leaflet';
 import { env } from '@/env';
 import { createCrs, worldBounds } from '@/lib/coords';
@@ -28,13 +28,39 @@ function isTypingTarget(target: EventTarget | null) {
  * swap by opacity, so the labels toggle never flashes blank; the 819 px low-res art sits
  * underneath while tiles stream in.
  */
-export default function MapCanvas({ mapId }: { mapId: MapId }) {
+export default function MapCanvas({
+  mapId,
+  children,
+  onCursor,
+}: {
+  mapId: MapId;
+  /** board layers (elements, cursors…) rendered inside the Leaflet map */
+  children?: ReactNode;
+  /** world-unit pointer position over the map (null when it leaves) */
+  onCursor?: (pt: Pt | null) => void;
+}) {
   const config = MAPS[mapId];
   const { worldSize, gridCells, maxNativeZoom } = config;
   const crs = useMemo(() => createCrs(config), [config]);
   const bounds = useMemo(() => worldBounds(worldSize), [worldSize]);
 
   const [map, setMap] = useState<L.Map | null>(null);
+
+  useEffect(() => {
+    if (!map || !onCursor) return;
+    const move = (e: L.LeafletMouseEvent) => {
+      onCursor([e.latlng.lng, e.latlng.lat]);
+    };
+    const out = () => {
+      onCursor(null);
+    };
+    map.on('mousemove', move);
+    map.on('mouseout', out);
+    return () => {
+      map.off('mousemove', move);
+      map.off('mouseout', out);
+    };
+  }, [map, onCursor]);
   const [variant, setVariant] = useState<BaseVariant>('labels');
   const [grid, setGrid] = useState(true);
 
@@ -124,6 +150,7 @@ export default function MapCanvas({ mapId }: { mapId: MapId }) {
               <GridLayer worldSize={worldSize} cells={gridCells} maxNativeZoom={maxNativeZoom} />
             )}
           </Pane>
+          {children}
         </MapContainer>
       </div>
       {map && grid && <GridLabels map={map} worldSize={worldSize} cells={gridCells} />}

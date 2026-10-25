@@ -21,6 +21,10 @@ export function makeConfig(mode: 'prod' | 'dev') {
     NEXT_PUBLIC_API_BASE: '/api/v1',
     NEXT_PUBLIC_SOCKET_PATH: '/realtime',
     NEXT_PUBLIC_TILES_BASE_URL: '/tiles',
+    // websockets don't pass through Next rewrites: the socket talks to the API directly
+    NEXT_PUBLIC_SOCKET_URL: `http://localhost:${API_PORT}`,
+    // test-only: keep window.__rlDebug in this production build
+    NEXT_PUBLIC_E2E_DEBUG: 'true',
     NEXT_TELEMETRY_DISABLED: '1',
   };
 
@@ -55,8 +59,9 @@ export function makeConfig(mode: 'prod' | 'dev') {
           ]
         : [
             {
-              // API without watch mode; DB/Redis from apps/server/.env (CI: the workflow env)
-              command: 'pnpm --dir ../server exec tsx --env-file-if-exists=.env src/index.ts',
+              // API without watch mode, under a supervisor the tests can restart (e2e/fixtures
+              // `restartApi`); DB/Redis from apps/server/.env (CI: the workflow env)
+              command: 'pnpm --dir ../server exec tsx scripts/e2e-api.ts',
               url: `http://localhost:${API_PORT}/api/health`,
               reuseExistingServer: false,
               timeout: 120_000,
@@ -65,6 +70,7 @@ export function makeConfig(mode: 'prod' | 'dev') {
                 APP_ORIGIN: origin,
                 RATE_LIMITS_ENABLED: 'false',
                 LOG_LEVEL: 'warn',
+                E2E_CONTROL_PORT: '4299',
               },
             },
             {

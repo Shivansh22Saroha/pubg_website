@@ -11,7 +11,10 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError } from '@/lib/api';
-import { useBoardState, useKickMember, useSetMemberRole } from '@/lib/rooms';
+import { cn } from '@/lib/utils';
+import { useKickMember, useSetMemberRole } from '@/lib/rooms';
+import { useBoardStore } from '@/stores/boardStore';
+import { usePresenceStore } from '@/stores/presenceStore';
 
 /** Right panel (UI_UX_SPEC §3.5): Chat · Layers · Members. */
 export function SidePanel({
@@ -19,13 +22,11 @@ export function SidePanel({
   role,
   meId,
   members,
-  boardId,
 }: {
   roomId: string;
   role: RoomRole;
   meId: string;
   members: Member[];
-  boardId: string | undefined;
 }) {
   return (
     <Tabs defaultValue="members" className="flex h-full flex-col">
@@ -42,7 +43,7 @@ export function SidePanel({
         Room chat with map pings arrives with live collaboration.
       </TabsContent>
       <TabsContent value="layers" className="overflow-y-auto p-2">
-        <LayersList boardId={boardId} />
+        <LayersList />
       </TabsContent>
       <TabsContent value="members" className="overflow-y-auto p-2">
         <MembersList roomId={roomId} role={role} meId={meId} members={members} />
@@ -52,12 +53,14 @@ export function SidePanel({
 }
 
 /** Read-only in Phase 4; layer editing goes over the socket (Phase 5/6). */
-function LayersList({ boardId }: { boardId: string | undefined }) {
-  const state = useBoardState(boardId);
-  if (!state.data) return <p className="p-2 text-sm text-text-muted">Loading layers…</p>;
+function LayersList() {
+  // live from the board store (realtime); editing arrives with the Phase 6 layers panel
+  const layers = useBoardStore((st) => st.view.layers);
+  const ready = useBoardStore((st) => st.ready);
+  if (!ready) return <p className="p-2 text-sm text-text-muted">Loading layers…</p>;
   return (
     <ul className="flex flex-col" aria-label="Layers">
-      {state.data.layers.map((l) => (
+      {layers.map((l) => (
         <li
           key={l.id}
           className="flex items-center gap-2 rounded-control px-2 py-2 text-sm hover:bg-surface-2"
@@ -100,7 +103,11 @@ function MembersList({
   const fail = (err: unknown) =>
     toast.error(err instanceof ApiError ? err.message : 'Something went wrong');
   // online first (presence arrives in Phase 5), then by join order
-  const sorted = [...members].sort((a, b) => Number(b.online) - Number(a.online));
+  // online first (live presence), then join order
+  const online = usePresenceStore((st) => st.users);
+  const sorted = [...members].sort(
+    (a, b) => Number(b.user.id in online) - Number(a.user.id in online),
+  );
 
   return (
     <>
@@ -111,7 +118,18 @@ function MembersList({
             className="flex items-center gap-2 rounded-control px-2 py-2 hover:bg-surface-2"
             data-testid="member-row"
           >
-            <Avatar user={m.user} className="size-7 text-xs" />
+            <span className="relative">
+              <Avatar user={m.user} className="size-7 text-xs" />
+              <span
+                aria-label={m.user.id in online ? 'online' : 'offline'}
+                data-testid="member-online"
+                data-online={m.user.id in online}
+                className={cn(
+                  'absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-surface',
+                  m.user.id in online ? 'bg-success' : 'bg-border',
+                )}
+              />
+            </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
                 {m.user.displayName}

@@ -14,8 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Avatar } from '@/components/auth/UserMenu';
-import { MapView } from '@/components/map/MapView';
+import { BoardMapView } from '@/components/map/BoardMapView';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -25,12 +24,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useMe } from '@/hooks/useMe';
+import { useRoomRealtime } from '@/hooks/useRoomRealtime';
 import { ApiError } from '@/lib/api';
+import { loadDebugHook } from '@/lib/debug/loadDebugHook';
 import { prefKeys, readPref, writePref } from '@/lib/prefs';
 import { useLeaveRoom, useRoom } from '@/lib/rooms';
 import { BoardTabs } from './BoardTabs';
 import { InviteDialog } from './InviteDialog';
 import { RoomSettingsDialog } from './RoomSettingsDialog';
+import {
+  PresenceStack,
+  RoomGoneDialog,
+  SessionExpiredDialog,
+  SyncIndicator,
+} from './RealtimeStatus';
 import { SidePanel } from './SidePanel';
 
 function isTypingTarget(t: EventTarget | null) {
@@ -41,9 +48,9 @@ function isTypingTarget(t: EventTarget | null) {
 }
 
 /**
- * Room workspace shell (UI_UX_SPEC §3.5) — Phase 4: board tabs, map of the active board,
- * invite / settings dialogs, members & layers panel. Drawing tools, presence, chat and sync
- * arrive with the realtime phases.
+ * Room workspace (UI_UX_SPEC §3.5): board tabs, live map of the active board, presence, sync
+ * state, invite / settings dialogs, members & layers panel. Drawing tools arrive in Phase 6,
+ * chat in Phase 7.
  */
 export function RoomWorkspace({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -55,6 +62,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   );
   const [panelOpen, setPanelOpen] = useState(true);
   const [dialog, setDialog] = useState<'invite' | 'settings' | null>(null);
+  const [gone, setGone] = useState<'kicked' | 'deleted' | null>(null);
 
   const boards = useMemo(() => query.data?.boards ?? [], [query.data]);
   // fall back to the first board when the remembered one is gone (deleted / other room)
@@ -64,6 +72,47 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
     setPicked(id);
     writePref(prefKeys.lastBoard(roomId), id);
   };
+
+  const { session, onCursor } = useRoomRealtime(roomId, me.data?.id, active?.id, {
+    onKicked: () => {
+      setGone('kicked');
+    },
+    onRoomDeleted: () => {
+      setGone('deleted');
+    },
+    onActiveBoardDeleted: (fallback) => {
+      toast('This board was deleted — moved you to the first board');
+      if (fallback) setPicked(fallback.id);
+    },
+    onRoleChanged: (r) => {
+      toast(
+        `Your role changed to ${r === 'OWNER' ? 'Owner' : r === 'EDITOR' ? 'Editor' : 'Viewer'}`,
+      );
+    },
+    onReject: (message) => {
+      toast.error(message);
+    },
+  });
+
+  useEffect(() => {
+    const hook = session && active ? loadDebugHook() : null; // dev / E2E only
+    if (!hook || !session || !active) return;
+    let uninstall: (() => void) | undefined;
+    let cancelled = false;
+    void hook.then(({ installRlDebug }) => {
+      if (!cancelled) uninstall = installRlDebug(session, active.mapId);
+    });
+    return () => {
+      cancelled = true;
+      uninstall?.();
+    };
+  }, [session, active]);
+
+  const names = useMemo(
+    () =>
+      Object.fromEntries((query.data?.members ?? []).map((m) => [m.user.id, m.user.displayName])),
+    [query.data],
+  );
 
   // UI_UX_SPEC §8: 1–9 switch board tab, ] toggles the right panel
   useEffect(() => {
@@ -180,23 +229,8 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
         />
 
         <div className="ml-auto flex shrink-0 items-center gap-2 px-3">
-          <div
-            className="hidden items-center -space-x-2 md:flex"
-            aria-label={`${members.length} members`}
-          >
-            {members.slice(0, 5).map((m) => (
-              <span
-                key={m.user.id}
-                title={m.user.displayName}
-                className="rounded-full ring-2 ring-bg"
-              >
-                <Avatar user={m.user} className="size-7 text-xs" />
-              </span>
-            ))}
-            {members.length > 5 && (
-              <span className="pl-3 text-xs text-text-muted">+{members.length - 5}</span>
-            )}
-          </div>
+          <SyncIndicator />
+          <PresenceStack members={members} />
           {can(role, 'invite.create') && (
             <Button
               variant="outline"
@@ -243,20 +277,22 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1" aria-label="Map">
-          {active && <MapView key={active.id} mapId={active.mapId} />}
+          {active && (
+            <BoardMapView
+              key={active.id}
+              mapId={active.mapId}
+              meId={meId}
+              names={names}
+              onCursor={onCursor}
+            />
+          )}
         </main>
         {panelOpen && (
           <aside
             className="w-[340px] shrink-0 border-l bg-surface max-xl:w-[300px]"
             aria-label="Room panel"
           >
-            <SidePanel
-              roomId={roomId}
-              role={role}
-              meId={meId}
-              members={members}
-              boardId={active?.id}
-            />
+            <SidePanel roomId={roomId} role={role} meId={meId} members={members} />
           </aside>
         )}
       </div>
@@ -272,6 +308,8 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           }}
         />
       )}
+      <RoomGoneDialog reason={gone} />
+      <SessionExpiredDialog />
       {dialog === 'settings' && (
         <RoomSettingsDialog
           room={room}

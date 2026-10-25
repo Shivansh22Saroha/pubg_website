@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:dev": "playwright test --config playwright.dev.config.ts"
+    "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+    "check:no-debug": "node scripts/check-no-debug.mjs .next"
   },
   "dependencies": {
     "@hookform/resolvers": "^6.0.0",
@@ -19,6 +20,7 @@
     "@tanstack/react-query": "^5.104.5",
     "class-variance-authority": "~0.7.1",
     "clsx": "^2.1.1",
+    "immer": "^11.2.9",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.61.0",
     "next": "^16.4.3",
@@ -27,9 +29,12 @@
     "react-dom": "^19.3.1",
     "react-hook-form": "^7.91.0",
     "react-leaflet": "^5.0.0",
+    "socket.io-client": "^4.8.4",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
-    "zod": "^4.6.7"
+    "uuid": "^14.0.3",
+    "zod": "^4.6.7",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

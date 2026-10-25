@@ -28,8 +28,10 @@ export const PERMISSIONS = {
   'room.view': ['OWNER', 'EDITOR', 'VIEWER'],
   /** send chat, pings, laser, cursor */
   'room.interact': ['OWNER', 'EDITOR', 'VIEWER'],
-  /** create/edit/delete elements & layers */
+  /** create/edit/delete elements; create/rename/recolor/reorder/delete *unlocked* layers */
   'board.edit': ['OWNER', 'EDITOR'],
+  /** lock/unlock layers, and rename/recolor/delete a locked layer */
+  'layer.lock': ['OWNER'],
   /** create/rename/duplicate/reorder boards, snapshots, restore */
   'board.manage': ['OWNER', 'EDITOR'],
   'board.delete': ['OWNER'],

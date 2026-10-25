@@ -139,11 +139,34 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
     - **socket authz matrix**: 18 events × 5 callers (74 cells; anonymous callers get no socket at all);
     - kick + block and `primaryMapId` tests;
     - REST authz matrix now 35 routes.
+- 2026-10-25 — **Phase 5B: realtime core, client side** (TODO Phase 5; RT-1…RT-7 client half, COLLAB cursors/presence; SECURITY V4/V5):
+  - `lib/realtime/socket.ts` + `connection.ts`: typed Socket.IO singleton (websocket only, `withCredentials`), jittered backoff 0.5–10 s, refresh on `TOKEN_EXPIRED` (handshake or server-side), proactive refresh 60 s before expiry with a silent reconnect (status never leaves "connected"), session-expired modal that keeps unsent ops.
+  - `stores/boardModel.ts` + `boardStore.ts` (Zustand + immer): confirmed state + pending overlay keyed by opId, per-item seq rule with delete tombstones, ack/reject (rollback), contiguous `lastSeq` with gap detection → delta resync after 2 s, full/delta subscribe, resend of pending ops with the same opIds, offline queue capped at 500 ops, `board:reset`, memoised per-id view.
+  - `RoomSession`: join → subscribe(`sinceSeq`) → flush on every (re)connect; consecutive element ops batched into `element:batch` (≤ 50 ops / 60 KB); retry on CONFLICT / RATE_LIMITED / INTERNAL; room events update the React Query cache (kick / room deleted / role change / boards / members).
+  - `presenceStore`: heartbeat every 20 s, idle after 2 min; sync indicator (synced / syncing / offline / reconnecting), presence avatars (5 + N) with colour rings, presence dots on board tabs, live cursors at 20 Hz fading after 5 s.
+  - `ElementLayer` on a shared `L.canvas` renderer: identity-diffed updates, visibility and restack only where needed; markers and text built with `createElement`/`textContent` and `#RRGGBB`-checked colours (never HTML).
+  - Dev/E2E-only `window.__rlDebug` (`addRandomElements`, `moveElement`, `deleteAll`, …), stripped from production builds and checked in CI (`check:no-debug`).
+  - Tests: web unit 74 (store rules incl. the remote-higher-seq-while-pending edge case, socket refresh flow with a fake socket, renderer diffing + marker DOM safety); E2E realtime (two contexts): 20 elements synced < 1 s + a move, presence + cursors, offline queue, API kill/restart mid-session (supervisor `scripts/e2e-api.ts`), kick; perf benchmark.
+  - **Perf (headless Chromium, software rendering), pan 5 s:** empty board 319 frames · avg 16.7 ms · p95 16.7 ms; **1 000 mixed elements 275 frames · avg 18.6 ms · p95 33.3 ms · max 50.0 ms.**
+  - Smoke script rerun: ack and broadcast p50 21.1 ms / p95 27.1 ms / max 45.6 ms.
+- 2026-10-25 — Phase 5A follow-ups:
+  - Layer lock/unlock and edits to a locked layer are OWNER-only (`layer.lock` permission); editors still create / rename / recolour / reorder / delete unlocked layers. SECURITY §3, API_SPEC, both authz matrices updated.
+  - Socket session expiry: the server records the token `exp` per socket, emits `session { expiresAt }`, and disconnects with `TOKEN_EXPIRED` `SOCKET_TOKEN_GRACE_SEC` (60 s) after it — one timer per socket, cleared on disconnect. Integration-tested.
+  - API_SPEC records the 5A decisions (join before subscribe, one broadcast per batch op, idempotent delete, batch op shape, summon → `board.edit`).
+  - Server: acked socket handlers run through a per-socket queue (emit order preserved); `element:batch` dedupes per op so a resend of a partially applied batch replays known ops and applies only the rest.
 - 2026-10-25 — Phase 4 follow-ups:
   - FEATURES F2 / API_SPEC now say an invite's role is fixed at creation.
   - **Kick + block**: `room_bans`, `DELETE …/members/:userId { ban?: true }`, `GET /rooms/:roomId/bans`, `DELETE /rooms/:roomId/bans/:userId`, invite accept → generic 403 for banned users. UI: "Also block them from rejoining" in the kick dialog; Room settings → Security → Blocked users with Unban.
   - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
   - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
+
+### Decisions (Phase 5B)
+- Dev/E2E sockets connect directly to the API (`NEXT_PUBLIC_SOCKET_URL`); the Next dev rewrite does not carry websocket upgrades. Production is unchanged (same origin via Caddy).
+- `lastSeq` only advances contiguously; an out-of-order seq is held in `seenAbove`, and a gap that persists 2 s triggers a delta resubscribe.
+- Resends are batched client-side and deduped per op server-side, so reconnecting with hundreds of pending ops stays under the rate limit and is safe to repeat.
+- The proactive refresh reconnects silently; the server-side expiry disconnect is the fallback when it fails.
+- The offline queue rejects new ops past 500 (`send()` returns false and the sync indicator shows the queue as full); the debug hook adds 1 000 elements as 2 × 500.
+- Dependencies (TECH_STACK): zustand 5.0.16, immer 11.2.9, socket.io-client 4.8.4, uuid 14.0.3 (web).
 
 ### Decisions (Phase 5A)
 - Durable ops and `board:subscribe` require `room:join` on the same socket first (`FORBIDDEN` otherwise). Ephemeral events only flow on the board the socket is subscribed to.

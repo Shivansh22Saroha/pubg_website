@@ -208,6 +208,8 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  /** on connect: when this socket's access token expires (epoch ms) — refresh ~60 s before */
+  session: (p: { expiresAt: number }) => void;
   'board:op': (p: BoardOp) => void;
   'board:reset': (p: {
     boardId: string;

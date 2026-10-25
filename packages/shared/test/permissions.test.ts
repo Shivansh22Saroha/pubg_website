@@ -18,6 +18,7 @@ const MATRIX: Record<Permission, Record<RoomRole, boolean>> = {
   'room.view': { OWNER: true, EDITOR: true, VIEWER: true },
   'room.interact': { OWNER: true, EDITOR: true, VIEWER: true },
   'board.edit': { OWNER: true, EDITOR: true, VIEWER: false },
+  'layer.lock': { OWNER: true, EDITOR: false, VIEWER: false },
   'board.manage': { OWNER: true, EDITOR: true, VIEWER: false },
   'board.delete': { OWNER: true, EDITOR: false, VIEWER: false },
   'invite.create': { OWNER: true, EDITOR: true, VIEWER: false },

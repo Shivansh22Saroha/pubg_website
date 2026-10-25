@@ -210,6 +210,7 @@ export async function buildApp({
       rooms,
       boardOps,
       events,
+      tokenGraceSec: config.SOCKET_TOKEN_GRACE_SEC,
     });
     dropSessions = (sids) => {
       disconnectSessions(realtime.io, sids);

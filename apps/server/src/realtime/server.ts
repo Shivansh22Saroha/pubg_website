@@ -74,6 +74,8 @@ export interface SocketData {
   rooms: string[];
   boardId: string | null;
   boardRoomId: string | null;
+  /** access token expiry, epoch seconds */
+  exp: number;
 }
 
 export type RealtimeServer = Server<
@@ -100,6 +102,8 @@ export interface RealtimeDeps {
   rooms: RoomService;
   boardOps: BoardOpsService;
   events: RoomEvents;
+  /** disconnect this long after the access token's exp (sessions never outlive their token) */
+  tokenGraceSec: number;
 }
 
 const ch = {
@@ -171,6 +175,7 @@ export function createRealtime(d: RealtimeDeps): {
           rooms: [],
           boardId: null,
           boardRoomId: null,
+          exp: claims.exp,
         };
         next();
       } catch (err) {
@@ -198,6 +203,21 @@ export function createRealtime(d: RealtimeDeps): {
     const user: AuthUser = { id: socket.data.userId, sid: socket.data.sid };
     void socket.join([ch.user(user.id), ch.session(user.sid)]);
     const limiter = createSocketLimiter();
+    // Acked events from one socket run one at a time, in emit order: a client may pipeline
+    // `upsert` then `delete` of the same element (or `room:join` then `board:subscribe`) and
+    // must see them applied in that order. Volatile events bypass the queue.
+    let queue: Promise<unknown> = Promise.resolve();
+
+    // session expiry: tell the client when to refresh, and drop the socket once the token is
+    // well past its exp — one timer per socket, cleared on disconnect
+    socket.emit('session', { expiresAt: socket.data.exp * 1000 });
+    const expiryTimer = setTimeout(
+      () => {
+        socket.emit('error', { code: 'TOKEN_EXPIRED', message: 'Session token expired' });
+        socket.disconnect(true);
+      },
+      Math.max(0, socket.data.exp * 1000 + d.tokenGraceSec * 1000 - Date.now()),
+    );
 
     function requireJoined(roomId: string) {
       if (!socket.data.rooms.includes(roomId))
@@ -232,14 +252,16 @@ export function createRealtime(d: RealtimeDeps): {
             });
             return;
           }
-          handler(parsed.data).then(
-            (data) => {
-              reply(data === undefined ? { ok: true } : { ok: true, data });
-            },
-            (err: unknown) => {
-              if (!(err instanceof AppError)) log.error({ err, event }, 'socket handler failed');
-              reply(toAckError(err));
-            },
+          queue = queue.then(() =>
+            handler(parsed.data).then(
+              (data) => {
+                reply(data === undefined ? { ok: true } : { ok: true, data });
+              },
+              (err: unknown) => {
+                if (!(err instanceof AppError)) log.error({ err, event }, 'socket handler failed');
+                reply(toAckError(err));
+              },
+            ),
           );
         },
       );
@@ -422,6 +444,7 @@ export function createRealtime(d: RealtimeDeps): {
     });
 
     socket.on('disconnect', () => {
+      clearTimeout(expiryTimer);
       for (const roomId of socket.data.rooms) {
         void presence.leave(roomId, user.id, socket.id).then(() => broadcastPresence(roomId));
       }

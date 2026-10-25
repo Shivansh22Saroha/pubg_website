@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Page } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
+import type {} from '../src/lib/debug/rlDebug';
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tiles');
 
@@ -48,4 +49,74 @@ export function uniqueName(prefix: string) {
     0,
     20,
   );
+}
+
+/** JSON call to our API from inside the page (its cookies, our CSRF header). */
+export async function pageApi<T = unknown>(
+  page: Page,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  return page.evaluate(
+    async ({ method, path, body }) => {
+      const res = await fetch(`/api/v1${path}`, {
+        method,
+        credentials: 'include',
+        headers: {
+          'x-requested-with': 'rotationlab',
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      if (!res.ok) throw new Error(`${method} ${path} → ${res.status} ${await res.text()}`);
+      return (res.status === 204 ? undefined : await res.json()) as unknown;
+    },
+    { method, path, body },
+  ) as Promise<T>;
+}
+
+/** Owner + second user in one room, both with the room open. */
+export async function twoUsersInRoom(browser: Browser) {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+  await serveFixtureTiles(a);
+  await serveFixtureTiles(b);
+  const nameA = uniqueName('rta');
+  const nameB = uniqueName('rtb');
+  await registerViaUi(a, nameA);
+  await registerViaUi(b, nameB);
+  const { room, board } = await pageApi<{ room: { id: string }; board: { id: string } }>(
+    a,
+    'POST',
+    '/rooms',
+    {
+      name: `Realtime ${Date.now().toString(36)}`,
+      firstBoard: { name: 'Erangel – Plan 1', mapId: 'erangel' },
+    },
+  );
+  const { invite } = await pageApi<{ invite: { code: string } }>(
+    a,
+    'POST',
+    `/rooms/${room.id}/invites`,
+    { expiresIn: '1h' },
+  );
+  await pageApi(b, 'POST', `/invites/${invite.code}/accept`, {});
+  for (const p of [a, b]) {
+    await p.goto(`/rooms/${room.id}`);
+    await p.waitForFunction(() => window.__rlDebug?.ready() === true);
+    await p.waitForSelector('[data-testid="sync-indicator"][data-state="synced"]');
+  }
+  return { ctxA, ctxB, a, b, nameA, nameB, roomId: room.id, boardId: board.id };
+}
+
+export const debugCount = (p: Page) => p.evaluate(() => window.__rlDebug?.count() ?? -1);
+export const debugPending = (p: Page) => p.evaluate(() => window.__rlDebug?.pending() ?? -1);
+
+/** Supervisor control (apps/server/scripts/e2e-api.ts). */
+export async function controlApi(action: 'stop' | 'start' | 'restart') {
+  const res = await fetch(`http://127.0.0.1:4299/${action}`, { method: 'POST' });
+  if (!res.ok) throw new Error(`api ${action}: ${res.status} ${await res.text()}`);
 }

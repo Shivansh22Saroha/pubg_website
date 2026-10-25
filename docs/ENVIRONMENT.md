@@ -48,6 +48,7 @@ Generate secrets with: `openssl rand -base64 48`
 | `SENTRY_DSN` | – | | error tracking |
 | `METRICS_TOKEN` | – | | if set, `/metrics` requires `Authorization: Bearer` (in addition to internal-only routing) |
 | `RATE_LIMITS_ENABLED` | – | `true` | `false` only for local E2E convenience (repeated registrations); refused when `NODE_ENV=production`. Integration tests always run with limits on |
+| `SOCKET_TOKEN_GRACE_SEC` | – | `60` | a socket is disconnected with `TOKEN_EXPIRED` this many seconds after its access token's `exp` (0–600); the client refreshes and reconnects silently before that |
 | `REFRESH_REUSE_GRACE_SEC` | – | `10` | a rotated refresh token presented again within this window is a concurrent refresh (two tabs) → `409`, not theft; after it → whole family revoked |
 | `TEST_DATABASE_URL` / `TEST_REDIS_URL` | tests only | `postgresql://…/rotationlab_test` / `redis://…/15` | integration tests; default = derived from `DATABASE_URL` / `REDIS_URL` (db `rotationlab_test`, Redis DB 15) |
 | `SEED_DEV_PASSWORD` | dev only | `devpassword123!` | password for seeded users; seeding refuses to run in production |
@@ -67,9 +68,12 @@ Only `NEXT_PUBLIC_*` variables reach the browser — **never** put secrets there
 | `INTERNAL_API_URL` | ✓ | `http://localhost:4000` (dev) / `http://server:4000` (docker) | server-side calls from Next middleware/RSC |
 
 ### Dev proxying
-In development, `next.config.ts` rewrites `/api/:path*` and `/realtime/:path*` → `http://localhost:4000` so the browser still sees a single origin (cookies work exactly like prod). Socket.IO websocket upgrade through Next rewrites can be unreliable — if so, connect the socket directly to `http://localhost:4000` in dev only (`NEXT_PUBLIC_SOCKET_URL`) with CORS dev origins enabled.
+In development, `next.config.ts` rewrites `/api/:path*` and `/realtime/:path*` → `http://localhost:4000` so the browser still sees a single origin (cookies work exactly like prod). **Websocket upgrades do not pass through the Next 16 dev rewrite** (measured in Phase 5B: 5/5 timeouts), so in dev and E2E the socket connects directly to the API via `NEXT_PUBLIC_SOCKET_URL`. The `rl_at` cookie is host-only on `localhost` and cookies ignore ports, so it is still sent; the API's CORS/Origin allow-list already includes the web origin. Production leaves it unset — Caddy serves `/realtime` on the app origin.
 
-| `NEXT_PUBLIC_SOCKET_URL` | dev only, optional | `http://localhost:4000` | direct socket URL fallback |
+| Variable | Required | Example | Description |
+|---|---|---|---|
+| `NEXT_PUBLIC_SOCKET_URL` | **dev / E2E** | `http://localhost:4000` (dev) / `http://localhost:4200` (E2E) | direct socket URL; unset in production (same origin) |
+| `NEXT_PUBLIC_E2E_DEBUG` | – | `false` | build-time: `true` only in the E2E build, which keeps the `window.__rlDebug` hook. Production builds strip it (`pnpm --filter web check:no-debug`) |
 
 ## 3. Map tiles (`packages/map-tiles/.env`)
 | Variable | Example | Description |

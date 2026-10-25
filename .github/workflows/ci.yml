@@ -89,6 +89,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Production build has no debug hook
+        run: pnpm --filter web check:no-debug
+
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install --with-deps chromium
 

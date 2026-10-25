@@ -31,7 +31,7 @@ describe('token service (SECURITY A3)', () => {
     const payload = decodeJwt(jwt);
     expect(Object.keys(payload).sort()).toEqual(['aud', 'exp', 'iat', 'iss', 'sid', 'sub']);
     expect(payload.exp! - payload.iat!).toBe(900);
-    expect(await svc.verify(jwt)).toEqual(claims);
+    expect(await svc.verify(jwt)).toEqual({ ...claims, exp: payload.exp });
   });
 
   it('maps an expired token to TOKEN_EXPIRED', async () => {
@@ -78,7 +78,7 @@ describe('token service (SECURITY A3)', () => {
       secret: 'n'.repeat(48),
       previousSecret: 'o'.repeat(48),
     });
-    expect(await rotated.verify(oldJwt)).toEqual(claims);
+    expect(await rotated.verify(oldJwt)).toMatchObject(claims);
     // new tokens are signed with the new secret only
     const fresh = await rotated.sign(claims);
     expect(await codeOf(old.verify(fresh))).toBe('UNAUTHENTICATED');

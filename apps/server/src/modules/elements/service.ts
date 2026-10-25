@@ -1,5 +1,6 @@
 import { Prisma, type Element as ElementRow, type PrismaClient } from '@prisma/client';
 import {
+  can,
   ELEMENT_LIMITS,
   elementJsonBytes,
   elementWithinWorld,
@@ -11,6 +12,7 @@ import {
   type ElementInput,
   type LayerInput,
   type OpBody,
+  type RoomRole,
 } from '@rotationlab/shared';
 import type { Redis } from 'ioredis';
 import { AppError } from '../../lib/errors.js';
@@ -107,6 +109,7 @@ export function createBoardOpsService(d: {
     tx: Tx,
     boardId: string,
     user: AuthUser,
+    role: RoomRole,
     op: OpRequest,
     seq: bigint,
     elementCount: number,
@@ -167,6 +170,14 @@ export function createBoardOpsService(d: {
         const existing = await tx.layer.findUnique({ where: { id: l.id } });
         if (existing && existing.boardId !== boardId)
           throw new AppError('FORBIDDEN', 'Layer id belongs to another board');
+        // lock/unlock — and editing a locked layer — is OWNER-only (SECURITY §3)
+        const touchesLock = existing ? existing.locked || existing.locked !== l.locked : l.locked;
+        if (touchesLock && !can(role, 'layer.lock')) {
+          throw new AppError(
+            'FORBIDDEN',
+            'Only the room owner can lock, unlock or edit locked layers',
+          );
+        }
         let row;
         if (existing) {
           row = await tx.layer.update({
@@ -197,7 +208,10 @@ export function createBoardOpsService(d: {
         return { body: { kind: 'layer:upsert', layer: toLayer(row) }, delta: 0 };
       }
       case 'layer:delete': {
-        await lockedLayer(tx, boardId, op.layerId);
+        const target = await lockedLayer(tx, boardId, op.layerId);
+        if (target.locked && !can(role, 'layer.lock')) {
+          throw new AppError('FORBIDDEN', 'Only the room owner can delete a locked layer');
+        }
         const ids = (
           await tx.layer.findMany({
             where: { boardId },
@@ -243,22 +257,37 @@ export function createBoardOpsService(d: {
 
   return {
     async apply(user: AuthUser, boardId: string, ops: OpRequest[]): Promise<ApplyResult> {
-      const { board } = await policy.requireBoard(user, boardId, 'board.edit');
-      const first = ops[0];
-      if (!first) throw new AppError('BAD_REQUEST', 'No ops');
+      const { board, role } = await policy.requireBoard(user, boardId, 'board.edit');
+      if (ops.length === 0) throw new AppError('BAD_REQUEST', 'No ops');
 
-      // idempotency (ARCHITECTURE §7.4): a resent message returns its original seqs
-      const key = opKey(user.id, first.opId);
-      const claimed = await redis.set(key, PENDING, 'EX', OP_TTL_SEC, 'NX');
-      if (claimed === null) {
-        const prior = await redis.get(key);
-        if (!prior || prior === PENDING)
-          throw new AppError('CONFLICT', 'This op is already being applied');
-        return { roomId: board.roomId, replay: true, ops: [], seqs: JSON.parse(prior) as number[] };
+      // Idempotency per op (ARCHITECTURE §7.4): every opId remembers its seq for 10 min. A
+      // resent message — single op or a batch that mixes applied and unapplied ops — returns
+      // the original seq for ops already applied and applies (and broadcasts) only the rest.
+      const keys = ops.map((o) => opKey(user.id, o.opId));
+      const prior = await redis.mget(keys);
+      if (prior.some((v) => v === PENDING)) {
+        throw new AppError('CONFLICT', 'This op is already being applied');
       }
+      const known = prior.map((v) => (v === null ? null : Number(v)));
+      // ops not applied yet, each paired with its dedupe key
+      const todoPairs = ops.flatMap((op, i) =>
+        known[i] === null ? [{ op, key: keys[i] ?? '' }] : [],
+      );
+      if (todoPairs.length === 0) {
+        return { roomId: board.roomId, replay: true, ops: [], seqs: known.map((v) => v ?? 0) };
+      }
+      const claimed: string[] = [];
+      for (const { key } of todoPairs) {
+        if ((await redis.set(key, PENDING, 'EX', OP_TTL_SEC, 'NX')) === null) {
+          if (claimed.length > 0) await redis.del(...claimed);
+          throw new AppError('CONFLICT', 'This op is already being applied');
+        }
+        claimed.push(key);
+      }
+      const todo = todoPairs.map((t) => t.op);
 
       try {
-        validate(boardId, MAPS[toMapId(board.mapId)].worldSize, ops);
+        validate(boardId, MAPS[toMapId(board.mapId)].worldSize, todo);
         const result = await prisma.$transaction(async (tx) => {
           const [locked] = await tx.$queryRaw<{ last_seq: bigint; element_count: number }[]>`
             SELECT last_seq, element_count FROM boards WHERE id = ${boardId}::uuid FOR UPDATE`;
@@ -266,9 +295,9 @@ export function createBoardOpsService(d: {
           let seq = locked.last_seq;
           let count = locked.element_count;
           const out: BoardOp[] = [];
-          for (const op of ops) {
+          for (const op of todo) {
             seq += 1n;
-            const { body, delta } = await applyOne(tx, boardId, user, op, seq, count);
+            const { body, delta } = await applyOne(tx, boardId, user, role, op, seq, count);
             count += delta;
             await tx.boardOp.create({
               data: {
@@ -288,11 +317,17 @@ export function createBoardOpsService(d: {
           });
           return out;
         });
-        await redis.set(key, JSON.stringify(result.map((o) => o.seq)), 'EX', OP_TTL_SEC);
+        const pipe = redis.multi();
+        result.forEach((o, n) =>
+          pipe.set(todoPairs[n]?.key ?? '', String(o.seq), 'EX', OP_TTL_SEC),
+        );
+        await pipe.exec();
         await touchRoom(prisma, board.roomId);
-        return { ops: result, seqs: result.map((o) => o.seq), roomId: board.roomId, replay: false };
+        let next = 0;
+        const seqs = known.map((seq) => seq ?? result[next++]?.seq ?? 0);
+        return { ops: result, seqs, roomId: board.roomId, replay: false };
       } catch (err) {
-        await redis.del(key); // let the client retry after fixing the op
+        await redis.del(...claimed); // let the client retry after fixing the op
         throw err;
       }
     },

@@ -37,6 +37,8 @@ interface Ctx {
 type Outcome = 'ok' | 'NOT_FOUND' | 'FORBIDDEN';
 interface AckedRow {
   event: (typeof ACKED_EVENTS)[number];
+  /** distinguishes several rows for one event */
+  label?: string;
   payload: (ctx: Ctx) => unknown;
   expect: Record<Exclude<Caller, 'anonymous'>, Outcome>;
 }
@@ -99,6 +101,17 @@ const ACKED: AckedRow[] = [
       layer: { id: opId(), name: 'New', color: '#22C55E', visible: true, locked: false },
     }),
     expect: write,
+  },
+  {
+    // lock / unlock is OWNER-only (SECURITY §3)
+    event: 'layer:upsert',
+    label: 'lock',
+    payload: ({ f, layerIds }) => ({
+      opId: opId(),
+      boardId: f.boardId,
+      layer: { id: layerIds[0], name: 'Plan', color: '#F2A900', visible: true, locked: true },
+    }),
+    expect: { outsider: 'NOT_FOUND', viewer: 'FORBIDDEN', editor: 'FORBIDDEN', owner: 'ok' },
   },
   {
     event: 'layer:delete',
@@ -182,7 +195,7 @@ async function prepare(caller: Exclude<Caller, 'anonymous'>) {
 
 describe('socket authz matrix', () => {
   it('has exactly one row per handled event (add a row when you add an event)', () => {
-    expect(ACKED.map((r) => r.event).sort()).toEqual([...ACKED_EVENTS].sort());
+    expect([...new Set(ACKED.map((r) => r.event))].sort()).toEqual([...ACKED_EVENTS].sort());
     expect(VOLATILE.map((r) => r.event).sort()).toEqual([...VOLATILE_EVENTS].sort());
   });
 
@@ -195,7 +208,7 @@ describe('socket authz matrix', () => {
     for (const caller of CALLERS) {
       if (caller === 'anonymous') continue; // covered above: no socket
       const want = row.expect[caller];
-      it(`${row.event} as ${caller} → ${want}`, async () => {
+      it(`${row.event}${row.label ? ` (${row.label})` : ''} as ${caller} → ${want}`, async () => {
         const { ctx, socket } = await prepare(caller);
         const res = await ack(socket, row.event, row.payload(ctx));
         if (want === 'ok') expect(res, JSON.stringify(res)).toMatchObject({ ok: true });

@@ -119,3 +119,64 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ---- board elements & cursors on the map (UI_UX_SPEC §6) ---------------------------------- */
+.rl-marker-icon,
+.rl-text-icon,
+.rl-cursor-icon {
+  background: none;
+  border: 0;
+}
+
+.rl-marker {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.rl-marker-label {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text);
+  font: 600 11px/1.4 var(--font-sans);
+}
+
+.rl-text {
+  display: inline-block;
+  transform: translate(-50%, -50%) scale(var(--rl-text-scale, 1));
+  white-space: pre;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.6);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rl-cursor {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  transition: opacity 300ms ease-out;
+  pointer-events: none;
+}
+
+.rl-cursor-name {
+  margin-top: 12px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  color: #0b0f14;
+  white-space: nowrap;
+  font: 600 11px/1.4 var(--font-sans);
+}
+
+.rl-cursor-faded .rl-cursor {
+  opacity: 0.15;
+}

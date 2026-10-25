@@ -37,7 +37,8 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 |---|---|---|---|
 | View boards, chat, presence | ✓ | ✓ | ✓ |
 | Send chat, pings, laser, cursor | ✓ | ✓ | ✓ |
-| Create/edit/delete elements & layers | ✓ | ✓ | ✗ |
+| Create/edit/delete elements; create/rename/recolor/reorder/delete **unlocked** layers | ✓ | ✓ | ✗ |
+| Lock/unlock layers; rename/recolor/delete a **locked** layer | ✓ | ✗ | ✗ |
 | Create/rename boards, snapshots, restore | ✓ | ✓ | ✗ |
 | Delete boards | ✓ | ✗ | ✗ |
 | Create invites | ✓ | ✓ (role ≤ EDITOR) | ✗ |

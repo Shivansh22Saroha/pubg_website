@@ -50,6 +50,8 @@ export const EnvSchema = z
      * concurrent refresh (two tabs), not theft: 409, no family revocation.
      */
     REFRESH_REUSE_GRACE_SEC: z.coerce.number().int().min(0).max(60).default(10),
+    /** sockets are disconnected (code TOKEN_EXPIRED) this long after their access token expires */
+    SOCKET_TOKEN_GRACE_SEC: z.coerce.number().int().min(0).max(600).default(60),
     SENTRY_DSN: optionalString,
     METRICS_TOKEN: optionalString,
   })

@@ -24,7 +24,9 @@ import {
   type ClientSocket,
   type RoomFixture,
 } from './harness.js';
-import { listen } from './harness.js';
+import { cookieHeader, listen } from './harness.js';
+import { APP_ORIGIN } from '../helpers.js';
+import { io as ioClient } from 'socket.io-client';
 
 useCleanState();
 
@@ -303,7 +305,7 @@ describe('element ops (ARCHITECTURE §7.2)', () => {
       (await ack(l.editor, 'element:upsert', { opId: opId(), boardId: l.f.boardId, element: el }))
         .ok,
     ).toBe(true);
-    const lock = await ack(l.editor, 'layer:upsert', {
+    const lock = await ack(l.owner, 'layer:upsert', {
       opId: opId(),
       boardId: l.f.boardId,
       layer: { id: layerId, name: 'Enemies', color: '#EF4444', visible: true, locked: true },
@@ -397,6 +399,34 @@ describe('element ops (ARCHITECTURE §7.2)', () => {
     expect(toOwner).toHaveLength(1);
     expect(await boardRow(l.f.boardId)).toMatchObject({ lastSeq: 1n, elementCount: 1 });
     expect(await prisma.boardOp.count()).toBe(1);
+  });
+
+  it('a resent batch mixing applied and new ops re-applies nothing and broadcasts only the new ones', async () => {
+    const l = await live();
+    const toOwner = collect(l.owner, 'board:op');
+    const a = { opId: opId(), kind: 'upsert', element: arrow(l.f.boardId, l.layerIds[0]!) };
+    const b = { opId: opId(), kind: 'upsert', element: arrow(l.f.boardId, l.layerIds[0]!) };
+    const first = await ack(l.editor, 'element:batch', { boardId: l.f.boardId, ops: [a] });
+    expect(first.data.seqs).toEqual([1]);
+    const mixed = await ack(l.editor, 'element:batch', { boardId: l.f.boardId, ops: [a, b] });
+    expect(mixed.data.seqs).toEqual([1, 2]);
+    const replay = await ack(l.editor, 'element:batch', { boardId: l.f.boardId, ops: [b, a] });
+    expect(replay.data.seqs).toEqual([2, 1]);
+    await sleep(150);
+    expect(toOwner.map((o) => o.seq)).toEqual([1, 2]);
+    expect(await boardRow(l.f.boardId)).toMatchObject({ lastSeq: 2n, elementCount: 2 });
+  });
+
+  it('pipelined ops from one socket apply in emit order (upsert then delete, no await)', async () => {
+    const l = await live();
+    const el = arrow(l.f.boardId, l.layerIds[0]!);
+    const [up, del] = await Promise.all([
+      ack(l.editor, 'element:upsert', { opId: opId(), boardId: l.f.boardId, element: el }),
+      ack(l.editor, 'element:delete', { opId: opId(), boardId: l.f.boardId, elementId: el.id }),
+    ]);
+    expect(up.data.seq).toBe(1);
+    expect(del.data.seq).toBe(2);
+    expect(await prisma.element.count()).toBe(0);
   });
 
   it('delete keeps element_count exact and still converges when the element is already gone', async () => {
@@ -522,6 +552,60 @@ describe('layer ops', () => {
     ).toBe(true);
     expect((await boardRow(b)).elementCount).toBe(0);
     expect(await prisma.layer.count({ where: { boardId: b } })).toBe(3);
+  });
+
+  it('lock/unlock and editing a locked layer are OWNER-only; editors keep the rest', async () => {
+    const l = await live();
+    const b = l.f.boardId;
+    const layer = (over: Record<string, unknown>) => ({
+      id: l.layerIds[0],
+      name: 'Plan',
+      color: '#F2A900',
+      visible: true,
+      locked: false,
+      ...over,
+    });
+    const upsert = (s: ClientSocket, over: Record<string, unknown>) =>
+      ack(s, 'layer:upsert', { opId: opId(), boardId: b, layer: layer(over) });
+    // editors: rename / recolor unlocked layers fine, locking forbidden
+    expect((await upsert(l.editor, { name: 'Drops', color: '#38BDF8' })).ok).toBe(true);
+    expect(await upsert(l.editor, { locked: true })).toMatchObject({
+      ok: false,
+      code: 'FORBIDDEN',
+    });
+    const newLocked = await ack(l.editor, 'layer:upsert', {
+      opId: opId(),
+      boardId: b,
+      layer: { id: opId(), name: 'Mine', color: '#22C55E', visible: true, locked: true },
+    });
+    expect(newLocked).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    // owner locks; editors can no longer rename or delete it
+    expect((await upsert(l.owner, { locked: true })).ok).toBe(true);
+    expect(await upsert(l.editor, { locked: true, name: 'Hijack' })).toMatchObject({
+      ok: false,
+      code: 'FORBIDDEN',
+    });
+    expect(
+      await ack(l.editor, 'layer:delete', { opId: opId(), boardId: b, layerId: l.layerIds[0] }),
+    ).toMatchObject({
+      ok: false,
+      code: 'FORBIDDEN',
+    });
+    // reordering stays an editor action, even with a locked layer in the list
+    expect(
+      (
+        await ack(l.editor, 'layer:reorder', {
+          opId: opId(),
+          boardId: b,
+          order: [...l.layerIds].reverse(),
+        })
+      ).ok,
+    ).toBe(true);
+    // owner unlocks / deletes
+    expect((await upsert(l.owner, { locked: false })).ok).toBe(true);
+    expect(
+      (await ack(l.owner, 'layer:delete', { opId: opId(), boardId: b, layerId: l.layerIds[0] })).ok,
+    ).toBe(true);
   });
 
   it("can't delete the last layer or exceed 10 layers", async () => {
@@ -931,5 +1015,39 @@ describe('board duplicate & jobs', () => {
     const results = await Promise.all([job(), job(), job()]);
     expect(results.filter(Boolean)).toHaveLength(1);
     expect(runs).toBe(1);
+  });
+});
+
+describe('socket session expiry', () => {
+  it('announces the token expiry and disconnects with TOKEN_EXPIRED after the grace period', async () => {
+    const { app: short } = await makeApp({
+      RATE_LIMITS_ENABLED: 'false',
+      ACCESS_TOKEN_TTL_SEC: '2',
+      SOCKET_TOKEN_GRACE_SEC: '1',
+    });
+    const shortUrl = await listen(short);
+    const { jar } = await register(short);
+    const started = Date.now();
+    // attach listeners before the handshake completes: `session` is emitted on connection
+    const socket: ClientSocket = ioClient(shortUrl, {
+      path: '/realtime',
+      transports: ['websocket'],
+      forceNew: true,
+      reconnection: false,
+      extraHeaders: { origin: APP_ORIGIN, cookie: cookieHeader(jar) },
+    });
+    const session = nextEvent<{ expiresAt: number }>(socket, 'session', 3000);
+    const error = nextEvent<{ code: string }>(socket, 'error', 8000);
+    const disconnected = nextEvent<string>(socket, 'disconnect', 8000);
+
+    const { expiresAt } = await session;
+    expect(expiresAt).toBeGreaterThan(started);
+    expect(expiresAt).toBeLessThanOrEqual(started + 3000);
+    expect(await error).toMatchObject({ code: 'TOKEN_EXPIRED' });
+    expect(await disconnected).toBe('io server disconnect');
+    const lifetime = Date.now() - started;
+    expect(lifetime).toBeGreaterThan(1500); // ttl 2 s (second-granular exp) + grace 1 s
+    expect(lifetime).toBeLessThan(5000);
+    socket.disconnect();
   });
 });

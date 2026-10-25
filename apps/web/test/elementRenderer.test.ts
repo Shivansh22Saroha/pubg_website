@@ -1,0 +1,222 @@
+import type { Layer } from '@rotationlab/shared';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { ElementRenderer, type LeafletApi, type MapLike } from '@/components/map/elementRenderer';
+import { cursorElement, markerElement, safeColor, textElement } from '@/components/map/markerDom';
+import type { ViewElement } from '@/stores/boardModel';
+
+/** Minimal fake Leaflet: records constructions and map add/remove calls. */
+class FakeLayer {
+  static made = 0;
+  fronted = 0;
+  constructor(
+    readonly kind: string,
+    readonly args: unknown[],
+  ) {
+    FakeLayer.made++;
+  }
+  bringToFront() {
+    this.fronted++;
+  }
+}
+const make =
+  (kind: string) =>
+  (...args: unknown[]) =>
+    new FakeLayer(kind, args) as never;
+const fakeL: LeafletApi = {
+  polyline: make('polyline'),
+  polygon: make('polygon'),
+  circle: make('circle'),
+  marker: make('marker'),
+  divIcon: ((o: unknown) => ({ divIcon: o })) as never,
+  featureGroup: make('featureGroup'),
+};
+
+class FakeMap implements MapLike {
+  onMap = new Set<unknown>();
+  adds = 0;
+  removes = 0;
+  addLayer(l: unknown) {
+    this.adds++;
+    this.onMap.add(l);
+  }
+  removeLayer(l: unknown) {
+    this.removes++;
+    this.onMap.delete(l);
+  }
+  getZoom() {
+    return 2;
+  }
+}
+
+const L1 = 'layer-1';
+const L2 = 'layer-2';
+const layers = (visible2 = true, swap = false): Layer[] => [
+  {
+    id: L1,
+    boardId: 'b',
+    name: 'A',
+    color: '#F2A900',
+    position: swap ? 1 : 0,
+    visible: true,
+    locked: false,
+    seq: 0,
+  },
+  {
+    id: L2,
+    boardId: 'b',
+    name: 'B',
+    color: '#EF4444',
+    position: swap ? 0 : 1,
+    visible: visible2,
+    locked: false,
+    seq: 0,
+  },
+];
+const el = (
+  id: string,
+  type: ViewElement['type'],
+  layerId = L1,
+  over: Partial<ViewElement> = {},
+): ViewElement => ({
+  id,
+  boardId: 'b',
+  layerId,
+  type,
+  geometry:
+    type === 'CIRCLE'
+      ? { center: [100, 100], r: 500 }
+      : type === 'TEXT' || type === 'MARKER'
+        ? { at: [5, 5] }
+        : {
+            points: [
+              [0, 0],
+              [10, 10],
+              [20, 0],
+            ],
+          },
+  style: { color: '#F2A900', width: 4, dashed: false, fillOpacity: 0.1 },
+  props:
+    type === 'TEXT'
+      ? { text: 'hi', size: 'md' }
+      : type === 'MARKER'
+        ? { kind: 'enemy_squad', number: 3 }
+        : {},
+  z: 0,
+  seq: 1,
+  createdBy: null,
+  updatedBy: null,
+  updatedAt: '2026-10-25T00:00:00.000Z',
+  ...over,
+});
+
+let map: FakeMap;
+let r: ElementRenderer;
+beforeEach(() => {
+  map = new FakeMap();
+  r = new ElementRenderer(fakeL, map, {} as never, 816_000);
+  FakeLayer.made = 0;
+});
+
+describe('ElementRenderer diffing', () => {
+  it('creates one Leaflet layer per element and renders every type', () => {
+    const els = Object.fromEntries(
+      (['STROKE', 'LINE', 'ARROW', 'CIRCLE', 'POLYGON', 'TEXT', 'MARKER'] as const).map((t, i) => [
+        `e${i}`,
+        el(`e${i}`, t),
+      ]),
+    );
+    const stats = r.sync(els, layers());
+    expect(stats.created).toBe(7);
+    expect(map.onMap.size).toBe(7);
+    const kinds = [...map.onMap].map((l) => (l as FakeLayer).kind).sort();
+    expect(kinds).toEqual([
+      'circle',
+      'featureGroup',
+      'marker',
+      'marker',
+      'polygon',
+      'polyline',
+      'polyline',
+    ]);
+  });
+
+  it('touches nothing when the same objects are synced again', () => {
+    const els = { a: el('a', 'LINE'), b: el('b', 'CIRCLE') };
+    r.sync(els, layers());
+    const adds = map.adds;
+    const made = FakeLayer.made;
+    const stats = r.sync({ ...els }, layers());
+    expect(stats).toMatchObject({ created: 0, replaced: 0, removed: 0 });
+    expect(map.adds).toBe(adds);
+    expect(FakeLayer.made).toBe(made);
+  });
+
+  it('replaces only the changed element and removes deleted ones', () => {
+    const a = el('a', 'LINE');
+    const b = el('b', 'LINE');
+    r.sync({ a, b }, layers());
+    const stats = r.sync({ a, b: { ...b, seq: 2 } }, layers());
+    expect(stats).toMatchObject({ created: 0, replaced: 1, removed: 0 });
+    const gone = r.sync({ a }, layers());
+    expect(gone.removed).toBe(1);
+    expect(map.onMap.size).toBe(1);
+  });
+
+  it('hides elements on hidden layers without dropping them, and shows them again', () => {
+    const els = { a: el('a', 'LINE', L1), b: el('b', 'LINE', L2) };
+    r.sync(els, layers());
+    r.sync(els, layers(false));
+    expect(map.onMap.size).toBe(1);
+    expect(r.size).toBe(2);
+    r.sync(els, layers(true));
+    expect(map.onMap.size).toBe(2);
+  });
+
+  it('only re-stacks new tail elements; a layer reorder re-stacks everything', () => {
+    const a = el('a', 'LINE', L1);
+    const b = el('b', 'LINE', L2);
+    r.sync({ a, b }, layers());
+    const c = el('c', 'LINE', L2, { z: 5 }); // sorts last
+    const stats = r.sync({ a, b, c }, layers());
+    expect(stats.reordered).toBe(false);
+    const swapped = r.sync({ a, b, c }, layers(true, true));
+    expect(swapped.reordered).toBe(true);
+  });
+});
+
+describe('marker DOM (SECURITY V4/V5)', () => {
+  it('puts user text in text nodes, never markup', () => {
+    const evil = '<img src=x onerror=alert(1)>';
+    const m = markerElement({ kind: 'enemy_squad', number: 7, label: evil }, '#EF4444');
+    expect(m.querySelector('img')).toBeNull();
+    expect(m.textContent).toContain(evil.slice(0, 24));
+    const t = textElement({ text: evil, size: 'lg' }, '#F8FAFC');
+    expect(t.querySelector('img')).toBeNull();
+    expect(t.textContent).toBe(evil);
+    const c = cursorElement(evil, '#38BDF8');
+    expect(c.querySelector('img')).toBeNull();
+  });
+
+  it('only lets #RRGGBB colours reach SVG/CSS', () => {
+    expect(safeColor('#22c55e')).toBe('#22c55e');
+    for (const bad of [
+      'red',
+      'url(javascript:x)',
+      '#fff',
+      '#12345g',
+      '#123456;fill:red',
+      42,
+      undefined,
+    ]) {
+      expect(safeColor(bad)).toBe('#F8FAFC');
+    }
+    const m = markerElement({ kind: 'pin' }, 'url(javascript:alert(1))');
+    expect(m.innerHTML).not.toContain('javascript');
+  });
+
+  it('falls back to a pin for unknown marker kinds and caps labels at 24 chars', () => {
+    const m = markerElement({ kind: 'nuke', label: 'x'.repeat(40) }, '#EF4444');
+    expect(m.querySelector('svg path')).not.toBeNull();
+    expect(m.querySelector('.rl-marker-label')?.textContent).toHaveLength(24);
+  });
+});
