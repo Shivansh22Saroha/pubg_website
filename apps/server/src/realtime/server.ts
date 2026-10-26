@@ -2,6 +2,7 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import {
   BoardSubscribeSchema,
   can,
+  ChatSendSchema,
   CursorMoveSchema,
   ElementBatchSchema,
   ElementDeleteSchema,
@@ -33,6 +34,7 @@ import { AppError } from '../lib/errors.js';
 import type { AuthUser } from '../lib/policy.js';
 import type { RevocationList } from '../modules/auth/revocation.js';
 import type { TokenService } from '../modules/auth/tokens.js';
+import type { ChatService } from '../modules/chat/service.js';
 import type { BoardOpsService, OpRequest } from '../modules/elements/service.js';
 import type { RoomEvents } from '../modules/rooms/events.js';
 import type { RoomPolicy } from '../modules/rooms/policy.js';
@@ -59,6 +61,7 @@ export const ACKED_EVENTS = [
   'follow:start',
   'follow:stop',
   'summon',
+  'chat:send',
 ] as const;
 export const VOLATILE_EVENTS = [
   'cursor:move',
@@ -101,6 +104,7 @@ export interface RealtimeDeps {
   policy: RoomPolicy;
   rooms: RoomService;
   boardOps: BoardOpsService;
+  chat: ChatService;
   events: RoomEvents;
   /** disconnect this long after the access token's exp (sessions never outlive their token) */
   tokenGraceSec: number;
@@ -200,6 +204,22 @@ export function createRealtime(d: RealtimeDeps): {
       });
     } catch (err) {
       log.warn({ err, roomId }, 'presence broadcast failed');
+    }
+  }
+
+  let closing = false;
+
+  /** Tells a leader (all their sockets) how many sockets follow them — never rejects. */
+  async function notifyFollowers(leaderId: string, only?: RtSocket) {
+    // shutting down: the adapter's request would publish on clients that are quitting, and the
+    // adapter doesn't handle that rejection itself
+    if (closing) return;
+    try {
+      const count = (await io.in(ch.followers(leaderId)).fetchSockets()).length;
+      if (only) only.emit('followers:update', { count });
+      else io.to(ch.user(leaderId)).emit('followers:update', { count });
+    } catch (err) {
+      log.warn({ err }, 'follower count failed');
     }
   }
 
@@ -311,6 +331,7 @@ export function createRealtime(d: RealtimeDeps): {
       await presence.join(roomId, user.id, socket.id);
       const online = await presence.list(roomId);
       void broadcastPresence(roomId);
+      void notifyFollowers(user.id, socket); // a reconnecting leader learns its follower count
       const onlineIds = new Set(online.map((p) => p.userId));
       return {
         room: { ...detail.room, onlineCount: onlineIds.size },
@@ -417,10 +438,12 @@ export function createRealtime(d: RealtimeDeps): {
     on('follow:start', FollowSchema, 'durable', async ({ targetUserId }) => {
       await d.policy.requireRoom(user, await sharedRoom(targetUserId), 'room.view');
       await socket.join(ch.followers(targetUserId));
+      void notifyFollowers(targetUserId);
     });
 
     on('follow:stop', FollowSchema, 'durable', async ({ targetUserId }) => {
       await socket.leave(ch.followers(targetUserId));
+      void notifyFollowers(targetUserId);
     });
 
     on('summon', SummonSchema, 'durable', async ({ boardId }) => {
@@ -429,6 +452,15 @@ export function createRealtime(d: RealtimeDeps): {
       if (!can(role, 'board.edit'))
         throw new AppError('FORBIDDEN', 'Only owners and editors can summon');
       socket.to(ch.room(board.roomId)).emit('summon', { userId: user.id, boardId });
+    });
+
+    // ---- chat (CHAT-1…6) ----------------------------------------------------------------
+    // the stored message is broadcast by the `chat:message` domain event (one path for user and
+    // system messages); a replayed clientId is not broadcast again
+    on('chat:send', ChatSendSchema, 'chat', async (p) => {
+      requireJoined(p.roomId);
+      const { message } = await d.chat.send(user, p);
+      return { message };
     });
 
     // ---- ephemeral (volatile, never persisted) ---------------------------------------------
@@ -451,8 +483,17 @@ export function createRealtime(d: RealtimeDeps): {
         socket.volatile.to(ch.followers(user.id)).emit('view:update', { userId: user.id, ...p });
     });
 
+    // leaders this socket followed: their counts drop once it is gone
+    let followed: string[] = [];
+    socket.on('disconnecting', () => {
+      followed = [...socket.rooms]
+        .filter((r) => r.startsWith('follow:'))
+        .map((r) => r.slice('follow:'.length));
+    });
+
     socket.on('disconnect', () => {
       clearTimeout(expiryTimer);
+      for (const leaderId of followed) void notifyFollowers(leaderId);
       for (const roomId of socket.data.rooms) {
         // fire-and-forget, but never an unhandled rejection (Redis gone → process crash)
         presence
@@ -483,6 +524,12 @@ export function createRealtime(d: RealtimeDeps): {
     await broadcastPresence(roomId);
   }
 
+  d.events.on('chat:message', ({ roomId, message }) =>
+    io.to(ch.room(roomId)).emit('chat:message', { message }),
+  );
+  d.events.on('chat:deleted', ({ roomId, messageId }) =>
+    io.to(ch.room(roomId)).emit('chat:deleted', { messageId }),
+  );
   d.events.on('member:joined', ({ roomId, member }) =>
     io.to(ch.room(roomId)).emit('member:joined', { member }),
   );
@@ -524,6 +571,7 @@ export function createRealtime(d: RealtimeDeps): {
     presence,
     /** logout / logout-all / password change / theft: drop those sessions' sockets everywhere */
     async close() {
+      closing = true;
       io.disconnectSockets(true);
       await new Promise<void>((resolve) => {
         io.engine.close();

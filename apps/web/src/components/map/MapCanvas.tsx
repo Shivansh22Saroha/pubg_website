@@ -62,6 +62,20 @@ export default function MapCanvas({
       container.removeEventListener('pointerleave', out);
     };
   }, [map, onCursor]);
+  // the view in world units on the DOM (data-center / data-zoom): tests and tooling read it
+  const [view, setView] = useState<{ center: string; zoom: string }>({ center: '', zoom: '' });
+  useEffect(() => {
+    if (!map) return;
+    const update = () => {
+      const c = map.getCenter();
+      setView({ center: `${Math.round(c.lng)},${Math.round(c.lat)}`, zoom: String(map.getZoom()) });
+    };
+    update();
+    map.on('moveend', update);
+    return () => {
+      map.off('moveend', update);
+    };
+  }, [map]);
   const [variant, setVariant] = useState<BaseVariant>('labels');
   const [grid, setGrid] = useState(true);
 
@@ -106,6 +120,8 @@ export default function MapCanvas({
       data-map={mapId}
       data-variant={variant}
       data-grid={grid ? 'on' : 'off'}
+      data-center={view.center}
+      data-zoom={view.zoom}
       className="relative h-full w-full overflow-hidden bg-bg"
     >
       <div className="absolute inset-0 isolate">

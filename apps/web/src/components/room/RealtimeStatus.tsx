@@ -1,13 +1,20 @@
 'use client';
 
-import type { Member } from '@rotationlab/shared';
+import type { Board, Member } from '@rotationlab/shared';
 import { useRouter } from 'next/navigation';
 import { Avatar } from '@/components/auth/UserMenu';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { resumeRealtime, useConnection } from '@/lib/realtime/socket';
 import { cn } from '@/lib/utils';
 import { selectPendingCount, selectQueueFull, useBoardStore } from '@/stores/boardStore';
+import { useFollowStore } from '@/stores/followStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 
 export type SyncState = 'synced' | 'saving' | 'reconnecting' | 'offline';
@@ -64,9 +71,28 @@ export function SyncIndicator() {
   );
 }
 
-/** Top-bar presence: up to 5 online avatars with presence-colour rings, then +N. */
-export function PresenceStack({ members }: { members: Member[] }) {
+/**
+ * Top-bar presence: up to 5 online avatars with presence-colour rings, then +N. Each avatar
+ * opens a menu (UI_UX_SPEC §3.5): others → Follow / Go to their board; me → Summon everyone
+ * (Editor+).
+ */
+export function PresenceStack({
+  members,
+  meId,
+  canSummon,
+  boards,
+  onGoToBoard,
+  onSummon,
+}: {
+  members: Member[];
+  meId: string;
+  canSummon: boolean;
+  boards: Pick<Board, 'id' | 'name'>[];
+  onGoToBoard: (boardId: string) => void;
+  onSummon: () => void;
+}) {
   const users = usePresenceStore((s) => s.users);
+  const leaderId = useFollowStore((s) => s.leaderId);
   const online = members.filter((m) => m.user.id in users);
   const shown = online.slice(0, 5);
   return (
@@ -77,21 +103,56 @@ export function PresenceStack({ members }: { members: Member[] }) {
     >
       {shown.map((m) => {
         const p = users[m.user.id];
+        const isMe = m.user.id === meId;
+        const board = p?.boardId ? boards.find((b) => b.id === p.boardId) : undefined;
+        const following = leaderId === m.user.id;
         return (
-          <span
-            key={m.user.id}
-            title={`${m.user.displayName}${p?.idle ? ' (idle)' : ''}`}
-            data-testid="presence-avatar"
-            data-user={m.user.username}
-            className={cn(
-              'rounded-full ring-2 ring-offset-1 ring-offset-bg',
-              p?.idle && 'opacity-50',
-            )}
-            // presence colours come from a fixed server-side palette
-            style={{ ['--tw-ring-color' as string]: p?.color }}
-          >
-            <Avatar user={m.user} className="size-7 text-xs" />
-          </span>
+          <DropdownMenu key={m.user.id}>
+            <DropdownMenuTrigger
+              title={`${m.user.displayName}${p?.idle ? ' (idle)' : ''}${board ? ` · ${board.name}` : ''}`}
+              aria-label={`${m.user.displayName}${isMe ? ' (you)' : ''}`}
+              data-testid="presence-avatar"
+              data-user={m.user.username}
+              className={cn(
+                'rounded-full ring-2 ring-offset-1 ring-offset-bg focus-visible:outline-none',
+                p?.idle && 'opacity-50',
+              )}
+              // presence colours come from a fixed server-side palette
+              style={{ ['--tw-ring-color' as string]: p?.color }}
+            >
+              <Avatar user={m.user} className="size-7 text-xs" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {isMe ? (
+                <DropdownMenuItem disabled={!canSummon} onSelect={onSummon}>
+                  {canSummon ? 'Summon everyone' : 'Viewers can’t summon'}
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      useFollowStore
+                        .getState()
+                        .dispatch(
+                          following ? { type: 'stop' } : { type: 'start', leaderId: m.user.id },
+                        );
+                      if (!following && board) onGoToBoard(board.id);
+                    }}
+                  >
+                    {following ? 'Stop following' : `Follow ${m.user.displayName}`}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!board}
+                    onSelect={() => {
+                      if (board) onGoToBoard(board.id);
+                    }}
+                  >
+                    {board ? `Go to their board (${board.name})` : 'Not on a board'}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       })}
       {online.length > 5 && (

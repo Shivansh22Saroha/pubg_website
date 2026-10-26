@@ -2,6 +2,7 @@
 
 import { MAPS, type MapId, type Pt, type RoomRole } from '@rotationlab/shared';
 import { useMemo } from 'react';
+import { FollowPill } from '@/components/room/FollowPill';
 import { StyleBar } from '@/components/tools/StyleBar';
 import { ToolLayer } from '@/components/tools/ToolLayer';
 import { makeNameOf } from '@/lib/editing';
@@ -9,7 +10,10 @@ import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useBoardStore } from '@/stores/boardStore';
 import { CursorLayer } from './CursorLayer';
 import { ElementLayer } from './ElementLayer';
+import { FollowController } from './FollowController';
+import { LaserLayer } from './LaserLayer';
 import MapCanvas from './MapCanvas';
+import { PingLayer } from './PingLayer';
 
 /** UI_UX_SPEC §9: shown on an empty board to people who can draw. */
 function EmptyHint() {
@@ -23,10 +27,11 @@ function EmptyHint() {
 }
 
 /**
- * A live board: tiles + grid (MapCanvas) + elements + other users' cursors, and the drawing
- * tools with their selection overlay and style bar. Client-only.
+ * A live board: tiles + grid (MapCanvas) + elements + other users' cursors, the drawing tools
+ * with their selection overlay and style bar, pings, laser trails and follow mode. Client-only.
  */
 export default function BoardMap({
+  boardId,
   mapId,
   meId,
   names,
@@ -35,6 +40,7 @@ export default function BoardMap({
   role,
   roomName,
 }: {
+  boardId: string;
   mapId: MapId;
   meId: string;
   /** userId → display name, for cursor pills and "Changed by …" */
@@ -53,6 +59,7 @@ export default function BoardMap({
       overlay={
         <>
           {role !== 'VIEWER' && <EmptyHint />}
+          <FollowPill names={names} />
           <StyleBar role={role} mapId={mapId} session={session} nameOf={nameOf} />
         </>
       }
@@ -67,6 +74,9 @@ export default function BoardMap({
         names={names}
       />
       <CursorLayer names={names} meId={meId} />
+      <PingLayer config={config} boardId={boardId} />
+      <LaserLayer meId={meId} />
+      <FollowController boardId={boardId} session={session} />
     </MapCanvas>
   );
 }

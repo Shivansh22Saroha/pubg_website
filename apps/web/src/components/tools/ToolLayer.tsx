@@ -15,6 +15,7 @@ import { useMap } from 'react-leaflet';
 import { toast } from 'sonner';
 import { v7 as uuid } from 'uuid';
 import { textScale } from '@/components/map/ElementLayer';
+import { MANUAL_VIEW_EVENT } from '@/components/map/FollowController';
 import { clientToWorld, worldPerPx } from '@/lib/coords';
 import { editorActions, makeNameOf, toInput } from '@/lib/editing';
 import type { RoomSession } from '@/lib/realtime/roomSession';
@@ -289,6 +290,9 @@ export function ToolLayer({
           },
         });
       },
+      laser: ([x, y]) => {
+        live.current.session?.laser(x, y);
+      },
       explainLocked: (layer) => {
         const key = `locked-hit:${layer.id}`;
         if (shown.has(key)) return;
@@ -392,6 +396,7 @@ export function ToolLayer({
 
     const onMove = (e: PointerEvent) => {
       if (pan && e.pointerId === pan.id) {
+        window.dispatchEvent(new Event(MANUAL_VIEW_EVENT)); // a manual pan ends follow mode
         map.panBy([pan.x - e.clientX, pan.y - e.clientY], { animate: false });
         pan = { ...pan, x: e.clientX, y: e.clientY };
         return;

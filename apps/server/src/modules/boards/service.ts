@@ -165,7 +165,7 @@ export function createBoardService(d: BoardServiceDeps) {
           remaining.map((b) => b.id).filter((id) => id !== boardId),
         );
       });
-      events.emit('board:deleted', { roomId: board.roomId, boardId });
+      events.emit('board:deleted', { roomId: board.roomId, boardId, name: board.name });
     },
 
     /** REST fallback of `board:subscribe` (API_SPEC §5) — used by PNG export / thumbnails. */

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
-// C0/C1 control characters, optionally keeping \n (SECURITY V3) — matching them is the point
+// C0/C1 control characters, optionally keeping \n — and only \n, not \t (SECURITY V3);
+// matching them is the point
 // eslint-disable-next-line no-control-regex
-const CONTROL = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
+const CONTROL = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g;
 // eslint-disable-next-line no-control-regex
 const CONTROL_AND_NEWLINE = /[\u0000-\u001F\u007F-\u009F]/g;
 

@@ -23,6 +23,8 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - UI_UX_SPEC §3.5: Measure / Laser disabled until built, layer-row contents, local-hide icon, lock read-only for non-owners. §8: Cmd on macOS, Ctrl+Y everywhere, tools take Enter / Esc / Backspace first, off inside dialogs and menus.
   - TESTING §7: end-of-phase perf claims use an A/B run on the same machine.
 
+- 2026-10-26 — Phase 7 docs: API_SPEC §1.5 / §6 / §7.2–7.3 (`ChatMessage.clientId`, nullable ping board, history and delete semantics, `chat:send` rules, `followers:update`, `chat:typing` not handled); DATABASE_SCHEMA §3.12 (`client_id`, CHECK details, delete semantics); FEATURES F8 (what counts as a manual move, the pill, follower count, summon) and F9 (text rules, optimistic send, unread rule, deleted-board chips, reduced motion); UI_UX_SPEC §3.5 (Chat is the default tab, removable chip, badge placement). FEATURES F5: the "can't be undone yet" warning on Clear layer.
+
 ### Added
 - 2026-10-25 — **Phase 1 scaffold** (TODO Phase 1):
   - pnpm workspace + Turborepo with `apps/web`, `apps/server`, `packages/shared`, `packages/map-tiles` (stub CLI for Phase 2).
@@ -155,6 +157,55 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - Tests: web unit 74 (store rules incl. the remote-higher-seq-while-pending edge case, socket refresh flow with a fake socket, renderer diffing + marker DOM safety); E2E realtime (two contexts): 20 elements synced < 1 s + a move, presence + cursors, offline queue, API kill/restart mid-session (supervisor `scripts/e2e-api.ts`), kick; perf benchmark.
   - **Perf (headless Chromium, software rendering), pan 5 s:** empty board 319 frames · avg 16.7 ms · p95 16.7 ms; **1 000 mixed elements 275 frames · avg 18.6 ms · p95 33.3 ms · max 50.0 ms.**
   - Smoke script rerun: ack and broadcast p50 21.1 ms / p95 27.1 ms / max 45.6 ms.
+- 2026-10-26 — **Phase 7: chat, map pings, laser, follow & summon** (TODO Phase 7; CHAT-1…6, RT-5, FEATURES F8/F9, API_SPEC §6–7, DATABASE_SCHEMA §3.12, SECURITY §4/§6):
+  - Schema: `chat_messages` + `ChatKind` enum, migration `chat`:
+    - UUIDv7 ids from app code (`gen_random_uuid()` fallback); index `(room_id, id DESC)`;
+    - CHECKs: body 1–500 chars; ping x/y within 0–1 000 000; ping fields all null or x/y set (the board may later be nulled); SYSTEM rows have no author and no client id;
+    - `client_id` with UNIQUE `(author_id, client_id)` for durable `chat:send` dedupe.
+  - Shared: `schemas/chat.ts` (`ChatMessage`, `ChatBodySchema`, `PingInputSchema`, `pingWithinWorld`, history query / response, `DELETED_BODY`); `chat:send` and `chat:message` are now typed; new `followers:update` event.
+  - Server:
+    - Chat service: send with ping validation (board in this room, point inside that map) and replay on a known `clientId`; list newest first with a cursor (50, max 100); delete by author or owner, which overwrites the body and drops the ping; system messages.
+    - System messages for join, leave, kick, role change and board created / deleted, from the existing domain events (`board:deleted` now carries the name). Snapshot ones are `TODO(phase8)`.
+    - Socket `chat:send` (`chat` bucket 5 / 10 s → `RATE_LIMITED`; `room.interact`, so viewers chat too). Broadcasts `chat:message` / `chat:deleted` to the room.
+    - Leaders get `followers:update { count }` on follow start / stop, a follower disconnecting, and their own `room:join`.
+    - REST `GET /rooms/:roomId/messages`, `DELETE /messages/:messageId`. Chat bodies are never logged (log-grep test).
+  - Web:
+    - **Chat tab** (now the default tab):
+      - grouped messages (same author within 2 min), system lines, presence-coloured names, times;
+      - infinite scroll up with a stable scroll position, and "Jump to latest" when scrolled up;
+      - optimistic send with Sending… / failed + Retry / discard;
+      - Enter / Shift+Enter, counter after 400, `/` focuses the input;
+      - hover menu to delete (own; owner: any), "message deleted" placeholder;
+      - throttled `aria-live` announcements; everything rendered as text nodes.
+    - **Unread badge** on the Chat tab, or on the panel toggle while the panel is closed.
+    - **Pings**:
+      - 📍 pick mode (crosshair, Esc cancels) or Alt+click anywhere attaches a removable chip `📍 {gridRef} · {board}`;
+      - a chip switches board, flies there (300 ms) and plays a 3-pulse ring; a deleted board's chip is disabled;
+      - a sent ping pulses 3 s for everyone on that board;
+      - reduced motion: instant jump, still ring.
+    - **Laser (K)**, for every role: hold to emit `laser:point` (≤ 30 Hz). A canvas overlay draws fading 1.5 s trails in the sender's presence colour. Cursor broadcasts pause while lasering (both share the 40/s volatile budget), and receivers move the sender's cursor with the laser.
+    - **Follow & summon**:
+      - the avatar menu offers Follow / Go to their board, and for yourself Summon everyone (Editor+);
+      - the follower mirrors the leader's board, center and zoom with 200 ms smoothing; the leader sends `view:update` (≤ 10 Hz) only while followed, plus once whenever a follower joins or the leader's new board is subscribed;
+      - manual pan / zoom stops following ("Stopped following"); a "Following {name} · Stop" pill is shown, and the follower's cursor is hidden;
+      - summon toast with "Don't follow" (5 s); followers stop with a toast when the leader leaves;
+      - a reconnecting follower re-follows.
+    - MapCanvas exposes `data-center` / `data-zoom` (world units) on the map element.
+  - Tests:
+    - Shared 105 (chat text normalization and limits, ping shape / bounds, history query).
+    - Web unit 166 (+16): grouping, merge / pending / retry, unread counting, ping labels, follow reducer (start, manual move, leader gone, silent stop), laser expiry and fade.
+    - Integration 400 (+31):
+      - `chat:send`: cleaning, limits, dedupe, the 6th message → `RATE_LIMITED`, join-first;
+      - pings: another room's board rejected, outside the map rejected, deleted board → `boardId: null`;
+      - pagination order and cursor, delete permissions, system messages on join / leave / kick / role change / board create / delete;
+      - an XSS payload stored and returned verbatim; no bodies in logs; follower counts and summon.
+    - Both authz matrices have the new rows: REST `GET …/messages`, `DELETE /messages/:id`; socket `chat:send`.
+    - E2E `chat.spec.ts` (two contexts): send / newline / counter / delete / `/`; the `<img onerror>` payload rendered literally with no element, no dialog and no CSP console message; unread badge; **E2E-4** across boards (center within 50 m, pulse visible) + Alt+click; laser seen by B and gone after 1.5 s, never persisted; summon → follow to another board and its pans → manual pan stops it; follow from the avatar menu and the leader leaving. **E2E-6** now also checks the room is gone from the dashboard and the kick system message.
+  - **Perf, A/B back to back** (pan 5 s, 1 000 elements): Phase 6 commit avg 17.0 ms · p95 16.8 ms; Phase 7 avg 17.2 ms · p95 16.8 ms. No regression.
+- 2026-10-26 — Phase 6 follow-ups:
+  - "Clear layer" confirm now says "This can't be undone yet." (Phase 8 adds the auto-snapshot).
+  - `pnpm check:deps` (`scripts/check-deps.mjs`, no new dependency): fails when a workspace imports a package its package.json doesn't declare. Runtime `src/` may use only its own deps; tests, scripts and configs may also use the root devDependencies. It runs in CI and in lint-staged, and a mutation check (dropping `jose`) makes it fail.
+  - CI job `fresh-clone-boot`: no pnpm cache, `pnpm install --frozen-lockfile`, builds the API, migrates fresh Postgres / Redis service containers, and boots `node apps/server/dist/index.js` in production mode until `/api/health` is ok.
 - 2026-10-26 — **Phase 6: drawing tools** (TODO Phase 6; DRAW-1…9, BOARD-4; FEATURES F5/F6/F7, UI_UX_SPEC §3.5/§6/§8, ARCHITECTURE §7.5). 6A (tools) was found uncommitted and not wired into the room, so it was finished here together with 6B.
   - Shared:
     - `geometry.ts`: boxes, point/segment/polyline distances, point-in-polygon, `hitTest`, circle helpers, 15° snap, `clampToWorld` (6A); `unionBBox`, `bboxFromCorners`, `anchorBBox`, `clampTranslation`, `translateGeometry`, `sweepPoints` (6B).
@@ -196,6 +247,20 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - **Kick + block**: `room_bans`, `DELETE …/members/:userId { ban?: true }`, `GET /rooms/:roomId/bans`, `DELETE /rooms/:roomId/bans/:userId`, invite accept → generic 403 for banned users. UI: "Also block them from rejoining" in the kick dialog; Room settings → Security → Blocked users with Unban.
   - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
   - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
+
+### Decisions (Phase 7)
+- `chat:send` dedupe is durable: a `client_id` column with UNIQUE `(author_id, client_id)` (DATABASE_SCHEMA §3.12 updated) instead of the 10-minute Redis set used for `opId`. A resend at any time returns the stored message and is not broadcast again. `ChatMessage` gained `clientId`, so the sender matches its optimistic copy even when the broadcast beats the ack.
+- One broadcast path: the service raises a `chat:message` domain event and realtime emits it to the whole room, sender included. System messages use the same path.
+- A ping to a board of another room (or a missing one) and a ping outside that board's map are both `VALIDATION_ERROR` — no hint whether the board exists (SECURITY Z2).
+- Deleting a message overwrites its body with "message deleted" and clears the ping; the text is not kept. Deleting twice is a 204 no-op.
+- The unread badge counts other people's **user** messages only; system messages don't. Shown on the Chat tab, or on the panel toggle when the panel is closed.
+- The Chat tab is now the default panel tab (it is first in UI_UX_SPEC §3.5). The existing Phase 4/5 E2E tests open Members explicitly.
+- Leaders need to know whether anyone follows them: a new server → client event `followers:update { count }` (API_SPEC §7.3) rather than sending view updates blindly.
+- Summon starts following at once; "Don't follow" in the 5 s toast stops it silently. Opening a ping chip while following counts as a manual move.
+- Under reduced motion a received ping shows a still ring for 3 s rather than nothing (it carries information); a chip's fly-to jumps with no ring.
+- Follow mode can't rely on one volatile packet: while followed, the leader re-sends its view every 1.5 s (on top of ≤ 10 Hz on moves). A dropped `view:update` (e.g. right after a board switch, under load) then only delays the follower. Laser trails are pruned on a 300 ms timer as well as per frame, so they expire even when frames aren't drawn.
+- Typing indicator (P2) is not built: `chat:typing` keeps its contract, with a `TODO(p2)`.
+- System chat messages are fire-and-forget after the request, so `app.chatIdle()` drains them on shutdown. The integration harness also drains them before truncating tables, because an in-flight insert racing `TRUNCATE … CASCADE` deadlocked (1 s `deadlock_timeout`).
 
 ### Decisions (Phase 6)
 - **Locked layers are locked for every role, the owner included.** FEATURES F5, API_SPEC §7.2 ("layer unlocked") and the server agree: element ops on a locked layer are refused for everyone. The 6A client let the owner draw on a locked layer, which the server would then roll back. That is fixed, and select / eraser ignore locked layers for every role. The owner unlocks first. (The Phase 6B brief said "non-owners can't select" — see the report.)
@@ -250,6 +315,8 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 - New dependencies (all in TECH_STACK): `@node-rs/argon2` 2.2.2, `jose` 6.2.13, `@fastify/cookie` 11.1.3, `@fastify/rate-limit` 11.2.1, `uuid` 14.0.3, `@tanstack/react-query` 5.104.5, `react-hook-form` 7.91.0, `@hookform/resolvers` 6.0.0 (Zod 4 compatible), `sonner` 2.0.8.
 
 ### Fixed
+- 2026-10-26 — `cleanText(…, { keepNewlines: true })` kept tab (U+0009) as well as `\n`; SECURITY V3 allows only `\n` in chat. Now stripped (found by the new chat normalization test).
+- 2026-10-26 — Realtime shutdown: follower-count notifications from sockets closing during `close()` published through the Redis adapter while its clients were quitting, which the adapter doesn't catch. Skipped once closing.
 - 2026-10-26 — Realtime server: the fire-and-forget `presence.leave` on socket disconnect, `evict` after leave / kick and `broadcastPresence` had no rejection handler. With Redis unavailable they were unhandled rejections, which crash Node 22 by default (seen as 2 "Connection is closed" errors in `pnpm test:int` teardown). They now log a warning. `close()` uses `quit()` instead of `disconnect()` on the adapter clients, so pending publishes complete.
 - 2026-10-26 — Dev env defaults (`apps/server/.env.example`, ENVIRONMENT.md): `DATABASE_URL` / `REDIS_URL` now use `127.0.0.1` instead of `localhost`. Compose binds IPv4 only, and on Windows the Prisma engine tries `::1` first, so every new pooled connection waited ≈ 2 050 ms (13 ms with `127.0.0.1`). Under concurrent load that surfaced as P2028 "Unable to start a transaction in the given time" (500 on `POST /rooms`) and > 1 s sync in the E2E latency tests.
 - 2026-10-26 — Local Playwright runs are capped at 3 workers (CI unchanged). With 6 workers on a 12-thread machine, 12 browsers plus Next, the API and Postgres pushed op latency past the 1 s E2E-3 assertion.

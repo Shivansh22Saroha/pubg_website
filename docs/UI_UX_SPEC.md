@@ -127,7 +127,7 @@ Active tool: `--accent` background, `--accent-fg` icon. Viewers see only Select,
 **Map HUD (bottom)**: left — cursor grid ref + world metres (mono font); right — labels toggle (◐), grid toggle (#), zoom −/+, fit map (⤢). Minimap (P2) bottom-right 160×160, collapsible.
 
 **Right panel (340 px, collapsible to 0 with `]`)**, three tabs:
-- *Chat*: message list (avatar, name in presence color, time, text; pings render as a chip `📍 F-M 4,7 · Erangel – Drop A`), system messages centered muted; input with 📍 ping button and send; Enter sends, Shift+Enter newline; char counter after 400.
+- *Chat* (the default tab): message list (avatar, name in presence color, time, text; pings render as a chip `📍 F-M 4,7 · Erangel – Drop A`), system messages centered muted; input with 📍 ping button and send; Enter sends, Shift+Enter newline; char counter after 400. A ping chip in the input is removable (×). Unread badge on the Chat tab, or on the panel toggle while the panel is closed.
 - *Layers*: list of layers, **top-most first** (drag handle, color dot, name + element count, eye toggle, lock toggle, kebab: rename / color / clear layer / delete); "+ Add layer" (≤ 10); active layer highlighted — click a row to make it active; new elements go to the active layer. Eye: board-wide visibility (Editor+); Alt+click hides it for you only (closed-eye icon in the accent colour). Lock: a button for the owner, a read-only icon for everyone else. Delete and Clear ask for confirmation and show the element count.
 - *Members*: online first, then offline; role badge; Owner sees role dropdown + Kick.
 

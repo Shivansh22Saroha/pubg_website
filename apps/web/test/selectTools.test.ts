@@ -265,6 +265,7 @@ class FakeCtx {
       explainLocked: (l) => {
         this.lockedToasts.push(l.name);
       },
+      laser: () => undefined,
     };
   }
 }

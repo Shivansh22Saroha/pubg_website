@@ -71,6 +71,7 @@ class Fake {
       commitChanges: () => true,
       editInline: () => undefined,
       explainLocked: () => undefined,
+      laser: () => undefined,
     };
   }
 }

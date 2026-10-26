@@ -74,6 +74,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Every import is a declared dependency
+        run: pnpm check:deps
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -105,3 +108,70 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
+
+  # A clean clone must install and boot: no pnpm cache, frozen lockfile, the *built* API against
+  # fresh service containers, until /api/health says ok (Phase 6: undeclared server deps only
+  # resolved from a stale local node_modules).
+  fresh-clone-boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: rl
+          POSTGRES_PASSWORD: rl_ci_pw
+          POSTGRES_DB: rotationlab
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rl -d rotationlab" --health-interval 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
+
+    env:
+      # production mode on purpose: the config guards (secure cookies, rate limits on) apply
+      NODE_ENV: production
+      PORT: '4000'
+      APP_ORIGIN: https://ci.invalid
+      DATABASE_URL: postgresql://rl:rl_ci_pw@127.0.0.1:5432/rotationlab?schema=public
+      REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_SECRET: ci-only-jwt-secret-not-used-anywhere-else-0123456789
+      JWT_ISSUER: rotationlab
+      JWT_AUDIENCE: rotationlab-web
+      COOKIE_SECURE: 'true'
+      RATE_LIMITS_ENABLED: 'true'
+      IP_HASH_SALT: ci-only-ip-hash-salt-0123456789
+      TRUST_PROXY: 'false'
+      LOG_LEVEL: info
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4 # no `cache:` — a truly clean install
+        with:
+          node-version-file: .nvmrc
+
+      - name: Clean install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the API (and the shared package it needs)
+        run: pnpm turbo run build --filter=server
+
+      - name: Migrate database
+        run: pnpm --filter server exec prisma migrate deploy
+
+      - name: Boot the built API until /api/health is ok
+        run: |
+          node apps/server/dist/index.js > api.log 2>&1 &
+          for i in $(seq 1 60); do
+            body=$(curl -fsS http://127.0.0.1:4000/api/health || true)
+            echo "$body" | grep -q '"status":"ok"' && { echo "healthy: $body"; exit 0; }
+            sleep 1
+          done
+          echo "API did not become healthy"; cat api.log; exit 1

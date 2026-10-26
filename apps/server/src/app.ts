@@ -23,6 +23,9 @@ import { createTokenService } from './modules/auth/tokens.js';
 import { createBoardOpsService } from './modules/elements/service.js';
 import { createRealtime, disconnectSessions } from './realtime/server.js';
 import { boardRoutes } from './modules/boards/routes.js';
+import { chatRoutes } from './modules/chat/routes.js';
+import { createChatService } from './modules/chat/service.js';
+import { registerSystemMessages } from './modules/chat/system.js';
 import { createBoardService } from './modules/boards/service.js';
 import { inviteRoutes } from './modules/invites/routes.js';
 import { createInviteService } from './modules/invites/service.js';
@@ -161,6 +164,10 @@ export async function buildApp({
   });
   const boards = createBoardService({ prisma, policy, events });
   const boardOps = createBoardOpsService({ prisma, redis, policy });
+  const chat = createChatService({ prisma, policy, events });
+  const systemMessages = registerSystemMessages(events, chat, prisma, app.log);
+  app.decorate('chatIdle', systemMessages.idle);
+  app.addHook('preClose', systemMessages.idle);
 
   app.decorate('authenticate', async (request) => {
     const token = cookies.readAccess(request);
@@ -196,6 +203,7 @@ export async function buildApp({
   await app.register(roomRoutes, { prefix: '/api/v1', rooms, invites, boards, redis, rateLimits });
   await app.register(inviteRoutes, { prefix: '/api/v1', invites, redis, rateLimits });
   await app.register(boardRoutes, { prefix: '/api/v1', boards });
+  await app.register(chatRoutes, { prefix: '/api/v1', chat });
 
   // ---- realtime (Socket.IO on the same HTTP server, path /realtime) -------------------
   if (withRealtime) {
@@ -209,6 +217,7 @@ export async function buildApp({
       policy,
       rooms,
       boardOps,
+      chat,
       events,
       tokenGraceSec: config.SOCKET_TOKEN_GRACE_SEC,
     });
@@ -229,5 +238,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     /** REST → realtime bridge; Phase 5 subscribes (member:kicked, board:created, …) */
     roomEvents: RoomEvents;
+    /** resolves when no system chat message is still being written */
+    chatIdle: () => Promise<void>;
   }
 }

@@ -17,7 +17,8 @@
     "prepare": "husky",
     "test:e2e": "turbo run test:e2e",
     "test:int": "turbo run test:int",
-    "test:e2e:dev": "pnpm --filter web test:e2e:dev"
+    "test:e2e:dev": "pnpm --filter web test:e2e:dev",
+    "check:deps": "node scripts/check-deps.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
@@ -25,7 +26,8 @@
       "prettier --write"
     ],
     "*.{json,css,yml,yaml}": "prettier --write",
-    "CLAUDE.md": "prettier --write"
+    "CLAUDE.md": "prettier --write",
+    "{package.json,apps/*/package.json,packages/*/package.json,**/*.{ts,tsx,js,mjs,cjs}}": "node scripts/check-deps.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

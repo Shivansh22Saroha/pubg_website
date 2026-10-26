@@ -6,6 +6,7 @@ import { Grid3x3, Layers, Maximize2, Minus, Plus } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { fromLatLng } from '@/lib/coords';
 import { cn } from '@/lib/utils';
+import { MANUAL_VIEW_EVENT } from './FollowController';
 
 interface MapHudProps {
   map: L.Map;
@@ -116,13 +117,31 @@ export function MapHud({
           <Grid3x3 className="size-[18px]" />
         </HudButton>
         <span aria-hidden className="mx-1 h-5 w-px bg-border" />
-        <HudButton label="Zoom out" onClick={() => map.zoomOut()}>
+        <HudButton
+          label="Zoom out"
+          onClick={() => {
+            window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
+            map.zoomOut();
+          }}
+        >
           <Minus className="size-[18px]" />
         </HudButton>
-        <HudButton label="Zoom in" onClick={() => map.zoomIn()}>
+        <HudButton
+          label="Zoom in"
+          onClick={() => {
+            window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
+            map.zoomIn();
+          }}
+        >
           <Plus className="size-[18px]" />
         </HudButton>
-        <HudButton label="Fit map" onClick={onFit}>
+        <HudButton
+          label="Fit map"
+          onClick={() => {
+            window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
+            onFit();
+          }}
+        >
           <Maximize2 className="size-[18px]" />
         </HudButton>
       </div>

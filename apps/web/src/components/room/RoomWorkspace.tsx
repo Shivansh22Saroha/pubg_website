@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { BoardMapView } from '@/components/map/BoardMapView';
 import { ShortcutsDialog } from '@/components/tools/ShortcutsDialog';
@@ -42,12 +42,16 @@ import {
   SessionExpiredDialog,
   SyncIndicator,
 } from './RealtimeStatus';
-import { SidePanel } from './SidePanel';
+import { SidePanel, UnreadBadge } from './SidePanel';
+import { useChatStore } from '@/stores/chatStore';
+import { useFollowStore } from '@/stores/followStore';
+import { usePresenceStore } from '@/stores/presenceStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 /**
  * Room workspace (UI_UX_SPEC §3.5): board tabs, toolbar, live map of the active board with the
  * drawing tools, presence, sync state, invite / settings dialogs, members & layers panel,
- * shortcut help. Chat arrives in Phase 7.
+ * shortcut help, chat with map pings, follow & summon.
  */
 export function RoomWorkspace({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -57,7 +61,9 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const [picked, setPicked] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : readPref(prefKeys.lastBoard(roomId)),
   );
-  const [panelOpen, setPanelOpen] = useState(true);
+  const panelOpen = useWorkspaceStore((s) => s.panelOpen);
+  const setPanelOpen = useWorkspaceStore((s) => s.setPanelOpen);
+  const unread = useChatStore((s) => s.unread);
   const [dialog, setDialog] = useState<'invite' | 'settings' | 'help' | null>(null);
   const [gone, setGone] = useState<'kicked' | 'deleted' | null>(null);
 
@@ -89,6 +95,23 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
     onReject: (message) => {
       toast.error(message);
     },
+    onSummon: (userId, boardId) => {
+      const follow = useFollowStore.getState();
+      if (follow.leaderId === userId) return;
+      // FEATURES F8: follow at once; "Don't follow" (5 s) opts out
+      follow.dispatch({ type: 'start', leaderId: userId, summoned: true });
+      useWorkspaceStore.getState().requestBoard(boardId);
+      toast(`${nameOfRef.current(userId)} is presenting — following`, {
+        id: `summon-${userId}`,
+        duration: 5_000,
+        action: {
+          label: 'Don’t follow',
+          onClick: () => {
+            useFollowStore.getState().dispatch({ type: 'stop' });
+          },
+        },
+      });
+    },
   });
 
   useEffect(() => {
@@ -112,6 +135,56 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   );
   const meId = me.data?.id;
   const nameOf = useMemo(() => makeNameOf(meId ?? '', names), [meId, names]);
+  const nameOfRef = useRef(nameOf);
+  useEffect(() => {
+    nameOfRef.current = nameOf;
+  });
+
+  // follow mode: the reducer's effects go out through this session
+  useEffect(() => {
+    if (!session || !meId) return;
+    useFollowStore.getState().bind({
+      meId,
+      nameOf: (id) => nameOfRef.current(id),
+      run: (e) => {
+        if (e.kind === 'emitStart') session.followStart(e.leaderId);
+        else if (e.kind === 'emitStop') session.followStop(e.leaderId);
+        else toast(e.message, { id: 'follow' });
+      },
+    });
+    const offPresence = usePresenceStore.subscribe((s, prev) => {
+      if (s.users !== prev.users)
+        useFollowStore
+          .getState()
+          .dispatch({ type: 'presence', online: new Set(Object.keys(s.users)) });
+    });
+    return () => {
+      offPresence();
+      useFollowStore.getState().dispatch({ type: 'stop' });
+      useFollowStore.getState().bind(null);
+    };
+  }, [session, meId]);
+
+  // ping chips and follow mode ask for another board
+  useEffect(
+    () =>
+      useWorkspaceStore.subscribe((s, prev) => {
+        const req = s.boardRequest;
+        if (!req || req === prev.boardRequest) return;
+        if (boards.some((b) => b.id === req.boardId)) {
+          setPicked(req.boardId);
+          writePref(prefKeys.lastBoard(roomId), req.boardId);
+        }
+      }),
+    [boards, roomId],
+  );
+
+  const summon = () => {
+    void session?.summon().then((res) => {
+      if (res?.ok) toast('Everyone in the room was asked to follow you', { id: 'summon' });
+      else toast.error(res?.message ?? 'Could not summon — are you online?');
+    });
+  };
 
   // UI_UX_SPEC §8: 1–9 switch board tab, ] toggles the right panel, ? help, / chat
   useEffect(() => {
@@ -125,14 +198,9 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
         case 'help':
           setDialog('help');
           break;
-        case 'chat': {
-          // Phase 7 adds the chat input; until then `/` does nothing
-          const input = document.querySelector<HTMLElement>('[data-chat-input]');
-          if (!input) return;
-          setPanelOpen(true);
-          input.focus();
+        case 'chat':
+          useWorkspaceStore.getState().focusChat();
           break;
-        }
         case 'board': {
           const target = boards[action.index];
           if (!target) return;
@@ -149,7 +217,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, [boards, roomId]);
+  }, [boards, roomId, setPanelOpen]);
 
   if (query.isPending || !me.data) {
     return (
@@ -245,7 +313,14 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
 
         <div className="ml-auto flex shrink-0 items-center gap-2 px-3">
           <SyncIndicator />
-          <PresenceStack members={members} />
+          <PresenceStack
+            members={members}
+            meId={me.data.id}
+            canSummon={can(role, 'board.edit')}
+            boards={boards}
+            onGoToBoard={select}
+            onSummon={summon}
+          />
           {can(role, 'invite.create') && (
             <Button
               variant="outline"
@@ -273,7 +348,8 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           <Button
             variant="ghost"
             size="icon"
-            className="size-8"
+            className="relative size-8"
+            data-testid="panel-toggle"
             aria-label={panelOpen ? 'Hide side panel' : 'Show side panel'}
             aria-pressed={panelOpen}
             title="Toggle panel (])"
@@ -286,6 +362,11 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             ) : (
               <PanelRightOpen className="size-4" />
             )}
+            {!panelOpen && unread > 0 && (
+              <span className="absolute -top-1 -right-1">
+                <UnreadBadge count={unread} />
+              </span>
+            )}
           </Button>
         </div>
       </header>
@@ -296,6 +377,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           {active && (
             <BoardMapView
               key={active.id}
+              boardId={active.id}
               mapId={active.mapId}
               meId={me.data.id}
               names={names}
@@ -316,6 +398,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               role={role}
               meId={me.data.id}
               members={members}
+              boards={boards}
               session={session}
             />
           </aside>

@@ -87,9 +87,9 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 
 ## Phase 7 — Collaboration extras & chat (P0/P1)
 - [x] Live cursors (20 Hz throttle, fade), presence dots on board tabs. _(done early in Phase 5B)_
-- [ ] Chat: send, history pagination, system messages, delete, unread badge.
-- [ ] Map pings (📍 button, Alt+click), ping chip fly-to + pulse.
-- [ ] Laser pointer (P1), follow & summon (P1).
+- [x] Chat: send, history pagination, system messages, delete, unread badge.
+- [x] Map pings (📍 button, Alt+click), ping chip fly-to + pulse.
+- [x] Laser pointer (P1), follow & summon (P1).
 
 **Exit:** E2E-4, E2E-6 pass.
 

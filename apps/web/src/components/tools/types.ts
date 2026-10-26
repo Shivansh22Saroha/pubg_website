@@ -28,11 +28,12 @@ export const CREATION_TOOLS = [
 ] as const satisfies readonly ToolId[];
 export type CreationToolId = (typeof CREATION_TOOLS)[number];
 
-/** Measure (Phase 8) and Laser (Phase 7) show in the toolbar but aren't built yet. */
+/** Measure (Phase 8) shows in the toolbar but isn't built yet. */
 export const IMPLEMENTED_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'select',
   ...CREATION_TOOLS,
   'eraser',
+  'laser',
 ]);
 
 export function isCreationTool(id: ToolId): id is CreationToolId {
@@ -114,6 +115,8 @@ export interface ToolContext {
   editInline(id: string): void;
   /** the pointer hit something on a locked layer: say why nothing happens */
   explainLocked(layer: Layer): void;
+  /** laser tool: one point of the trail (ephemeral, every role) */
+  laser(at: Pt): void;
 }
 
 export interface Tool {

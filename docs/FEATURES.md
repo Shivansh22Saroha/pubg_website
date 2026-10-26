@@ -65,7 +65,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - 1–10 layers per board. New elements go to the **active layer** (per user, local).
 - `visible` (board-wide) toggled by Editor+ affects everyone; each user can also locally "solo/hide" a layer (eye with slash in their own view only — shown as a different icon). v1: local hide only via Alt+click eye.
 - `locked`: server rejects element ops on that layer **for every role, the owner included** (the owner unlocks first); select and eraser ignore its elements for everyone, and drawing on it is blocked with a toast. Only the owner can lock / unlock, rename, recolor or delete a locked layer; nobody can clear it.
-- Deleting a layer deletes its elements (confirm shows count). Can't delete the last layer. "Clear layer" (kebab) removes its elements after a confirm.
+- Deleting a layer deletes its elements (confirm shows count). Can't delete the last layer. "Clear layer" (kebab) removes its elements after a confirm that warns it can't be undone yet (Phase 8 adds the auto-snapshot).
 - Reorder changes rendering order (z of layer > z of element). The panel lists the **top-most layer first**.
 - Layer ops (add, rename, recolor, visibility, lock, reorder, clear, delete) are not part of undo / redo in v1.
 
@@ -137,8 +137,8 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - **Ephemeral events are best-effort**: cursors, laser, `stroke:preview` ghosts and follow-mode view updates may be dropped and are never replayed; the UI tolerates gaps (ghosts vanish after 3 s without updates, cursors fade).
 - **Cursors**: shown only for users on the same board; name pill; hidden while user is idle > 5 s (fade) or follow mode active.
 - **Presence**: online dot; idle (2 min no input) shows half-opacity avatar; board dots on tabs.
-- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following").
-- **Summon**: leader triggers; each member gets non-blocking toast with "Don't follow" button (5 s).
+- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following"). "Manual" = drag, wheel, double-click, pan/zoom keys, Space / middle-mouse pan, the HUD zoom / fit buttons, or opening a ping chip; programmatic moves never count. A "Following {name} · Stop" pill sits at the top of the map; the follower's own cursor isn't broadcast meanwhile. The leader learns its follower count (`followers:update`) and sends `view:update` (≤ 10 Hz) only while it is > 0. Started from a presence avatar's menu (Follow / Go to their board). If the leader leaves the room or goes offline, followers stop with a toast "{name} left — stopped following".
+- **Summon**: leader triggers (Editor+, own avatar → "Summon everyone"); each member starts following at once and gets a non-blocking toast "{name} is presenting — following" with a "Don't follow" button (5 s).
 - **Sync indicator** states defined in UI_UX_SPEC §3.5.
 - **Reconnect**: exponential backoff 0.5 s → 10 s with jitter; on reconnect rejoin room + resubscribe board with `sinceSeq`.
 
@@ -153,7 +153,10 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Ping creation: click 📍 in the chat input → cursor becomes crosshair → click map → chip attached to input; send. Shortcut: `Alt+click` anywhere on the map attaches a ping and focuses the chat input. (`P` is reserved for Pen.)
 - Ping chip text: `📍 {gridRef} · {board name}`; click → switch board if needed, fly to, pulse.
 - Pings also show a temporary pulse on the map for all users on that board when sent (3 s).
-- Typing indicator "Rudra is typing…" (P2).
+- Typing indicator "Rudra is typing…" (P2 — not built in v1; the event contract exists).
+- Chat text: trimmed, NFC, control characters stripped except `\n`, 1–500 code points; shown as text only (no HTML, no auto-links). Viewers can chat and ping. Optimistic send with a pending state; a failed message offers Retry (same `clientId`, so never duplicated) or discard. Enter sends, Shift+Enter is a newline, a counter shows from 400 characters. Delete own messages (owner: any) from a hover menu.
+- Unread badge counts other people's **user** messages that arrive while the chat isn't on screen (panel closed → on the panel toggle; another tab → on the Chat tab). System messages don't count.
+- A ping on a board that was later deleted keeps its message; the chip shows disabled. Reduced motion: chips jump instantly and pulses don't animate (a still ring is shown).
 - System messages: join, leave, kick, role change, board created/deleted, snapshot saved/restored.
 - History: 50 per page, infinite scroll up; "Jump to latest" button when scrolled up and new messages arrive.
 - Unread badge on Chat tab / FAB when panel hidden.

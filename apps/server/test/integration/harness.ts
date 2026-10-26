@@ -34,6 +34,8 @@ export async function makeApp(overrides: Record<string, string> = {}) {
 /** Clean slate per test: Postgres tables truncated, Redis test DB flushed. */
 export function useCleanState() {
   beforeEach(async () => {
+    // fire-and-forget system messages of the previous test would deadlock with TRUNCATE
+    await Promise.all(apps.map((a) => a.chatIdle()));
     await prisma.$executeRawUnsafe(
       'TRUNCATE TABLE board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
     );

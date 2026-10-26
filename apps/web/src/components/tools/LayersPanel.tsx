@@ -384,7 +384,7 @@ export function LayersPanel({ role, session }: { role: RoomRole; session: LayerS
             description={
               confirm.kind === 'delete'
                 ? `“${confirm.layer.name}” and its ${confirm.count} element${confirm.count === 1 ? '' : 's'} will be deleted for everyone.`
-                : `All ${confirm.count} element${confirm.count === 1 ? '' : 's'} on “${confirm.layer.name}” will be removed for everyone.`
+                : `All ${confirm.count} element${confirm.count === 1 ? '' : 's'} on “${confirm.layer.name}” will be removed for everyone. This can’t be undone yet.`
             }
           >
             <div className="flex justify-end gap-2">

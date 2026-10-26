@@ -4,6 +4,8 @@ import type {
   AckResult,
   Board,
   BoardSubscribeAck,
+  ChatMessage,
+  PingInput,
   Pt,
   ErrorCode,
   RoomDetailResponse,
@@ -14,10 +16,16 @@ import type {
 } from '@rotationlab/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { v7 as uuid } from 'uuid';
+import { fetchMessages } from '@/lib/chat';
 import { keys } from '@/lib/rooms';
 import { hasGap, type LocalOp, type PendingOp } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
+import { useChatStore } from '@/stores/chatStore';
+import { useFollowStore } from '@/stores/followStore';
+import { useLaserStore } from '@/stores/laserStore';
 import { usePresenceStore } from '@/stores/presenceStore';
+import { usePulseStore } from '@/stores/pulseStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { planSends, toWire } from './batching';
 import { getSocket, startRealtime } from './socket';
 import type { RtSocket } from './connection';
@@ -25,6 +33,8 @@ import type { RtSocket } from './connection';
 export const HEARTBEAT_MS = 20_000;
 export const IDLE_AFTER_MS = 120_000;
 export const CURSOR_INTERVAL_MS = 50; // 20 Hz (RT-2)
+export const LASER_INTERVAL_MS = 34; // <= 30 Hz (ARCHITECTURE 7.3)
+export const VIEW_INTERVAL_MS = 100; // <= 10 Hz, only while followed
 const ACK_TIMEOUT_MS = 10_000;
 const GAP_RESYNC_MS = 2_000;
 /** transient server answers: keep the op and try again */
@@ -38,6 +48,8 @@ export interface RoomSessionCallbacks {
   onActiveBoardDeleted: (fallback: Board | undefined) => void;
   onRoleChanged: (role: RoomRole) => void;
   onReject: (message: string) => void;
+  /** someone is presenting: start following them unless the user says no */
+  onSummon: (userId: string, boardId: string) => void;
 }
 
 type AnyAck = AckResult<unknown>;
@@ -60,6 +72,9 @@ export class RoomSession {
   private lastCursor = 0;
   private pendingCursor: { x: number; y: number } | null = null;
   private cursorTimer: ReturnType<typeof setTimeout> | null = null;
+  private laserLimit = new Throttle(LASER_INTERVAL_MS);
+  private viewLimit = new Throttle(VIEW_INTERVAL_MS);
+  private lastLaser = 0;
   private offs: (() => void)[] = [];
 
   constructor(
@@ -73,6 +88,8 @@ export class RoomSession {
 
   start() {
     useBoardStore.getState().setMe(this.meId);
+    if (useChatStore.getState().roomId !== this.roomId)
+      useChatStore.getState().reset(this.roomId, this.meId);
     this.listen();
     this.timers.push(
       setInterval(() => {
@@ -103,6 +120,9 @@ export class RoomSession {
     for (const t of this.timers.splice(0)) clearInterval(t);
     if (this.gapTimer) clearTimeout(this.gapTimer);
     if (this.cursorTimer) clearTimeout(this.cursorTimer);
+    this.laserLimit.cancel();
+    this.viewLimit.cancel();
+    useLaserStore.getState().clear();
     if (this.socket.connected && this.joined)
       this.socket.emit('room:leave', { roomId: this.roomId }, () => undefined);
     this.joined = false;
@@ -116,6 +136,7 @@ export class RoomSession {
     const presence = usePresenceStore.getState();
     for (const id of Object.keys(presence.cursors)) presence.dropCursor(id);
     for (const id of Object.keys(presence.ghosts)) presence.dropGhost(id);
+    useLaserStore.getState().clear();
     if (this.joined && this.socket.connected) void this.subscribe(false);
   }
 
@@ -128,7 +149,20 @@ export class RoomSession {
     if (!(await this.join())) return;
     if (this.boardId) await this.subscribe(true);
     this.flush();
+    // a follower's socket is new after a reconnect: follow again
+    const { leaderId } = useFollowStore.getState();
+    if (leaderId) this.followStart(leaderId);
+    void this.loadLatestChat();
   };
+
+  /** The newest page of chat (first load, and after every reconnect to catch up). */
+  async loadLatestChat() {
+    try {
+      useChatStore.getState().pageLoaded(await fetchMessages(this.roomId), false);
+    } catch {
+      // offline / transient: the next reconnect tries again
+    }
+  }
 
   private async join(): Promise<boolean> {
     const res = (await this.socket
@@ -304,8 +338,11 @@ export class RoomSession {
     }
   }
 
-  /** Throttled to 20 Hz; the last position always gets sent. */
+  /** Throttled to 20 Hz; the last position always gets sent. Not while following (F8). */
   cursor(x: number, y: number) {
+    if (useFollowStore.getState().leaderId) return;
+    // the laser already shows where I am (and both share the 40/s volatile budget)
+    if (Date.now() - this.lastLaser < 200) return;
     this.pendingCursor = { x: Math.round(x), y: Math.round(y) };
     const wait = this.lastCursor + CURSOR_INTERVAL_MS - Date.now();
     if (wait <= 0) this.sendCursor();
@@ -337,6 +374,90 @@ export class RoomSession {
 
   get activeBoardId() {
     return this.boardId;
+  }
+
+  // ---- laser, follow, summon (FEATURES F6/F8) ---------------------------------------------
+
+  /** Laser while held: ≤ 30 Hz, best-effort; my own trail is drawn locally at once. */
+  laser(x: number, y: number) {
+    if (!this.boardId) return;
+    const boardId = this.boardId;
+    const pt = { x: Math.round(x), y: Math.round(y) };
+    this.lastLaser = Date.now();
+    useLaserStore.getState().add(this.meId, pt.x, pt.y);
+    this.laserLimit.run(() => {
+      if (this.socket.connected && this.boardId === boardId)
+        this.socket.volatile.emit('laser:point', { boardId, ...pt });
+    });
+  }
+
+  /** My view for followers: ≤ 10 Hz, and only while someone follows me. */
+  viewUpdate(center: [number, number], zoom: number, force = false) {
+    if (!this.boardId || useWorkspaceStore.getState().followerCount === 0) return;
+    const boardId = this.boardId;
+    const send = () => {
+      if (this.socket.connected && this.boardId === boardId)
+        this.socket.volatile.emit('view:update', { boardId, center, zoom });
+    };
+    if (force) send();
+    else this.viewLimit.run(send);
+  }
+
+  followStart(targetUserId: string) {
+    if (this.socket.connected) this.socket.emit('follow:start', { targetUserId }, () => undefined);
+  }
+
+  followStop(targetUserId: string) {
+    if (this.socket.connected) this.socket.emit('follow:stop', { targetUserId }, () => undefined);
+  }
+
+  /** Ask everyone to follow me (Editor+; the server re-checks). */
+  async summon(): Promise<AnyAck | null> {
+    if (!this.boardId || !this.online) return null;
+    return (await this.socket
+      .timeout(ACK_TIMEOUT_MS)
+      .emitWithAck('summon', { boardId: this.boardId })
+      .catch(() => null)) as AnyAck | null;
+  }
+
+  // ---- chat (FEATURES F9) -----------------------------------------------------------------
+
+  /** Optimistic: shown at once as pending; the ack (or the broadcast) brings the stored copy. */
+  sendChat(body: string, ping: PingInput | null) {
+    const clientId = uuid();
+    useChatStore
+      .getState()
+      .addPending({ clientId, body, ping, createdAt: new Date().toISOString() });
+    void this.emitChat(clientId, body, ping);
+  }
+
+  /** Resend a failed message with the same clientId (the server dedupes). */
+  retryChat(clientId: string) {
+    const p = useChatStore.getState().pending.find((x) => x.clientId === clientId);
+    if (!p) return;
+    useChatStore.getState().retry(clientId);
+    void this.emitChat(clientId, p.body, p.ping);
+  }
+
+  private async emitChat(clientId: string, body: string, ping: PingInput | null) {
+    if (!this.online) {
+      useChatStore.getState().failed(clientId, 'You’re offline');
+      return;
+    }
+    const res = (await this.socket
+      .timeout(ACK_TIMEOUT_MS)
+      .emitWithAck('chat:send', { clientId, roomId: this.roomId, body, ...(ping ? { ping } : {}) })
+      .catch(() => null)) as AnyAck | null;
+    if (res?.ok) {
+      useChatStore.getState().acked((res.data as { message: ChatMessage }).message);
+      return;
+    }
+    const why = !res
+      ? 'Not sent'
+      : res.code === 'RATE_LIMITED'
+        ? 'Slow down — too many messages'
+        : res.message;
+    useChatStore.getState().failed(clientId, why);
   }
 
   // ---- server events ---------------------------------------------------------------------
@@ -378,6 +499,33 @@ export class RoomSession {
     this.on('stroke:preview', ({ userId, boardId, tempId, points, style }) => {
       if (boardId !== this.boardId || userId === this.meId) return;
       usePresenceStore.getState().previewGhost({ userId, tempId, points, style });
+    });
+    this.on('chat:message', ({ message }) => {
+      if (message.roomId !== this.roomId) return;
+      useChatStore.getState().receive(message);
+      // a fresh ping pulses for everyone on that board (3 s)
+      const ping = message.ping;
+      if (ping?.boardId && ping.boardId === this.boardId)
+        usePulseStore.getState().add({ boardId: ping.boardId, x: ping.x, y: ping.y, kind: 'ping' });
+    });
+    this.on('chat:deleted', ({ messageId }) => {
+      useChatStore.getState().deleted(messageId);
+    });
+    this.on('laser:point', ({ userId, boardId, x, y }) => {
+      if (boardId !== this.boardId || userId === this.meId) return;
+      useLaserStore.getState().add(userId, x, y);
+      usePresenceStore.getState().moveCursor({ userId, boardId, x, y });
+    });
+    this.on('view:update', ({ userId, boardId, center, zoom }) => {
+      if (userId !== useFollowStore.getState().leaderId) return;
+      useFollowStore.getState().setView({ boardId, center, zoom });
+      if (boardId !== this.boardId) useWorkspaceStore.getState().requestBoard(boardId);
+    });
+    this.on('followers:update', ({ count }) => {
+      useWorkspaceStore.getState().setFollowerCount(count);
+    });
+    this.on('summon', ({ userId, boardId }) => {
+      if (userId !== this.meId) this.cb.onSummon(userId, boardId);
     });
     this.on('board:created', ({ board }) => {
       this.updateRoom((p) =>
@@ -442,5 +590,40 @@ export class RoomSession {
       this.gapTimer = null;
       if (hasGap(useBoardStore.getState())) void this.subscribe(true);
     }, GAP_RESYNC_MS);
+  }
+}
+
+/** Leading-edge throttle that always delivers the last call (trailing). */
+class Throttle {
+  private last = 0;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private latest: (() => void) | null = null;
+  constructor(private readonly ms: number) {}
+
+  run(fn: () => void) {
+    this.latest = fn;
+    const wait = this.last + this.ms - Date.now();
+    if (wait <= 0) {
+      this.fire();
+      return;
+    }
+    this.timer ??= setTimeout(() => {
+      this.timer = null;
+      this.fire();
+    }, wait);
+  }
+
+  cancel() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.latest = null;
+  }
+
+  private fire() {
+    const fn = this.latest;
+    this.latest = null;
+    if (!fn) return;
+    this.last = Date.now();
+    fn();
   }
 }

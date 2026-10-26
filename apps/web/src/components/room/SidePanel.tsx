@@ -1,20 +1,29 @@
 'use client';
 
-import { can, type AssignableRole, type Member, type RoomRole } from '@rotationlab/shared';
-import { MessageSquare } from 'lucide-react';
+import {
+  can,
+  type AssignableRole,
+  type Board,
+  type Member,
+  type RoomRole,
+} from '@rotationlab/shared';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/auth/UserMenu';
+import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoleBadge } from '@/components/rooms/bits';
-import { LayersPanel, type LayerSink } from '@/components/tools/LayersPanel';
+import { LayersPanel } from '@/components/tools/LayersPanel';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useKickMember, useSetMemberRole } from '@/lib/rooms';
+import { useChatStore } from '@/stores/chatStore';
 import { usePresenceStore } from '@/stores/presenceStore';
+import { useWorkspaceStore, type PanelTab } from '@/stores/workspaceStore';
 
 /** Right panel (UI_UX_SPEC §3.5): Chat · Layers · Members. */
 export function SidePanel({
@@ -22,27 +31,45 @@ export function SidePanel({
   role,
   meId,
   members,
+  boards,
   session,
 }: {
   roomId: string;
   role: RoomRole;
   meId: string;
   members: Member[];
-  session: LayerSink | null;
+  boards: Board[];
+  session: RoomSession | null;
 }) {
+  const tab = useWorkspaceStore((s) => s.tab);
+  const setTab = useWorkspaceStore((s) => s.setTab);
+  const unread = useChatStore((s) => s.unread);
   return (
-    <Tabs defaultValue="members" className="flex h-full flex-col">
+    <Tabs
+      value={tab}
+      onValueChange={(v) => {
+        setTab(v as PanelTab);
+      }}
+      className="flex h-full flex-col"
+    >
       <TabsList>
-        <TabsTrigger value="chat">Chat</TabsTrigger>
+        <TabsTrigger value="chat">
+          Chat
+          {unread > 0 && tab !== 'chat' && <UnreadBadge count={unread} />}
+        </TabsTrigger>
         <TabsTrigger value="layers">Layers</TabsTrigger>
         <TabsTrigger value="members">Members</TabsTrigger>
       </TabsList>
-      <TabsContent
-        value="chat"
-        className="flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-text-muted"
-      >
-        <MessageSquare className="size-6" aria-hidden />
-        Room chat with map pings arrives with live collaboration.
+      {/* forceMount keeps the chat (scroll position, draft) alive while another tab shows */}
+      <TabsContent value="chat" forceMount className="min-h-0 flex-1 data-[state=inactive]:hidden">
+        <ChatPanel
+          roomId={roomId}
+          meId={meId}
+          role={role}
+          members={members}
+          boards={boards}
+          session={session}
+        />
       </TabsContent>
       <TabsContent value="layers" className="overflow-y-auto p-2">
         <LayersPanel role={role} session={session} />
@@ -195,5 +222,18 @@ function MembersList({
         )}
       </Dialog>
     </>
+  );
+}
+
+/** Unread chat count (FEATURES F9) — text, not colour alone (UI_UX_SPEC §10). */
+export function UnreadBadge({ count }: { count: number }) {
+  return (
+    <span
+      data-testid="unread-badge"
+      aria-label={`${count} unread`}
+      className="ml-1.5 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 font-mono text-[10px] leading-4 font-bold text-accent-fg"
+    >
+      {count > 99 ? '99+' : count}
+    </span>
   );
 }

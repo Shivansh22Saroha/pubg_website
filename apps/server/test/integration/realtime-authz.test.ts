@@ -144,6 +144,12 @@ const ACKED: AckedRow[] = [
     expect: { outsider: 'ok', viewer: 'ok', editor: 'ok', owner: 'ok' },
   },
   { event: 'summon', payload: ({ f }) => ({ boardId: f.boardId }), expect: write },
+  // chat: every member (viewers too — room.interact), after room:join
+  {
+    event: 'chat:send',
+    payload: ({ f }) => ({ clientId: opId(), roomId: f.roomId, body: 'matrix' }),
+    expect: joined,
+  },
 ];
 
 const everyMember = { outsider: false, viewer: true, editor: true, owner: true };

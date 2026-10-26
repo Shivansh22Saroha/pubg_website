@@ -32,6 +32,7 @@ model User {
   createdInvites   RoomInvite[]   @relation("InviteCreator")
   bans             RoomBan[]      @relation("BannedUser")
   bansIssued       RoomBan[]      @relation("BanIssuer")
+  chatMessages     ChatMessage[]
 
   @@map("users")
 }
@@ -87,23 +88,24 @@ enum MapId {
 }
 
 model Room {
-  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name           String       @db.VarChar(40)
-  description    String?      @db.VarChar(280)
-  ownerId        String       @map("owner_id") @db.Uuid
-  passwordHash   String?      @map("password_hash")
-  defaultRole    RoomRole     @default(EDITOR) @map("default_role")
-  isLocked       Boolean      @default(false) @map("is_locked")
-  maxMembers     Int          @default(16) @map("max_members") @db.SmallInt
-  lastActivityAt DateTime     @default(now()) @map("last_activity_at") @db.Timestamptz(6)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
-  owner          User         @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String        @db.VarChar(40)
+  description    String?       @db.VarChar(280)
+  ownerId        String        @map("owner_id") @db.Uuid
+  passwordHash   String?       @map("password_hash")
+  defaultRole    RoomRole      @default(EDITOR) @map("default_role")
+  isLocked       Boolean       @default(false) @map("is_locked")
+  maxMembers     Int           @default(16) @map("max_members") @db.SmallInt
+  lastActivityAt DateTime      @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  owner          User          @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   members        RoomMember[]
   invites        RoomInvite[]
   boards         Board[]
   bans           RoomBan[]
+  chatMessages   ChatMessage[]
 
   @@index([ownerId])
   @@map("rooms")
@@ -143,37 +145,38 @@ model RoomInvite {
 }
 
 model Board {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  roomId       String   @map("room_id") @db.Uuid
-  name         String   @db.VarChar(40)
-  mapId        MapId    @map("map_id")
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId       String        @map("room_id") @db.Uuid
+  name         String        @db.VarChar(40)
+  mapId        MapId         @map("map_id")
   position     Int
-  lastSeq      BigInt   @default(0) @map("last_seq")
-  elementCount Int      @default(0) @map("element_count")
-  thumbnailKey String?  @map("thumbnail_key")
-  createdBy    String?  @map("created_by") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  room         Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  lastSeq      BigInt        @default(0) @map("last_seq")
+  elementCount Int           @default(0) @map("element_count")
+  thumbnailKey String?       @map("thumbnail_key")
+  createdBy    String?       @map("created_by") @db.Uuid
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  room         Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
   layers       Layer[]
   elements     Element[]
   ops          BoardOp[]
+  pings        ChatMessage[]
 
   @@index([roomId, position])
   @@map("boards")
 }
 
 model Layer {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  boardId   String   @map("board_id") @db.Uuid
-  name      String   @db.VarChar(32)
-  color     String   @db.Char(7)
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId   String    @map("board_id") @db.Uuid
+  name      String    @db.VarChar(32)
+  color     String    @db.Char(7)
   position  Int
-  visible   Boolean  @default(true)
-  locked    Boolean  @default(false)
+  visible   Boolean   @default(true)
+  locked    Boolean   @default(false)
   seq       BigInt
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
   elements  Element[]
 
@@ -243,4 +246,32 @@ model BoardOp {
   @@id([boardId, seq])
   @@index([createdAt])
   @@map("board_ops")
+}
+
+enum ChatKind {
+  USER
+  SYSTEM
+}
+
+/// room chat + map pings (DATABASE_SCHEMA §3.12); id is UUIDv7, so ordering by id = by time
+model ChatMessage {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId      String    @map("room_id") @db.Uuid
+  authorId    String?   @map("author_id") @db.Uuid
+  kind        ChatKind  @default(USER)
+  body        String    @db.VarChar(500)
+  pingBoardId String?   @map("ping_board_id") @db.Uuid
+  pingX       Int?      @map("ping_x")
+  pingY       Int?      @map("ping_y")
+  /// sender's idempotency key (chat:send resend → same message)
+  clientId    String?   @map("client_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  room        Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  author      User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  pingBoard   Board?    @relation(fields: [pingBoardId], references: [id], onDelete: SetNull)
+
+  @@unique([authorId, clientId])
+  @@index([roomId, id(sort: Desc)])
+  @@map("chat_messages")
 }

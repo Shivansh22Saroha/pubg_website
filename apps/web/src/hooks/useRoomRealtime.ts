@@ -40,6 +40,9 @@ export function useRoomRealtime(
       onReject: (m) => {
         cb.current.onReject(m);
       },
+      onSummon: (userId, boardId) => {
+        cb.current.onSummon(userId, boardId);
+      },
     });
     s.start();
     setSession(s);

@@ -61,7 +61,8 @@ test('E2E-2: create room, invite, second user joins, both see each other', async
   await expect(joiner).toHaveURL(new RegExp(`${roomPath}$`));
   await expect(joiner.getByTestId('room-name')).toHaveText(roomName);
 
-  // both see each other (members list; live presence arrives in Phase 5)
+  // both see each other (members list; the panel opens on Chat since Phase 7)
+  await joiner.getByRole('tab', { name: 'Members' }).click();
   const joinerMembers = joiner.getByTestId('member-row');
   await expect(joinerMembers).toHaveCount(2);
   await expect(joinerMembers.filter({ hasText: ownerName })).toContainText('Owner');
@@ -70,6 +71,7 @@ test('E2E-2: create room, invite, second user joins, both see each other', async
   await expect(joiner.getByRole('button', { name: 'Room settings' })).toHaveCount(0);
 
   await owner.reload();
+  await owner.getByRole('tab', { name: 'Members' }).click();
   const ownerMembers = owner.getByTestId('member-row');
   await expect(ownerMembers).toHaveCount(2);
   await expect(owner.getByLabel(`Role of ${joinerName}`)).toHaveValue('EDITOR');

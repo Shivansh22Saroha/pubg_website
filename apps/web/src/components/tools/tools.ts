@@ -525,7 +525,36 @@ function dedupe(points: Pt[]): Pt[] {
   return out;
 }
 
+/** Laser (K): hold to draw a fading trail everyone on the board sees (never stored). */
+export class LaserTool extends BaseTool {
+  readonly id = 'laser';
+  private pressed = false;
+
+  get busy() {
+    return this.pressed;
+  }
+
+  override onPointerDown(p: ToolPointer) {
+    if (p.button !== 0) return;
+    this.pressed = true;
+    this.ctx.laser(p.world);
+  }
+
+  override onPointerMove(p: ToolPointer) {
+    if (this.pressed) this.ctx.laser(p.world);
+  }
+
+  override onPointerUp() {
+    this.pressed = false;
+  }
+
+  override cancel() {
+    this.pressed = false;
+  }
+}
+
 export type AnyTool =
+  | LaserTool
   | SelectTool
   | EraserTool
   | PenTool
@@ -536,7 +565,7 @@ export type AnyTool =
   | TextTool
   | MarkerTool;
 
-/** Tool instances for one map session (Measure / Laser arrive in Phases 8 / 7). */
+/** Tool instances for one map session (Measure arrives in Phase 8). */
 export function createTools(ctx: ToolContext): Partial<Record<ToolId, AnyTool>> {
   return {
     select: new SelectTool(ctx),
@@ -548,5 +577,6 @@ export function createTools(ctx: ToolContext): Partial<Record<ToolId, AnyTool>> 
     text: new TextTool(ctx),
     marker: new MarkerTool(ctx),
     eraser: new EraserTool(ctx),
+    laser: new LaserTool(ctx),
   };
 }

@@ -180,3 +180,60 @@
 .rl-cursor-faded .rl-cursor {
   opacity: 0.15;
 }
+
+/* ---- Phase 7: pings & pulses (UI_UX_SPEC §5) ---------------------------------------------- */
+.rl-ping-pick,
+.rl-ping-pick .leaflet-interactive {
+  cursor: crosshair !important;
+}
+
+.rl-pulse-icon {
+  background: none;
+  border: 0;
+}
+
+.rl-pulse {
+  position: relative;
+  pointer-events: none;
+}
+
+.rl-pulse span {
+  position: absolute;
+  left: -18px;
+  top: -18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* a sent ping: 3 s of slow pulses; a chip's fly-to: 3 quick pulses (1.2 s) */
+.rl-pulse-ping span {
+  animation: rl-pulse 1s ease-out 3;
+}
+.rl-pulse-focus span {
+  animation: rl-pulse 0.4s ease-out 3;
+}
+.rl-pulse span:nth-child(2) {
+  animation-delay: 0.15s;
+  opacity: 0.6;
+}
+
+@keyframes rl-pulse {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* reduced motion: a still ring instead of a pulse */
+@media (prefers-reduced-motion: reduce) {
+  .rl-pulse span {
+    animation: none;
+  }
+}

@@ -7,6 +7,7 @@ export * from './maps.js';
 export * from './permissions.js';
 export * from './realtime.js';
 export * from './schemas/auth.js';
+export * from './schemas/chat.js';
 export * from './schemas/elements.js';
 export * from './schemas/health.js';
 export * from './schemas/rooms.js';

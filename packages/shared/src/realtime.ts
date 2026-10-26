@@ -9,8 +9,8 @@ import {
   PtSchema,
   StyleSchema,
 } from './schemas/elements.js';
+import { ChatBodySchema, PingInputSchema, type ChatMessage } from './schemas/chat.js';
 import { BoardSchema, LayerSchema, MemberSchema, RoomDetailSchema } from './schemas/rooms.js';
-import { textField } from './text.js';
 
 /**
  * Socket.IO contract (API_SPEC §7). Path `/realtime`, websocket transport. Every
@@ -123,12 +123,11 @@ export const LayerReorderSchema = z.strictObject({
 export const LayerClearSchema = LayerDeleteSchema;
 
 export const ChatSendSchema = z.strictObject({
+  /** idempotency key: a resend with the same clientId returns the stored message */
   clientId: z.uuid(),
   roomId: z.uuid(),
-  body: textField(1, 500, { keepNewlines: true }),
-  ping: z
-    .strictObject({ boardId, x: z.number().int().min(0), y: z.number().int().min(0) })
-    .optional(),
+  body: ChatBodySchema,
+  ping: PingInputSchema.optional(),
 });
 export const ChatTypingSchema = z.strictObject({ roomId: z.uuid() });
 
@@ -202,8 +201,8 @@ export interface ClientToServerEvents {
   'stroke:preview': (p: In<typeof StrokePreviewSchema>) => void;
   'laser:point': (p: In<typeof LaserPointSchema>) => void;
   'view:update': (p: In<typeof ViewUpdateSchema>) => void;
-  // Phase 7 (chat) — contract defined now, handlers arrive with chat
-  'chat:send': (p: In<typeof ChatSendSchema>, ack: Ack<{ message: unknown }>) => void;
+  'chat:send': (p: In<typeof ChatSendSchema>, ack: Ack<{ message: ChatMessage }>) => void;
+  // TODO(p2): typing indicator — contract only, no server handler yet (FEATURES F9)
   'chat:typing': (p: In<typeof ChatTypingSchema>) => void;
 }
 
@@ -226,13 +225,15 @@ export interface ServerToClientEvents {
   'laser:point': (p: { userId: string; boardId: string; x: number; y: number }) => void;
   'view:update': (p: { userId: string } & z.infer<typeof ViewUpdateSchema>) => void;
   summon: (p: { userId: string; boardId: string }) => void;
+  /** to a leader: how many sockets follow them now (send `view:update` only while > 0) */
+  'followers:update': (p: { count: number }) => void;
   'member:joined': (p: { member: z.infer<typeof MemberSchema> }) => void;
   'member:left': (p: { userId: string }) => void;
   'member:roleChanged': (p: { userId: string; role: z.infer<typeof RoomRoleSchema> }) => void;
   'member:kicked': (p: { userId: string }) => void;
   'room:updated': (p: { room: z.infer<typeof RoomDetailSchema> }) => void;
   'room:deleted': (p: { roomId: string }) => void;
-  'chat:message': (p: { message: unknown }) => void;
+  'chat:message': (p: { message: ChatMessage }) => void;
   'chat:deleted': (p: { messageId: string }) => void;
   'chat:typing': (p: { userId: string }) => void;
   error: (p: { code: ErrorCode; message: string }) => void;

@@ -50,7 +50,8 @@ Board      = { id, roomId, name, mapId: 'erangel'|'miramar'|'rondo', position, e
 Layer      = { id, boardId, name, color, position, visible, locked, seq }
 Element    = { id, boardId, layerId, type, geometry, style, props, z, seq, createdBy, updatedBy, updatedAt }
 ChatMessage= { id, roomId, author: PublicUser|null, kind: 'USER'|'SYSTEM', body,
-               ping: { boardId, x, y } | null, deleted: boolean, createdAt }
+               ping: { boardId: string|null /* null once that board is deleted */, x, y } | null,
+               deleted: boolean, clientId: string|null /* the sender's idempotency key */, createdAt }
 Invite     = { id, code, url, role, maxUses, useCount, expiresAt, createdAt }
 Snapshot   = { id, boardId, name, isAuto, elementCount, createdBy: PublicUser|null, createdAt }
 ```
@@ -136,6 +137,11 @@ Layer and element mutations go through **Socket.IO only** (§7).
 | `GET /rooms/:roomId/messages` | member | `limit, before` | `{ items: ChatMessage[], nextCursor }` (newest first) |
 | `DELETE /messages/:messageId` | author or OWNER | – | `204` + socket `chat:deleted` |
 
+Implementation notes (Phase 7):
+- History: `limit` 1–100 (default 50), `before` = an id from the previous page; ids are UUIDv7 so id order = time order. `nextCursor` is null on the last page.
+- Delete overwrites the body with `"message deleted"` (the original text is not kept), drops the ping and sets `deleted: true`; deleting again is a 204 no-op. Others → 403, non-members / unknown ids → 404.
+- System messages (`kind: 'SYSTEM'`, no author) are created from the domain events: join, leave, kick, role change, board created / deleted (snapshot events: Phase 8). They arrive like any message (`chat:message`).
+
 ## 7. Realtime (Socket.IO)
 
 ### 7.1 Connection
@@ -175,8 +181,8 @@ Implementation notes (Phase 5A/5B):
 | `layer:delete` | `{ opId, boardId, layerId }` | `{ seq }` | deletes its elements |
 | `layer:reorder` | `{ opId, boardId, order: layerId[] }` | `{ seq }` | |
 | `layer:clear` | `{ opId, boardId, layerId }` | `{ seq }` | |
-| `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | body trimmed 1–500 chars |
-| `chat:typing` | `{ roomId }` | – | volatile, ≤ 1 / 2 s |
+| `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | body: NFC, control chars stripped except `\n`, trimmed, 1–500 code points; `room.interact` (viewers too) after `room:join`; ping board must be in this room and the point inside its map (`VALIDATION_ERROR`); 5 / 10 s per socket (`RATE_LIMITED`); a resent `clientId` returns the stored message and is not broadcast again |
+| `chat:typing` | `{ roomId }` | – | volatile, ≤ 1 / 2 s — **P2, not handled yet** |
 | `cursor:move` | `{ boardId, x, y }` | – (no ack, volatile) | ≤ 20 Hz |
 | `stroke:preview` | `{ boardId, tempId, points: Pt[], style }` | – volatile, best-effort | only new points since last; ≤ 20 Hz |
 | `laser:point` | `{ boardId, x, y }` | – volatile | |
@@ -194,7 +200,7 @@ Implementation notes (Phase 5A/5B):
 | `board:reset` | `{ boardId, seq, reason: 'snapshot_restore' \| 'clear' }` → client resubscribes with full load |
 | `op:reject` | `{ opId, code, message }` (only if ack lost; normally via ack) |
 | `board:created` / `board:updated` / `board:deleted` | `{ board }` / `{ board }` / `{ boardId }` |
-| `chat:message` | `{ message: ChatMessage }` |
+| `chat:message` | `{ message: ChatMessage }` (to the whole room, sender included — the client matches its optimistic copy by `clientId`) |
 | `chat:deleted` | `{ messageId }` |
 | `chat:typing` | `{ userId }` |
 | `presence:update` | `{ roomId, users: Presence[] }` where `Presence = { userId, boardId, idle, color }` |
@@ -203,6 +209,7 @@ Implementation notes (Phase 5A/5B):
 | `laser:point` | `{ userId, boardId, x, y }` |
 | `view:update` | `{ userId, boardId, center, zoom }` (only to followers) |
 | `summon` | `{ userId, boardId }` |
+| `followers:update` | `{ count }` → to the leader's sockets whenever their follower count changes (and on `room:join`); the leader sends `view:update` only while `count > 0` |
 | `member:joined` / `member:left` | `{ member }` / `{ userId }` |
 | `member:roleChanged` | `{ userId, role }` |
 | `member:kicked` | `{ userId }` (target socket then force-disconnected) |

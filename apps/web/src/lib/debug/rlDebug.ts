@@ -7,6 +7,7 @@ import { v7 as uuid } from 'uuid';
 import type { RoomSession } from '@/lib/realtime/roomSession';
 import { getSocket } from '@/lib/realtime/socket';
 import { useBoardStore } from '@/stores/boardStore';
+import { useLaserStore } from '@/stores/laserStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 
 const COLORS = ['#F2A900', '#EF4444', '#22C55E', '#38BDF8', '#EC4899', '#F8FAFC'] as const;
@@ -30,6 +31,8 @@ export interface RlDebug {
   history(): { undo: number; redo: number };
   /** a raw socket emit with ack — to prove the server rejects what the UI hides (E2E-5) */
   emit(event: string, payload: unknown): Promise<unknown>;
+  /** user ids with a live laser trail on this board */
+  laserUsers(): string[];
 }
 
 declare global {
@@ -188,6 +191,7 @@ export function installRlDebug(session: RoomSession, mapId: MapId): () => void {
       const h = s.boardId ? s.history[s.boardId] : undefined;
       return { undo: h?.undo.length ?? 0, redo: h?.redo.length ?? 0 };
     },
+    laserUsers: () => Object.keys(useLaserStore.getState().trails),
     emit: (event, payload) =>
       (
         getSocket().timeout(5_000) as unknown as {

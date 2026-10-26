@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../../src/app.js';
+import { newId } from '../../src/lib/ids.js';
 import {
   accept,
   call,
@@ -9,6 +11,7 @@ import {
   register,
   makeApp,
   PASSWORD,
+  prisma,
   setupRoom,
   useCleanState,
   type RoomFixture,
@@ -32,6 +35,8 @@ interface Ctx {
   inviteId: string;
   /** a former member the owner kicked with `ban: true` */
   bannedId: string;
+  /** a chat message written by the editor (delete: author or owner) */
+  messageId: string;
 }
 
 interface Row {
@@ -317,6 +322,20 @@ const MATRIX: Row[] = [
     request: ({ f }) => ({ url: `/api/v1/boards/${f.boardId}/state` }),
     expect: room(200, 200, 200),
   },
+  // ---- chat (Phase 7) ----------------------------------------------------------------
+  {
+    method: 'GET',
+    url: '/api/v1/rooms/:roomId/messages',
+    request: ({ f }) => ({ url: `/api/v1/rooms/${f.roomId}/messages?limit=10` }),
+    expect: room(200, 200, 200),
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/messages/:messageId',
+    request: ({ messageId }) => ({ url: `/api/v1/messages/${messageId}` }),
+    // the editor wrote it; the owner may delete anything
+    expect: room(403, 204, 204),
+  },
 ];
 
 useCleanState();
@@ -342,8 +361,18 @@ async function context(): Promise<Ctx> {
   await call(app, f.owner.jar, 'DELETE', `/api/v1/rooms/${f.roomId}/members/${bannedId}`, {
     ban: true,
   });
+  const message = await prisma.chatMessage.create({
+    data: {
+      id: newId(),
+      roomId: f.roomId,
+      authorId: f.editor.id,
+      body: 'matrix',
+      clientId: randomUUID(),
+    },
+  });
   return {
     f,
+    messageId: message.id,
     spareBoardId: spare.json<{ board: { id: string } }>().board.id,
     inviteCode: inv.code,
     inviteId: inv.id,

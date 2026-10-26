@@ -195,9 +195,10 @@ Index `(board_id, created_at DESC)`. Limit 50 manual + 10 auto per board (oldest
 | ping_board_id | uuid | NULL FK → boards SET NULL |
 | ping_x | int | NULL CHECK 0–1 000 000 |
 | ping_y | int | NULL CHECK 0–1 000 000 |
+| client_id | uuid | NULL — the sender's idempotency key; UNIQUE `(author_id, client_id)` |
 | deleted_at | timestamptz | NULL |
 | created_at | timestamptz | NOT NULL |
-Index `(room_id, id DESC)`. CHECK ping fields all null or all set (board may later be nulled).
+Index `(room_id, id DESC)`. CHECK ping fields all null or all set (board may later be nulled) — implemented as: x/y both null and board null, or x/y both set. CHECK `char_length(body)` 1–500. CHECK a SYSTEM message has no author and no client id. A deleted message keeps its row; its body is overwritten with `message deleted` and its ping cleared.
 
 ### 3.13 `audit_logs`
 | id uuid PK | actor_id uuid NULL | room_id uuid NULL | action varchar(48) (e.g. `room.kick`, `role.change`, `auth.login_failed`, `snapshot.restore`) | target_id uuid NULL | meta jsonb | ip_hash char(64) NULL | created_at |

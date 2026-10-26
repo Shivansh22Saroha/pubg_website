@@ -115,7 +115,9 @@ test('API killed and restarted mid-session: both clients recover without a reloa
   await ctxB.close();
 });
 
-test('kick: B gets the modal and lands on the dashboard', async ({ browser }) => {
+test('E2E-6 kick: B gets the modal, lands on the dashboard and the room is not listed', async ({
+  browser,
+}) => {
   const { ctxA, ctxB, a, b, roomId } = await twoUsersInRoom(browser);
   const members = await pageApi<{ items: { user: { id: string; username: string } }[] }>(
     a,
@@ -129,7 +131,15 @@ test('kick: B gets the modal and lands on the dashboard', async ({ browser }) =>
   await expect(b.getByRole('dialog', { name: 'You were removed from this room' })).toBeVisible();
   await b.getByTestId('room-gone-dashboard').click();
   await expect(b).toHaveURL(/\/dashboard$/);
+  await expect(b.getByText('No rooms yet')).toBeVisible(); // the list has loaded…
+  await expect(b.locator(`a[href="/rooms/${roomId}"]`)).toHaveCount(0); // …without the room (E2E-6)
+  await a.getByRole('tab', { name: 'Members' }).click();
   await expect(a.getByTestId('member-row')).toHaveCount(1);
+  // E2E-6 + Phase 7: the room sees the system message
+  await a.getByRole('tab', { name: 'Chat' }).click();
+  await expect(
+    a.getByTestId('chat-system').filter({ hasText: 'was removed from the room' }),
+  ).toBeVisible();
 
   await ctxA.close();
   await ctxB.close();
