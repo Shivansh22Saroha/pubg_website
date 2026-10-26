@@ -33,6 +33,8 @@ import { createEmailFlows } from './modules/auth/emailFlows.js';
 import { createEmailTokens } from './modules/auth/emailTokens.js';
 import { createMemoryMailer, createSmtpMailer, type Mailer } from './lib/mailer.js';
 import { createSnapshotService } from './modules/snapshots/service.js';
+import { publicRoutes } from './modules/public/routes.js';
+import { createPublicService } from './modules/public/service.js';
 import { createBoardService } from './modules/boards/service.js';
 import { inviteRoutes } from './modules/invites/routes.js';
 import { createInviteService } from './modules/invites/service.js';
@@ -246,6 +248,10 @@ export async function buildApp({
   await app.register(boardRoutes, { prefix: '/api/v1', boards });
   await app.register(chatRoutes, { prefix: '/api/v1', chat });
   await app.register(snapshotRoutes, { prefix: '/api/v1', snapshots });
+  await app.register(publicRoutes, {
+    prefix: '/api/v1',
+    service: createPublicService({ prisma, demoBoardIds: config.DEMO_BOARD_IDS }),
+  });
 
   // ---- realtime (Socket.IO on the same HTTP server, path /realtime) -------------------
   if (withRealtime) {

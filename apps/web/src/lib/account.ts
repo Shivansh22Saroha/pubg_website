@@ -1,12 +1,15 @@
 'use client';
 
 import {
+  PrefsResponseSchema,
   PublicConfigResponseSchema,
   SessionsResponseSchema,
   UserResponseSchema,
   type ChangePasswordBody,
   type DeleteMeBody,
+  type Me,
   type UpdateMeBody,
+  type UpdatePrefsBody,
 } from '@rotationlab/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ME_QUERY_KEY } from '@/hooks/useMe';
@@ -28,6 +31,26 @@ export function useUpdateMe() {
       api('/me', { method: 'PATCH', body, schema: UserResponseSchema }),
     onSuccess: ({ user }) => {
       qc.setQueryData(ME_QUERY_KEY, user);
+    },
+  });
+}
+
+/**
+ * Phase 9: server-side UI prefs (the room tour). Optimistic: the cached `me` changes at once,
+ * so a failed request never shows the tour twice in this tab.
+ */
+export function useUpdatePrefs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdatePrefsBody) =>
+      api('/me/prefs', { method: 'PATCH', body, schema: PrefsResponseSchema }),
+    onMutate: (body) => {
+      qc.setQueryData<Me>(ME_QUERY_KEY, (me) =>
+        me ? { ...me, prefs: { ...me.prefs, ...body } } : me,
+      );
+    },
+    onSuccess: ({ prefs }) => {
+      qc.setQueryData<Me>(ME_QUERY_KEY, (me) => (me ? { ...me, prefs } : me));
     },
   });
 }

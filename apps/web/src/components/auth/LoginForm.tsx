@@ -133,7 +133,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         New here?{' '}
         <Link
           href={`/register?redirectTo=${encodeURIComponent(redirectTo)}`}
-          className="text-info hover:underline"
+          className="text-info underline underline-offset-2 hover:no-underline"
         >
           Create an account
         </Link>

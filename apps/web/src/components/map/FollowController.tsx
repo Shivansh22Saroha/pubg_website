@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
+import { prefersReducedMotion } from '@/lib/motion';
 import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useBoardStore } from '@/stores/boardStore';
 import { useFollowStore } from '@/stores/followStore';
@@ -71,8 +72,9 @@ export function FollowController({
     const apply = () => {
       const { leaderId, view } = useFollowStore.getState();
       if (!leaderId || view?.boardId !== boardId) return;
+      // reduced motion (UI_UX_SPEC §2.4): jump instead of gliding after the leader
       map.setView([view.center[1], view.center[0]], view.zoom, {
-        animate: true,
+        animate: !prefersReducedMotion(),
         duration: SMOOTH_SECONDS,
       });
     };

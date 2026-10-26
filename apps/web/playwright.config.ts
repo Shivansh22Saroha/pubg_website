@@ -26,6 +26,9 @@ export function makeConfig(mode: 'prod' | 'dev') {
     // test-only: keep window.__rlDebug in this production build
     NEXT_PUBLIC_E2E_DEBUG: 'true',
     NEXT_TELEMETRY_DISABLED: '1',
+    // the Phase 2 map viewer E2E (maps.spec.ts) needs the dev page; gating is unit-tested
+    ENABLE_DEV_PAGES: 'true',
+    SECURITY_CONTACT: 'mailto:security@example.com',
   };
 
   return defineConfig({

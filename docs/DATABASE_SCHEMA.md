@@ -42,6 +42,7 @@ users / rooms 1──* audit_logs
 | locked_until | timestamptz | NULL |
 | created_at / updated_at | timestamptz | NOT NULL |
 | deleted_at | timestamptz | NULL (soft delete; PII scrubbed by job) |
+| prefs | jsonb | NOT NULL default `'{}'`, CHECK object ≤ 4 KB. UI preferences that follow the user across devices (Phase 9: `roomTourDone`); read through `UserPrefsSchema` (unknown keys ignored, bad values → defaults); cleared on account deletion |
 
 ### 3.2 `refresh_tokens`
 | Column | Type | Constraints |
@@ -342,3 +343,4 @@ Raw-SQL migration additions (Prisma can't express them): `CREATE EXTENSION citex
 ## 7. Seed data
 - 2 users (`alice` / `bob`, dev-only passwords from env), 1 room "Demo Squad" with both, 3 boards (one per map) with sample rotation arrows, a zone circle and enemy markers.
 - Three public **demo boards** (one per map; IDs set in env `DEMO_BOARD_IDS`) used by `/explore` ("Explore maps" on the landing page) in read-only mode.
+- Implementation (Phase 9): `pnpm --filter server seed` (dev: alice / bob with `SEED_DEV_PASSWORD`, room "Demo Squad", plus the demo boards) and `pnpm --filter server seed --demo-only` (the only mode allowed in production). The demo boards live in a locked room "Explore demo boards" owned by `rotationlab_demo`, a user whose password hash is not a hash (nobody can log in as it). Each board: default layers, a drop marker, a rotation arrow, a zone circle, three numbered enemy squads, an own-squad marker and a note (`apps/server/scripts/seedContent.ts`, positions as map fractions). Idempotent: existing users and the demo room are reused; it prints the `DEMO_BOARD_IDS=` line.

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  can,
   MARKER_DEFAULT_COLORS,
   MARKER_KINDS,
   type MarkerKind,
@@ -29,7 +30,8 @@ import { editorActions, type EditSink } from '@/lib/editing';
 import { cn } from '@/lib/utils';
 import { useBoardStore } from '@/stores/boardStore';
 import { useToolStore } from '@/stores/toolStore';
-import { resolveActiveLayer, toolsForRole } from './gating';
+import type { Breakpoint } from '@/hooks/useBreakpoint';
+import { resolveActiveLayer, toolsFor } from './gating';
 import { IMPLEMENTED_TOOLS, type ToolId } from './types';
 
 const TOOLS: { id: ToolId; label: string; key: string; icon: LucideIcon }[] = [
@@ -87,7 +89,7 @@ function ToolButton({
       data-testid={testId}
       onClick={disabled ? undefined : onClick}
       className={cn(
-        'flex size-10 items-center justify-center rounded-control text-text-muted transition-colors',
+        'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
         'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
         active ? 'bg-accent text-accent-fg' : 'hover:bg-surface-2 hover:text-text',
         disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-muted',
@@ -99,17 +101,23 @@ function ToolButton({
 }
 
 /**
- * Left toolbar (UI_UX_SPEC §3.5): the tools this role may use (viewers: Select, Measure,
- * Laser), the marker picker flyout, and undo / redo — disabled while their stack is empty.
+ * Toolbar (UI_UX_SPEC §3.5 / §7): the tools this role may use at this breakpoint (viewers:
+ * Select, Measure, Laser; phones: Select, Marker, Measure, Laser), the marker picker flyout,
+ * and undo / redo — disabled while their stack is empty. A left column on desktop, a
+ * horizontally scrollable bottom bar on tablets and phones.
  */
 export function Toolbar({
   role,
   session,
   nameOf,
+  breakpoint = 'desktop',
+  orientation = 'vertical',
 }: {
   role: RoomRole;
   session: EditSink | null;
   nameOf: (userId: string | null) => string;
+  breakpoint?: Breakpoint;
+  orientation?: 'vertical' | 'horizontal';
 }) {
   const tool = useToolStore((s) => s.tool);
   const setTool = useToolStore((s) => s.setTool);
@@ -121,9 +129,10 @@ export function Toolbar({
   const redoCount = useBoardStore((s) =>
     s.boardId ? (s.history[s.boardId]?.redo.length ?? 0) : 0,
   );
-  const allowed = toolsForRole(role);
+  const allowed = toolsFor(role, breakpoint);
+  const horizontal = orientation === 'horizontal';
   const actions = editorActions(session, nameOf);
-  const canEdit = allowed.includes('pen');
+  const canEdit = can(role, 'board.edit');
 
   const pickMarker = (kind: MarkerKind) => {
     const { view } = useBoardStore.getState();
@@ -137,7 +146,14 @@ export function Toolbar({
     <nav
       aria-label="Drawing tools"
       data-testid="toolbar"
-      className="flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r bg-bg py-2"
+      data-tour="toolbar"
+      data-orientation={orientation}
+      className={cn(
+        'flex shrink-0 items-center gap-1 bg-bg',
+        horizontal
+          ? 'h-14 w-full flex-row overflow-x-auto overscroll-x-contain border-t px-2 pointer-coarse:h-16'
+          : 'w-14 flex-col overflow-y-auto border-r py-2',
+      )}
     >
       {TOOLS.filter((t) => allowed.includes(t.id)).map((t) => {
         const implemented = IMPLEMENTED_TOOLS.has(t.id);
@@ -153,7 +169,7 @@ export function Toolbar({
                   data-testid="tool-marker"
                   data-tool-button=""
                   className={cn(
-                    'flex size-10 items-center justify-center rounded-control text-text-muted transition-colors',
+                    'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
                     'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
                     tool === 'marker'
                       ? 'bg-accent text-accent-fg'
@@ -168,7 +184,7 @@ export function Toolbar({
               </Popover.Trigger>
               <Popover.Portal>
                 <Popover.Content
-                  side="right"
+                  side={horizontal ? 'top' : 'right'}
                   align="start"
                   sideOffset={8}
                   className="z-50 w-52 rounded-panel border bg-surface p-1 shadow-panel"
@@ -183,7 +199,7 @@ export function Toolbar({
                           aria-selected={kind === markerKind}
                           data-testid={`marker-kind-${kind}`}
                           className={cn(
-                            'flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-[13px] hover:bg-surface-2',
+                            'flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-[13px] hover:bg-surface-2 pointer-coarse:min-h-11',
                             kind === markerKind && 'bg-surface-2',
                           )}
                           onClick={() => {
@@ -226,7 +242,10 @@ export function Toolbar({
       })}
       {canEdit && (
         <>
-          <span aria-hidden className="my-1 h-px w-8 bg-border" />
+          <span
+            aria-hidden
+            className={cn('shrink-0 bg-border', horizontal ? 'mx-1 h-8 w-px' : 'my-1 h-px w-8')}
+          />
           <ToolButton
             label="Undo"
             shortcut="Ctrl+Z"

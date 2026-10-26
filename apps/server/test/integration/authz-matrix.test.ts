@@ -136,6 +136,12 @@ const MATRIX: Row[] = [
     expect: authed(200),
   },
   {
+    method: 'PATCH',
+    url: '/api/v1/me/prefs',
+    request: () => ({ url: '/api/v1/me/prefs', payload: { roomTourDone: true } }),
+    expect: authed(200),
+  },
+  {
     method: 'POST',
     url: '/api/v1/me/password',
     request: () => ({
@@ -379,6 +385,12 @@ const MATRIX: Row[] = [
     url: '/api/v1/me',
     request: () => ({ url: '/api/v1/me', payload: { password: PASSWORD, confirm: 'DELETE' } }),
     expect: authed(204), // everyone may delete their own account
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/public/demo-boards',
+    request: () => ({ url: '/api/v1/public/demo-boards' }),
+    expect: everyone(200), // no auth; only DEMO_BOARD_IDS are served (public-demo.test.ts)
   },
   {
     method: 'GET',

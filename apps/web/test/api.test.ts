@@ -12,6 +12,7 @@ const ME = {
     email: 'alice@example.com',
     emailVerified: false,
     createdAt: '2026-10-25T07:10:00.000Z',
+    prefs: { roomTourDone: false },
   },
 };
 const json = (status: number, body: unknown) =>

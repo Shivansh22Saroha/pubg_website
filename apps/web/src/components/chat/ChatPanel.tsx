@@ -340,7 +340,8 @@ function Line({
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label="Message options"
-            className="absolute top-0 right-0 rounded-control p-0.5 text-text-muted opacity-0 group-hover:opacity-100 hover:bg-surface-2 focus-visible:opacity-100 data-[state=open]:opacity-100"
+            // touch has no hover: always shown there, with a 44 px target (UI_UX_SPEC §7)
+            className="absolute top-0 right-0 rounded-control p-0.5 text-text-muted opacity-0 group-hover:opacity-100 hover:bg-surface-2 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:-top-2 pointer-coarse:-right-2 pointer-coarse:flex pointer-coarse:size-11 pointer-coarse:items-center pointer-coarse:justify-center pointer-coarse:opacity-100"
           >
             <EllipsisVertical className="size-4" aria-hidden />
           </DropdownMenuTrigger>

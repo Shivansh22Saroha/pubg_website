@@ -25,15 +25,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [unauthenticated, pathname, router]);
 
   // the room workspace brings its own full-screen chrome (UI_UX_SPEC §3.5)
-  if (pathname.startsWith('/rooms/')) {
-    return me.data ? (
-      children
-    ) : (
-      <p role="status" className="flex h-dvh items-center justify-center gap-2 text-text-muted">
-        <Loader2 className="size-4 animate-spin" aria-hidden /> Loading…
-      </p>
-    );
-  }
+  // (it shows its own loader until /me and the room arrive, both fetched in parallel)
+  if (pathname.startsWith('/rooms/')) return children;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -46,16 +39,24 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       {me.data && <VerifyBanner verified={me.data.emailVerified} />}
       <main className="flex-1">
-        {me.data ? (
-          children
-        ) : me.error && !unauthenticated ? (
+        {me.error && !unauthenticated ? (
           <p role="alert" className="p-8 text-center text-danger">
             Could not load your account. Please refresh.
           </p>
         ) : (
-          <p role="status" className="flex items-center justify-center gap-2 p-8 text-text-muted">
-            <Loader2 className="size-4 animate-spin" aria-hidden /> Loading…
-          </p>
+          <>
+            {!me.data && (
+              <p
+                role="status"
+                className="flex items-center justify-center gap-2 p-8 text-text-muted"
+              >
+                <Loader2 className="size-4 animate-spin" aria-hidden /> Loading…
+              </p>
+            )}
+            {/* mounted while /me is in flight so the page's own queries (e.g. /rooms) start in
+                parallel instead of after it; pages render nothing until they have the user */}
+            {!me.error && children}
+          </>
         )}
       </main>
     </div>

@@ -6,7 +6,6 @@ import {
   elementWithinWorld,
   MAPS,
   ROOM_LIMITS,
-  SNAPSHOT_LIMITS,
   type BoardOp,
   type BoardSubscribeAck,
   type Element,
@@ -252,11 +251,11 @@ export function createBoardOpsService(d: {
       case 'layer:clear': {
         const layer = await lockedLayer(tx, boardId, op.layerId);
         if (layer.locked) throw new AppError('FORBIDDEN', 'Layer is locked');
-        // FEATURES F10: a big clear is undoable through an auto snapshot of the whole board,
-        // taken in the same transaction (the board row is already locked)
+        // FEATURES F10: every non-empty clear is undoable through an auto snapshot of the
+        // whole board, taken in the same transaction (the board row is already locked)
         const onLayer = await tx.element.count({ where: { layerId: op.layerId } });
-        const big = onLayer > SNAPSHOT_LIMITS.clearAutoThreshold;
-        if (big) {
+        const snap = onLayer > 0;
+        if (snap) {
           await captureSnapshot(tx, {
             boardId,
             name: autoName('Before clearing ', layer.name),
@@ -268,7 +267,7 @@ export function createBoardOpsService(d: {
         return {
           body: { kind: 'layer:clear', layerId: op.layerId },
           delta: -count,
-          ...(big ? { cleared: { layerName: layer.name, count } } : {}),
+          ...(snap ? { cleared: { layerName: layer.name, count } } : {}),
         };
       }
     }

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { ImageOverlay, MapContainer, Pane, TileLayer } from 'react-leaflet';
 import { env } from '@/env';
 import { createCrs, worldBounds } from '@/lib/coords';
+import { prefersReducedMotion } from '@/lib/motion';
 import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { GRID_PANE, GridLayer } from './GridLayer';
 import { GridLabels } from './GridLabels';
@@ -42,6 +43,8 @@ export default function MapCanvas({
   const bounds = useMemo(() => worldBounds(worldSize), [worldSize]);
 
   const [map, setMap] = useState<L.Map | null>(null);
+  // read once per mount: Leaflet takes these options at creation only
+  const [reducedMotion] = useState(prefersReducedMotion);
 
   useEffect(() => {
     if (!map || !onCursor) return;
@@ -140,6 +143,10 @@ export default function MapCanvas({
           wheelPxPerZoomLevel={120}
           zoomControl={false}
           attributionControl={false}
+          // reduced motion: no zoom / fade / marker-zoom animations (UI_UX_SPEC §2.4)
+          zoomAnimation={!reducedMotion}
+          fadeAnimation={!reducedMotion}
+          markerZoomAnimation={!reducedMotion}
           className="h-full w-full !bg-bg"
           aria-label={`${config.name} map`}
         >

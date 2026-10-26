@@ -3,6 +3,7 @@ import { Crosshair } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { env } from '@/env';
+import { Providers } from '../providers';
 
 const backdrop = `${env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '')}/erangel/preview.jpg`;
 
@@ -27,7 +28,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           <Crosshair className="size-5 text-accent" aria-hidden />
           {PRODUCT_NAME}
         </Link>
-        <div className="rounded-panel border bg-surface p-6 shadow-panel">{children}</div>
+        <div className="rounded-panel border bg-surface p-6 shadow-panel">
+          <Providers>{children}</Providers>
+        </div>
       </div>
     </div>
   );

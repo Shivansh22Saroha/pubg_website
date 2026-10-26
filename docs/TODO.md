@@ -95,7 +95,7 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 
 ## Phase 8 — Snapshots, measure, export, settings (P1)
 - [x] Snapshots: save, list, preview modal, restore with auto-snapshot, `board:reset`.
-- [x] Auto-snapshot before "Clear layer" (moved from Phase 6; > 50 elements).
+- [x] Auto-snapshot before "Clear layer" (moved from Phase 6; every non-empty clear since the Phase 9 follow-up).
 - [x] Measure tool with travel time (approx. label).
 - [x] Zone presets dropdown (values from Phase 0 or hidden behind flag) — still empty (`TODO(phase0)`), dropdown hidden; plumbing unit-tested with injected presets.
 - [x] PNG export with footer attribution (tiles CORS configured — DEPLOYMENT §4 R2 rule).
@@ -106,14 +106,15 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 **Exit:** E2E-7, E2E-11 pass.
 
 ## Phase 9 — Landing, explore mode, responsive, a11y (P1)
-- [ ] Landing page + footer attribution/notice "PC map art — BGMI may differ".
-- [ ] Gate or remove the `/maps/[mapId]` dev page in production (env flag).
-- [ ] `/explore` read-only demo boards.
-- [ ] Tablet layout (bottom toolbar, bottom sheet), phone view + chat mode, touch gestures.
-- [ ] Coach-mark onboarding tour.
-- [ ] Axe pass, keyboard-only pass, reduced-motion.
+- [x] Landing page + footer attribution/notice "PC map art — BGMI may differ".
+- [x] Gate or remove the `/maps/[mapId]` dev page in production (env flag).
+- [x] `/explore` read-only demo boards.
+- [x] Tablet layout (bottom toolbar, bottom sheet), phone view + chat mode, touch gestures.
+- [x] Coach-mark onboarding tour.
+- [x] Axe pass, keyboard-only pass, reduced-motion.
 
 **Exit:** E2E-12, E2E-13 pass; Lighthouse targets met.
+> Phase 9 result: E2E-12 and E2E-13 pass. Lighthouse (mobile, cold cache, median of 3): landing Performance 95 / Accessibility 100 ✔; dashboard Performance 83 / Accessibility 100 — **2 points under the 85 target** (CHANGELOG, Decisions (Phase 9)).
 
 ## Phase 10 — Hardening & launch
 - [ ] Security headers + CSP nonces verified; ZAP baseline clean; gitleaks/audit clean.

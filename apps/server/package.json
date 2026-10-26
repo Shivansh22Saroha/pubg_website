@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "postinstall": "prisma generate",
-    "test:int": "vitest run --config vitest.integration.config.ts"
+    "test:int": "vitest run --config vitest.integration.config.ts",
+    "seed": "tsx --env-file-if-exists=.env scripts/seed.ts"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"

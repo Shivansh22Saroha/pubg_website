@@ -91,6 +91,8 @@ Both `io<ServerToClientEvents, ClientToServerEvents>()` and `new Server<ClientTo
 | socket.io-client in tests | realtime integration |
 | Testcontainers (Postgres, Redis) | real DB in integration tests |
 | Playwright | E2E, multi-browser-context collaboration tests |
+| @axe-core/playwright (4.13) | E2E-13 accessibility scans (Phase 9) |
+| lighthouse (13.x, Node API) | `pnpm --filter web test:lighthouse` on landing + dashboard through Playwright's Chromium (Phase 9) |
 | k6 or Artillery | load test sockets |
 | OWASP ZAP baseline | DAST in CI |
 

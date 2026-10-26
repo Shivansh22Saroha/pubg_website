@@ -31,8 +31,8 @@ export function DropdownMenuItem({
   return (
     <Menu.Item
       className={cn(
-        'flex cursor-default items-center gap-2 rounded-control px-2 py-1.5 text-[13px] outline-none select-none',
-        'data-[disabled]:opacity-50 data-[highlighted]:bg-surface-2',
+        'flex cursor-default items-center gap-2 rounded-control px-2 py-1.5 text-[13px] outline-none select-none pointer-coarse:min-h-11',
+        'data-[disabled]:opacity-50 data-[highlighted]:bg-surface-2 data-[highlighted]:shadow-[inset_2px_0_0_var(--accent)]',
         destructive && 'text-danger',
         className,
       )}

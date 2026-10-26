@@ -206,7 +206,7 @@ export function RegisterForm({ redirectTo }: { redirectTo: string }) {
         Already have an account?{' '}
         <Link
           href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
-          className="text-info hover:underline"
+          className="text-info underline underline-offset-2 hover:no-underline"
         >
           Log in
         </Link>

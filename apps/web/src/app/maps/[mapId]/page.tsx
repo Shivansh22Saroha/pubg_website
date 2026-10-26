@@ -4,16 +4,17 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { MapView } from '@/components/map/MapView';
+import { devPagesEnabled, serverEnv } from '@/lib/serverEnv';
 import { cn } from '@/lib/utils';
+import { Providers } from '../../providers';
 
-// Phase 2 dev page for eyeballing the three maps (TODO.md Phase 2).
+// Phase 2 dev page for eyeballing the three maps (TODO.md Phase 2). Off in production unless
+// ENABLE_DEV_PAGES=true (Phase 9) — checked per request, so it needs no rebuild.
 export const metadata: Metadata = { title: 'Map viewer', robots: { index: false } };
-
-export function generateStaticParams() {
-  return MAP_IDS.map((mapId) => ({ mapId }));
-}
+export const dynamic = 'force-dynamic';
 
 export default async function MapDevPage({ params }: { params: Promise<{ mapId: string }> }) {
+  if (!devPagesEnabled(serverEnv())) notFound();
   const { mapId } = await params;
   if (!isMapId(mapId)) notFound();
 
@@ -44,7 +45,9 @@ export default async function MapDevPage({ params }: { params: Promise<{ mapId: 
         </span>
       </header>
       <main className="relative min-h-0 flex-1">
-        <MapView key={mapId} mapId={mapId} />
+        <Providers>
+          <MapView key={mapId} mapId={mapId} />
+        </Providers>
       </main>
     </div>
   );

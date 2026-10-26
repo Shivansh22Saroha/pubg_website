@@ -4,7 +4,6 @@ import { Inter, JetBrains_Mono, Rajdhani } from 'next/font/google';
 import type { ReactNode } from 'react';
 import '@/env';
 import './globals.css';
-import { Providers } from './providers';
 
 const rajdhani = Rajdhani({
   subsets: ['latin'],
@@ -18,6 +17,8 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ['500'],
   variable: '--font-jetbrains-mono',
   display: 'swap',
+  // coordinates / badges in the room only: not worth a preload on every page (Phase 9)
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -36,9 +37,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`dark ${rajdhani.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="min-h-dvh bg-bg text-text">
-        <Providers>{children}</Providers>
-      </body>
+      <body className="min-h-dvh bg-bg text-text">{children}</body>
     </html>
   );
 }

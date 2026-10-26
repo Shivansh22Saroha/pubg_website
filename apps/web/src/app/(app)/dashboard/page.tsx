@@ -78,8 +78,8 @@ export default function DashboardPage() {
             <p className="text-text-muted">No rooms match “{query}”.</p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((room) => (
-                <RoomCard key={room.id} room={room} />
+              {filtered.map((room, i) => (
+                <RoomCard key={room.id} room={room} priority={i === 0} />
               ))}
             </div>
           )}

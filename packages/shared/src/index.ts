@@ -12,6 +12,7 @@ export * from './schemas/auth.js';
 export * from './schemas/chat.js';
 export * from './schemas/elements.js';
 export * from './schemas/health.js';
+export * from './schemas/public.js';
 export * from './schemas/rooms.js';
 export * from './schemas/snapshots.js';
 export * from './text.js';

@@ -10,6 +10,7 @@ import {
   type MarkerKind,
   type RoomRole,
 } from '@rotationlab/shared';
+import type { Breakpoint } from '@/hooks/useBreakpoint';
 import type { ViewElement } from '@/stores/boardModel';
 import type { ToolId } from './types';
 
@@ -43,6 +44,17 @@ export function toolsForRole(role: RoomRole): ToolId[] {
         'laser',
       ]
     : ['select', 'measure', 'laser'];
+}
+
+/**
+ * UI_UX_SPEC §7 phone "view + chat" mode: Select, Marker, Laser and Measure only (what the
+ * role allows of them). Tablets and up get the role's full set.
+ */
+export const PHONE_TOOLS: readonly ToolId[] = ['select', 'marker', 'measure', 'laser'];
+
+export function toolsFor(role: RoomRole, breakpoint: Breakpoint): ToolId[] {
+  const tools = toolsForRole(role);
+  return breakpoint === 'phone' ? tools.filter((t) => PHONE_TOOLS.includes(t)) : tools;
 }
 
 export interface CreateState {

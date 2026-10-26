@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { FollowPill } from '@/components/room/FollowPill';
 import { StyleBar } from '@/components/tools/StyleBar';
 import { ToolLayer } from '@/components/tools/ToolLayer';
+import { isTouchLayout, useBreakpoint } from '@/hooks/useBreakpoint';
 import { makeNameOf } from '@/lib/editing';
 import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useBoardStore } from '@/stores/boardStore';
@@ -19,10 +20,16 @@ import { PingLayer } from './PingLayer';
 /** UI_UX_SPEC §9: shown on an empty board to people who can draw. */
 function EmptyHint() {
   const empty = useBoardStore((s) => s.ready && Object.keys(s.view.elements).length === 0);
+  const touch = isTouchLayout(useBreakpoint());
   if (!empty) return null;
   return (
-    <p className="pointer-events-none absolute inset-x-0 top-1/3 z-[500] text-center text-sm text-text-muted [text-shadow:0_1px_3px_rgb(0_0_0/0.8)]">
-      Pick a tool on the left and start drawing. Press ? for shortcuts.
+    <p
+      data-testid="empty-hint"
+      className="pointer-events-none absolute inset-x-0 top-1/3 z-[500] px-4 text-center text-sm text-text [text-shadow:0_1px_3px_rgb(0_0_0/0.9)]"
+    >
+      {touch
+        ? 'Pick a tool below and start drawing.'
+        : 'Pick a tool on the left and start drawing. Press ? for shortcuts.'}
     </p>
   );
 }

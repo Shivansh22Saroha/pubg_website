@@ -64,128 +64,133 @@ export function BoardTabs({
   const close = () => {
     setDialog(null);
   };
+  const current = boards.find((b) => b.id === activeId);
 
   return (
     <>
-      <div
-        role="tablist"
-        aria-label="Boards"
-        className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
-      >
-        {boards.map((b, i) => {
-          const active = b.id === activeId;
-          return (
-            <div
-              key={b.id}
-              className={cn(
-                'group flex shrink-0 items-center border-r',
-                active ? 'bg-surface shadow-[inset_0_-2px_0_var(--accent)]' : 'hover:bg-surface',
-                dragId && dragId !== b.id && 'data-[over=true]:bg-surface-2',
-              )}
-              draggable={canManage}
-              onDragStart={(e) => {
-                setDragId(b.id);
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              onDragEnd={() => {
-                setDragId(null);
-              }}
-              onDragOver={(e) => {
-                if (dragId) e.preventDefault();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragId && dragId !== b.id) {
-                  update.mutate({ boardId: dragId, position: i }, { onError: fail });
-                }
-                setDragId(null);
-              }}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={`${b.name} (${MAPS[b.mapId].name}) — ${i < 9 ? `press ${i + 1}` : ''}`}
-                onClick={() => {
-                  onSelect(b.id);
-                }}
+      {/* a tablist may only own tabs (axe aria-required-children): the actions of the active
+          board and "New board" sit right after it */}
+      <div data-tour="board-tabs" className="flex min-w-0 items-stretch">
+        <div
+          role="tablist"
+          aria-label="Boards"
+          className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+        >
+          {boards.map((b, i) => {
+            const active = b.id === activeId;
+            return (
+              <div
+                key={b.id}
                 className={cn(
-                  'flex h-12 items-center gap-1.5 px-3 text-[13px]',
-                  active ? 'text-text' : 'text-text-muted',
+                  'group flex shrink-0 items-center border-r',
+                  active ? 'bg-surface shadow-[inset_0_-2px_0_var(--accent)]' : 'hover:bg-surface',
+                  dragId && dragId !== b.id && 'data-[over=true]:bg-surface-2',
                 )}
+                draggable={canManage}
+                onDragStart={(e) => {
+                  setDragId(b.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragEnd={() => {
+                  setDragId(null);
+                }}
+                onDragOver={(e) => {
+                  if (dragId) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragId && dragId !== b.id) {
+                    update.mutate({ boardId: dragId, position: i }, { onError: fail });
+                  }
+                  setDragId(null);
+                }}
               >
-                <MapIcon className="size-3.5" aria-hidden />
-                <span className="max-w-40 truncate">{b.name}</span>
-                <BoardPresenceDots boardId={b.id} />
-              </button>
-              {
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    aria-label={`Board actions for ${b.name}`}
-                    className="mr-1 rounded-control p-1 text-text-muted opacity-60 hover:bg-surface-2 hover:opacity-100"
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  title={`${b.name} (${MAPS[b.mapId].name}) — ${i < 9 ? `press ${i + 1}` : ''}`}
+                  onClick={() => {
+                    onSelect(b.id);
+                  }}
+                  className={cn(
+                    'flex h-12 items-center gap-1.5 px-3 text-[13px]',
+                    active ? 'text-text' : 'text-text-muted',
+                  )}
+                >
+                  <MapIcon className="size-3.5" aria-hidden />
+                  <span className="max-w-40 truncate">{b.name}</span>
+                  <BoardPresenceDots boardId={b.id} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {current && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`Board actions for ${current.name}`}
+              className="flex w-8 shrink-0 items-center justify-center text-text-muted hover:bg-surface hover:text-text pointer-coarse:w-11"
+            >
+              <MoreVertical className="size-4" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onSelect={() => {
+                  onSnapshots(current);
+                }}
+              >
+                Snapshots…
+              </DropdownMenuItem>
+              {canManage && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setName(current.name);
+                      setDialog({ kind: 'rename', board: current });
+                    }}
                   >
-                    <MoreVertical className="size-3.5" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        onSnapshots(b);
-                      }}
-                    >
-                      Snapshots…
-                    </DropdownMenuItem>
-                    {canManage && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            setName(b.name);
-                            setDialog({ kind: 'rename', board: b });
-                          }}
-                        >
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            create.mutate(
-                              {
-                                name: `${b.name} (copy)`.slice(0, 40),
-                                mapId: b.mapId,
-                                duplicateFrom: b.id,
-                              },
-                              {
-                                onSuccess: ({ board }) => {
-                                  onSelect(board.id);
-                                },
-                                onError: fail,
-                              },
-                            );
-                          }}
-                        >
-                          Duplicate
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {canDelete && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          destructive
-                          disabled={boards.length <= 1}
-                          onSelect={() => {
-                            setDialog({ kind: 'delete', board: b });
-                          }}
-                        >
-                          Delete board
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              }
-            </div>
-          );
-        })}
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      create.mutate(
+                        {
+                          name: `${current.name} (copy)`.slice(0, 40),
+                          mapId: current.mapId,
+                          duplicateFrom: current.id,
+                        },
+                        {
+                          onSuccess: ({ board }) => {
+                            onSelect(board.id);
+                          },
+                          onError: fail,
+                        },
+                      );
+                    }}
+                  >
+                    Duplicate
+                  </DropdownMenuItem>
+                </>
+              )}
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    destructive
+                    disabled={boards.length <= 1}
+                    onSelect={() => {
+                      setDialog({ kind: 'delete', board: current });
+                    }}
+                  >
+                    Delete board
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         {canManage && (
           <button
             type="button"
@@ -319,6 +324,7 @@ function BoardPresenceDots({ boardId }: { boardId: string }) {
   if (here.length === 0) return null;
   return (
     <span
+      role="img"
       className="flex -space-x-1"
       aria-label={`${here.length} here`}
       data-testid="board-presence"

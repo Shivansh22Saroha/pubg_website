@@ -1,6 +1,6 @@
 'use client';
 
-import { can, type Board } from '@rotationlab/shared';
+import { can, MAPS, type Board } from '@rotationlab/shared';
 import {
   ArrowLeft,
   ChevronDown,
@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { preload } from 'react-dom';
 import { toast } from 'sonner';
 import { BoardMapView } from '@/components/map/BoardMapView';
 import { SnapshotsDrawer } from '@/components/snapshots/SnapshotsDrawer';
@@ -27,7 +28,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { isTouchLayout, useBreakpoint } from '@/hooks/useBreakpoint';
 import { useMe } from '@/hooks/useMe';
+import { env } from '@/env';
 import { useRoomRealtime } from '@/hooks/useRoomRealtime';
 import { ApiError } from '@/lib/api';
 import { loadDebugHook } from '@/lib/debug/loadDebugHook';
@@ -44,11 +47,23 @@ import {
   SessionExpiredDialog,
   SyncIndicator,
 } from './RealtimeStatus';
+import { RoomTour } from './RoomTour';
 import { SidePanel, UnreadBadge } from './SidePanel';
+import {
+  BoardSelect,
+  ChatButton,
+  FullSheet,
+  HalfSheet,
+  PhoneBanner,
+  PhoneRoomMenu,
+  type PhoneMenuItem,
+} from './TouchChrome';
 import { useChatStore } from '@/stores/chatStore';
 import { useFollowStore } from '@/stores/followStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+
+const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 
 /**
  * Room workspace (UI_UX_SPEC §3.5): board tabs, toolbar, live map of the active board with the
@@ -69,10 +84,28 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const [dialog, setDialog] = useState<'invite' | 'settings' | 'help' | null>(null);
   const [gone, setGone] = useState<'kicked' | 'deleted' | null>(null);
   const [snapshotsFor, setSnapshotsFor] = useState<Board | null>(null);
+  const breakpoint = useBreakpoint();
+  const touch = isTouchLayout(breakpoint);
+  const phone = breakpoint === 'phone';
+
+  // UI_UX_SPEC §7: the panel starts open only on wide screens (compact: collapsed; tablet /
+  // phone: it is a sheet) — and closes when the layout changes under it
+  useEffect(() => {
+    setPanelOpen(breakpoint === 'desktop');
+  }, [breakpoint, setPanelOpen]);
 
   const boards = useMemo(() => query.data?.boards ?? [], [query.data]);
   // fall back to the first board when the remembered one is gone (deleted / other room)
   const active = boards.find((b) => b.id === picked) ?? boards[0];
+  // UI_UX_SPEC §9: the 819 px low-res art shows first — start fetching it with the room data,
+  // before the map bundle has even loaded (MapCanvas's overlay uses the same URL and CORS mode)
+  if (active) {
+    preload(`${tilesBase}/${MAPS[active.mapId].lowres}`, {
+      as: 'image',
+      crossOrigin: 'anonymous',
+      fetchPriority: 'high',
+    });
+  }
 
   const select = (id: string) => {
     setPicked(id);
@@ -252,166 +285,260 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
 
   const { room, members } = query.data;
   const role = room.role;
+  const leaveRoom = () => {
+    leave.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(`You left ${room.name}`);
+        router.replace('/dashboard');
+      },
+    });
+  };
+  const openPanel = (tab?: 'chat' | 'members') => {
+    if (tab) useWorkspaceStore.getState().setTab(tab);
+    setPanelOpen(true);
+  };
+  const sidePanel = (
+    <SidePanel
+      roomId={roomId}
+      role={role}
+      meId={me.data.id}
+      members={members}
+      boards={boards}
+      session={session}
+    />
+  );
+  const toolbar = (
+    <Toolbar
+      role={role}
+      session={session}
+      nameOf={nameOf}
+      breakpoint={breakpoint}
+      orientation={touch ? 'horizontal' : 'vertical'}
+    />
+  );
+  const phoneMenu: PhoneMenuItem[] = [
+    ...(can(role, 'invite.create')
+      ? [
+          {
+            label: 'Invite teammates',
+            onSelect: () => {
+              setDialog('invite');
+            },
+          },
+        ]
+      : []),
+    {
+      label: 'Members',
+      onSelect: () => {
+        openPanel('members');
+      },
+    },
+    {
+      label: 'Chat',
+      onSelect: () => {
+        openPanel('chat');
+      },
+    },
+    ...(active
+      ? [
+          {
+            label: 'Snapshots…',
+            onSelect: () => {
+              setSnapshotsFor(active);
+            },
+          },
+          {
+            label: 'Export PNG',
+            onSelect: () => {
+              useWorkspaceStore.getState().requestExport();
+            },
+          },
+        ]
+      : []),
+    ...(can(role, 'room.manage')
+      ? [
+          {
+            label: 'Room settings',
+            onSelect: () => {
+              setDialog('settings');
+            },
+          },
+        ]
+      : []),
+    ...(role !== 'OWNER'
+      ? [{ label: 'Leave room', onSelect: leaveRoom, destructive: true, separatorBefore: true }]
+      : []),
+  ];
 
   return (
-    <div className="flex h-dvh flex-col">
-      <header className="flex h-12 shrink-0 items-stretch border-b bg-bg">
-        <Link
-          href="/dashboard"
-          aria-label="Back to dashboard"
-          className="flex w-12 shrink-0 items-center justify-center border-r text-text-muted hover:text-text"
-        >
-          <ArrowLeft className="size-4" />
-        </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex max-w-56 shrink-0 items-center gap-1 border-r px-3 font-display text-base font-bold hover:bg-surface">
-            <span className="truncate" data-testid="room-name">
-              {room.name}
-            </span>
-            <ChevronDown className="size-4 shrink-0 text-text-muted" aria-hidden />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {can(role, 'room.manage') && (
-              <DropdownMenuItem
-                onSelect={() => {
-                  setDialog('settings');
-                }}
-              >
-                Room settings
-              </DropdownMenuItem>
-            )}
-            {can(role, 'invite.create') && (
-              <DropdownMenuItem
-                onSelect={() => {
-                  setDialog('invite');
-                }}
-              >
-                Invite teammates
-              </DropdownMenuItem>
-            )}
-            {role !== 'OWNER' && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  destructive
-                  onSelect={() => {
-                    leave.mutate(undefined, {
-                      onSuccess: () => {
-                        toast.success(`You left ${room.name}`);
-                        router.replace('/dashboard');
-                      },
-                    });
-                  }}
-                >
-                  Leave room
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <BoardTabs
-          roomId={roomId}
-          role={role}
-          boards={boards}
-          activeId={active?.id}
-          onSelect={select}
-          onSnapshots={(b) => {
-            setSnapshotsFor(b);
-          }}
-        />
-
-        <div className="ml-auto flex shrink-0 items-center gap-2 px-3">
+    <div className="flex h-dvh flex-col" data-layout={breakpoint}>
+      {phone ? (
+        <header className="flex h-12 shrink-0 items-center gap-1 border-b bg-bg pr-1">
+          <Link
+            href="/dashboard"
+            aria-label="Back to dashboard"
+            className="flex size-11 shrink-0 items-center justify-center text-text-muted hover:text-text"
+          >
+            <ArrowLeft className="size-4" />
+          </Link>
+          <span className="sr-only" data-testid="room-name">
+            {room.name}
+          </span>
+          <BoardSelect boards={boards} activeId={active?.id} onSelect={select} />
           <SyncIndicator />
-          <PresenceStack
-            members={members}
-            meId={me.data.id}
-            canSummon={can(role, 'board.edit')}
-            boards={boards}
-            onGoToBoard={select}
-            onSummon={summon}
-          />
-          {can(role, 'invite.create') && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setDialog('invite');
-              }}
-            >
-              <UserPlus className="size-4" aria-hidden /> Invite
-            </Button>
-          )}
+          <PhoneRoomMenu items={phoneMenu} />
+        </header>
+      ) : (
+        <header className="flex h-12 shrink-0 items-stretch border-b bg-bg">
+          <Link
+            href="/dashboard"
+            aria-label="Back to dashboard"
+            className="flex w-12 shrink-0 items-center justify-center border-r text-text-muted hover:text-text"
+          >
+            <ArrowLeft className="size-4" />
+          </Link>
           <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label="More"
-              data-testid="more-menu"
-              className="flex size-8 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text"
-            >
-              <MoreHorizontal className="size-4" aria-hidden />
+            <DropdownMenuTrigger className="flex max-w-56 shrink-0 items-center gap-1 border-r px-3 font-display text-base font-bold hover:bg-surface">
+              <span className="truncate" data-testid="room-name">
+                {room.name}
+              </span>
+              <ChevronDown className="size-4 shrink-0 text-text-muted" aria-hidden />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={!active}
-                onSelect={() => {
-                  useWorkspaceStore.getState().requestExport();
-                }}
-              >
-                Export PNG
-              </DropdownMenuItem>
-              {active && (
+            <DropdownMenuContent align="start">
+              {can(role, 'room.manage') && (
                 <DropdownMenuItem
                   onSelect={() => {
-                    setSnapshotsFor(active);
+                    setDialog('settings');
                   }}
                 >
-                  Snapshots…
+                  Room settings
                 </DropdownMenuItem>
+              )}
+              {can(role, 'invite.create') && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setDialog('invite');
+                  }}
+                >
+                  Invite teammates
+                </DropdownMenuItem>
+              )}
+              {role !== 'OWNER' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem destructive onSelect={leaveRoom}>
+                    Leave room
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          {can(role, 'room.manage') && (
+
+          <BoardTabs
+            roomId={roomId}
+            role={role}
+            boards={boards}
+            activeId={active?.id}
+            onSelect={select}
+            onSnapshots={(b) => {
+              setSnapshotsFor(b);
+            }}
+          />
+
+          <div className="ml-auto flex shrink-0 items-center gap-2 px-3">
+            <SyncIndicator />
+            <PresenceStack
+              members={members}
+              meId={me.data.id}
+              canSummon={can(role, 'board.edit')}
+              boards={boards}
+              onGoToBoard={select}
+              onSummon={summon}
+            />
+            {can(role, 'invite.create') && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-tour="invite"
+                onClick={() => {
+                  setDialog('invite');
+                }}
+              >
+                <UserPlus className="size-4" aria-hidden /> Invite
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="More"
+                data-testid="more-menu"
+                className="flex size-8 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text"
+              >
+                <MoreHorizontal className="size-4" aria-hidden />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={!active}
+                  onSelect={() => {
+                    useWorkspaceStore.getState().requestExport();
+                  }}
+                >
+                  Export PNG
+                </DropdownMenuItem>
+                {active && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSnapshotsFor(active);
+                    }}
+                  >
+                    Snapshots…
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {can(role, 'room.manage') && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                aria-label="Room settings"
+                onClick={() => {
+                  setDialog('settings');
+                }}
+              >
+                <Settings className="size-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
-              className="size-8"
-              aria-label="Room settings"
+              className="relative size-8"
+              data-testid="panel-toggle"
+              aria-label={panelOpen ? 'Hide side panel' : 'Show side panel'}
+              aria-pressed={panelOpen}
+              title="Toggle panel (])"
               onClick={() => {
-                setDialog('settings');
+                setPanelOpen((o) => !o);
               }}
             >
-              <Settings className="size-4" />
+              {panelOpen ? (
+                <PanelRightClose className="size-4" />
+              ) : (
+                <PanelRightOpen className="size-4" />
+              )}
+              {!panelOpen && unread > 0 && (
+                <span className="absolute -top-1 -right-1">
+                  <UnreadBadge count={unread} />
+                </span>
+              )}
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative size-8"
-            data-testid="panel-toggle"
-            aria-label={panelOpen ? 'Hide side panel' : 'Show side panel'}
-            aria-pressed={panelOpen}
-            title="Toggle panel (])"
-            onClick={() => {
-              setPanelOpen((o) => !o);
-            }}
-          >
-            {panelOpen ? (
-              <PanelRightClose className="size-4" />
-            ) : (
-              <PanelRightOpen className="size-4" />
-            )}
-            {!panelOpen && unread > 0 && (
-              <span className="absolute -top-1 -right-1">
-                <UnreadBadge count={unread} />
-              </span>
-            )}
-          </Button>
-        </div>
-      </header>
+          </div>
+        </header>
+      )}
 
       <div className="flex min-h-0 flex-1">
-        <Toolbar role={role} session={session} nameOf={nameOf} />
+        {!touch && toolbar}
         <main className="relative min-w-0 flex-1" aria-label="Map">
+          {phone && <PhoneBanner />}
           {active && (
             <BoardMapView
               key={active.id}
@@ -427,22 +554,44 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             />
           )}
         </main>
-        {panelOpen && (
+        {panelOpen && !touch && (
           <aside
             className="w-[340px] shrink-0 border-l bg-surface max-xl:w-[300px]"
             aria-label="Room panel"
           >
-            <SidePanel
-              roomId={roomId}
-              role={role}
-              meId={me.data.id}
-              members={members}
-              boards={boards}
-              session={session}
-            />
+            {sidePanel}
           </aside>
         )}
       </div>
+      {touch && toolbar}
+      {touch && !panelOpen && (
+        <ChatButton
+          unread={unread}
+          onClick={() => {
+            openPanel('chat');
+          }}
+        />
+      )}
+      {touch && !phone && panelOpen && (
+        <HalfSheet
+          onClose={() => {
+            setPanelOpen(false);
+          }}
+        >
+          {sidePanel}
+        </HalfSheet>
+      )}
+      {phone && (
+        <FullSheet
+          open={panelOpen}
+          onClose={() => {
+            setPanelOpen(false);
+          }}
+        >
+          {sidePanel}
+        </FullSheet>
+      )}
+      <RoomTour enabled={Boolean(active)} />
 
       {can(role, 'invite.create') && (
         <InviteDialog

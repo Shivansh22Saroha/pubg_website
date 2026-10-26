@@ -6,13 +6,32 @@
  *   PORT=4200 E2E_CONTROL_PORT=4299 tsx scripts/e2e-api.ts
  *   POST http://127.0.0.1:4299/restart   → kill the API, start it again, wait until healthy
  */
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 4200);
 const CONTROL = Number(process.env.E2E_CONTROL_PORT ?? 4299);
 let child: ChildProcess | null = null;
+
+/**
+ * `/explore` needs demo boards: seed them (idempotent) and hand their ids to the API, unless
+ * the environment already names some.
+ */
+function seedDemoBoards() {
+  if (process.env.DEMO_BOARD_IDS) return;
+  const out = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', '--env-file-if-exists=.env', 'scripts/seed.ts', '--demo-only'],
+    { env: process.env, encoding: 'utf8' },
+  );
+  const ids = /^DEMO_BOARD_IDS=(.*)$/m.exec(out)?.[1]?.trim();
+  if (!ids)
+    throw new Error(`seed printed no DEMO_BOARD_IDS:
+${out}`);
+  process.env.DEMO_BOARD_IDS = ids;
+}
+seedDemoBoards();
 
 function start() {
   // one node process (no tsx wrapper) so a kill really frees the port

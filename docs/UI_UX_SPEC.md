@@ -190,6 +190,12 @@ Each marker has an optional label (≤ 24 chars) shown under it.
 
 Touch: one finger draws in drawing tools, two fingers always pan/zoom. Long-press = context menu.
 
+Implementation notes (Phase 9):
+- Breakpoints are read from the window width (`useBreakpoint`). Compact: the panel starts collapsed. Tablet: **every** tool of the role (the listed ones are the ones verified with touch), the panel as a half-height sheet above the bottom toolbar, the style bar right above the toolbar. Phone: Select, Marker, Measure, Laser (a viewer keeps Select, Measure, Laser), undo / redo for editors, a dismissible banner, the board dropdown, and one top-bar menu: Invite, Members, Chat, Snapshots…, Export PNG, Room settings, Leave. The chat button (with the unread count) sits at the top right of the map on both touch layouts.
+- Leaving the room desktop-wide → touch-wide closes the panel; a tool the new layout doesn't offer falls back to Select.
+- Long-press (Select, one finger held 500 ms within 10 px) on an editable element selects it and opens Edit label / Edit text (markers, text) and Delete; the OS long-press menu is suppressed on the map.
+- Touch targets ≥ 44 px via `pointer: coarse` (buttons, menu items, tabs, tool buttons); hover-only actions (chat message options) are always shown on touch.
+
 ## 8. Keyboard shortcuts
 | Key | Action |
 |---|---|
@@ -213,7 +219,7 @@ Shortcuts disabled while focus is in an input, a dialog or a menu. On macOS the 
 
 ## 9. States & feedback
 - **Loading**: skeleton cards on dashboard; on room load show low-res map preview (819 px image) blurred → crisp tiles.
-- **Empty board**: center hint "Pick a tool on the left and start drawing. Press ? for shortcuts."
+- **Empty board**: center hint "Pick a tool on the left and start drawing. Press ? for shortcuts." (touch layouts: "Pick a tool below and start drawing.")
 - **Locked layer**: lock icon cursor + toast once "Layer is locked".
 - **Viewer**: toolbar shows only allowed tools; banner in style bar area "View only — ask the owner for edit access".
 - **Kicked / room deleted**: modal "You were removed from this room" → button to dashboard.
@@ -226,3 +232,4 @@ Shortcuts disabled while focus is in an input, a dialog or a menu. On macOS the 
 - Chat list `aria-live="polite"` for new messages (throttled).
 - Color is never the only signal: markers have icons/numbers, sync state has text.
 - Map element list view (P2): a table of elements for screen-reader users, with delete/select actions.
+- Phase 9: the element list is built — Layers tab → "List": type, label, layer, author; Select / Delete (Editor+, unlocked layers), 100 rows at a time. Board tabs: a `tablist` may only own tabs, so the board actions (Snapshots…, Rename, Duplicate, Delete) are one "⋮" menu for the **active** board right after the tabs, and "+ New board" after it. Labelled status dots / badges use `role="img"`. Destructive buttons use `#DC2626` behind white text (4.8:1; `#EF4444` is 3.8:1). `prefers-reduced-motion` also turns off Leaflet's zoom / fade animations and makes follow mode jump instead of glide. E2E-13 scans with the WCAG 2.0–2.2 A / AA tags.

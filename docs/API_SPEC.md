@@ -79,8 +79,9 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 
 | Method & path | Body | Success |
 |---|---|---|
-| `GET /me` | – | `{ user: Me }` |
+| `GET /me` | – | `{ user: Me }` — `Me.prefs = { roomTourDone }` (Phase 9) |
 | `PATCH /me` | `{ displayName?, ign?, avatarColor? }` | `{ user: Me }` |
+| `PATCH /me/prefs` | `{ roomTourDone?: boolean }` (strict, ≥ 1 key) | `{ prefs }` — merged into `users.prefs` key by key (`prefs \|\| patch` in one statement), so two devices never overwrite each other. UI preferences that must follow the user across devices (the room coach-mark tour); per-device conveniences stay in localStorage |
 | `POST /me/password` | `{ currentPassword, newPassword }` | `204`, other sessions revoked |
 | `GET /me/sessions` | – | `{ items: [{ id, userAgent, createdAt, current }] }` |
 | `DELETE /me/sessions/:id` | – | `204` |
@@ -132,7 +133,7 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 | `POST /snapshots/:snapshotId/restore` | EDITOR+ | – | `200 { seq }` + socket `board:reset` |
 | `DELETE /snapshots/:snapshotId` | OWNER, author | – | `204` |
 
-Snapshot notes (Phase 8): saving / restoring needs `board.manage` (OWNER / EDITOR); listing and reading any member; snapshots of boards you can't see are `404`. The 51st manual snapshot → `422 LIMIT_REACHED`. Restore runs in one transaction (auto snapshot "Before restore of '{name}'" → layers + elements replaced with the snapshot's ids at a new seq → op log dropped so a `sinceSeq` resync becomes a full load → audit row) and only then emits `board:reset` and a system chat message. A `layer:clear` of more than 50 elements first saves an auto snapshot "Before clearing '{layer}'". Auto snapshots: at most 10 per board (the one being restored is never pruned).
+Snapshot notes (Phase 8): saving / restoring needs `board.manage` (OWNER / EDITOR); listing and reading any member; snapshots of boards you can't see are `404`. The 51st manual snapshot → `422 LIMIT_REACHED`. Restore runs in one transaction (auto snapshot "Before restore of '{name}'" → layers + elements replaced with the snapshot's ids at a new seq → op log dropped so a `sinceSeq` resync becomes a full load → audit row) and only then emits `board:reset` and a system chat message. A `layer:clear` of a non-empty layer first saves an auto snapshot "Before clearing '{layer}'". Auto snapshots: at most 10 per board (the one being restored is never pruned).
 
 Layer and element mutations go through **Socket.IO only** (§7).
 
@@ -236,7 +237,7 @@ Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violati
 |---|---|
 | `GET /api/health` | `{ status: 'ok', db: 'ok', redis: 'ok', version }` |
 | `GET /api/v1/maps` | static map registry `{ items: [{ id, name, worldSize, tileBaseUrl: { labels, clean }, maxNativeZoom, thumbnailUrl }] }` |
-| `GET /api/v1/public/demo-boards` | read-only demo boards for `/explore`: `{ items: [{ board, layers, elements }] }`, no auth, rate-limited 30 / min / IP, `Cache-Control: public, max-age=300` |
+| `GET /api/v1/public/demo-boards` | read-only demo boards for `/explore`: `{ items: [{ board, layers, elements }] }`, no auth, rate-limited 30 / min / IP, `Cache-Control: public, max-age=300`. Only boards whose id is in `DEMO_BOARD_IDS` (≤ 3, env order; ids that don't exist or whose room is deleted are skipped; unset → `{ items: [] }`). The id list never comes from the request. Nothing points back at a room or a person: `board` has no `roomId`, elements have `createdBy` / `updatedBy: null` |
 | `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+, `image/jpeg` body ≤ 100 KB, 256×256 (server re-encodes with sharp and stores in object storage) — P1 |
 | `GET /metrics` | Prometheus, **internal network only** |
 

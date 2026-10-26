@@ -25,6 +25,8 @@ model User {
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  /// UI preferences that follow the user across devices (UserPrefsSchema), e.g. the room tour
+  prefs            Json           @default("{}")
   refreshTokens    RefreshToken[]
   emailTokens      EmailToken[]
   memberships      RoomMember[]

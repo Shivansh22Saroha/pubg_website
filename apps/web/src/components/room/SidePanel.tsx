@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Avatar } from '@/components/auth/UserMenu';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoleBadge } from '@/components/rooms/bits';
+import { ElementList } from '@/components/tools/ElementList';
 import { LayersPanel } from '@/components/tools/LayersPanel';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -44,6 +45,7 @@ export function SidePanel({
   const tab = useWorkspaceStore((s) => s.tab);
   const setTab = useWorkspaceStore((s) => s.setTab);
   const unread = useChatStore((s) => s.unread);
+  const [layersView, setLayersView] = useState<'layers' | 'list'>('layers');
   return (
     <Tabs
       value={tab}
@@ -72,7 +74,31 @@ export function SidePanel({
         />
       </TabsContent>
       <TabsContent value="layers" className="overflow-y-auto p-2">
-        <LayersPanel role={role} session={session} />
+        {/* UI_UX_SPEC §10: the same board as a table, for keyboard / screen-reader users */}
+        <div role="group" aria-label="Layers view" className="mb-2 flex gap-1">
+          {(['layers', 'list'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={layersView === v}
+              data-testid={`layers-view-${v}`}
+              onClick={() => {
+                setLayersView(v);
+              }}
+              className={cn(
+                'h-7 rounded-control px-2 text-xs text-text-muted hover:bg-surface-2 hover:text-text pointer-coarse:h-11',
+                layersView === v && 'bg-surface-2 text-text',
+              )}
+            >
+              {v === 'layers' ? 'Layers' : 'List'}
+            </button>
+          ))}
+        </div>
+        {layersView === 'layers' ? (
+          <LayersPanel role={role} session={session} />
+        ) : (
+          <ElementList role={role} session={session} members={members} meId={meId} />
+        )}
       </TabsContent>
       <TabsContent value="members" className="overflow-y-auto p-2">
         <MembersList roomId={roomId} role={role} meId={meId} members={members} />
@@ -118,6 +144,7 @@ function MembersList({
             <span className="relative">
               <Avatar user={m.user} className="size-7 text-xs" />
               <span
+                role="img"
                 aria-label={m.user.id in online ? 'online' : 'offline'}
                 data-testid="member-online"
                 data-online={m.user.id in online}
@@ -229,6 +256,7 @@ function MembersList({
 export function UnreadBadge({ count }: { count: number }) {
   return (
     <span
+      role="img"
       data-testid="unread-badge"
       aria-label={`${count} unread`}
       className="ml-1.5 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 font-mono text-[10px] leading-4 font-bold text-accent-fg"

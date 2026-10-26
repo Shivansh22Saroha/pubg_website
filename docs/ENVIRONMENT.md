@@ -44,7 +44,7 @@ Generate secrets with: `openssl rand -base64 48`
 | `S3_ENDPOINT` | P1 | `https://<acct>.r2.cloudflarestorage.com` | for board thumbnails |
 | `S3_BUCKET` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_REGION` | P1 | `rotationlab-assets` / … / `auto` | |
 | `PUBLIC_ASSETS_BASE_URL` | P1 | `https://assets.example.com` | public URL for thumbnails |
-| `DEMO_BOARD_IDS` | – | `uuid1,uuid2,uuid3` | boards exposed read-only at `/explore` |
+| `DEMO_BOARD_IDS` | – | `uuid1,uuid2,uuid3` | boards exposed read-only at `/explore` (≤ 3 uuids, comma-separated; unset → none). `pnpm --filter server seed` prints the line; the E2E API supervisor seeds them itself |
 | `SENTRY_DSN` | – | | error tracking |
 | `METRICS_TOKEN` | – | | if set, `/metrics` requires `Authorization: Bearer` (in addition to internal-only routing) |
 | `RATE_LIMITS_ENABLED` | – | `true` | `false` only for local E2E convenience (repeated registrations); refused when `NODE_ENV=production`. Integration tests always run with limits on |
@@ -74,6 +74,13 @@ In development, `next.config.ts` rewrites `/api/:path*` and `/realtime/:path*` �
 |---|---|---|---|
 | `NEXT_PUBLIC_SOCKET_URL` | **dev / E2E** | `http://localhost:4000` (dev) / `http://localhost:4200` (E2E) | direct socket URL; unset in production (same origin) |
 | `NEXT_PUBLIC_E2E_DEBUG` | – | `false` | build-time: `true` only in the E2E build, which keeps the `window.__rlDebug` hook. Production builds strip it (`pnpm --filter web check:no-debug`) |
+
+Server-only web settings (Phase 9; `src/lib/serverEnv.ts`) — read per request by server components / route handlers, never sent to the browser, so they change without a rebuild:
+
+| Variable | Required | Example | Description |
+|---|---|---|---|
+| `ENABLE_DEV_PAGES` | – | *(unset)* | `true` \| `false`. The `/maps/[mapId]` dev map viewer. Unset: on in development, **off (404) in production**. The E2E build sets `true` for the Phase 2 map test |
+| `SECURITY_CONTACT` | prod | `mailto:security@example.com` | `Contact:` of `/.well-known/security.txt` (SECURITY §13); `mailto:` or `https:` URL. Unset → the file is a 404 |
 
 ## 3. Map tiles (`packages/map-tiles/.env`)
 | Variable | Example | Description |

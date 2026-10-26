@@ -97,7 +97,9 @@ export function PresenceStack({
   const shown = online.slice(0, 5);
   return (
     <div
-      className="hidden items-center -space-x-1.5 md:flex"
+      // spaced, not overlapping: each avatar is its own ≥ 24 px target (WCAG 2.2 target-size)
+      role="group"
+      className="hidden items-center gap-1 md:flex"
       aria-label={`${online.length} online`}
       data-testid="presence-stack"
     >
@@ -114,7 +116,7 @@ export function PresenceStack({
               data-testid="presence-avatar"
               data-user={m.user.username}
               className={cn(
-                'rounded-full ring-2 ring-offset-1 ring-offset-bg focus-visible:outline-none',
+                'rounded-full ring-2 ring-offset-1 ring-offset-bg',
                 p?.idle && 'opacity-50',
               )}
               // presence colours come from a fixed server-side palette

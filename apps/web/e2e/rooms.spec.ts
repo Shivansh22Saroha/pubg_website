@@ -78,7 +78,7 @@ test('E2E-2: create room, invite, second user joins, both see each other', async
 
   // the room shows up on the joiner's dashboard
   await joiner.goto('/dashboard');
-  await expect(joiner.getByRole('link', { name: `Open room ${roomName}` })).toBeVisible();
+  await expect(joiner.getByRole('link', { name: new RegExp(roomName) }).first()).toBeVisible();
 
   // re-opening the invite as a member goes straight into the room
   await joiner.goto(new URL(inviteUrl).pathname);

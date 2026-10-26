@@ -10,12 +10,13 @@ const buttonVariants = cva(
         accent: 'bg-accent text-accent-fg hover:bg-accent/90',
         outline: 'border border-accent text-accent hover:bg-accent/10',
         ghost: 'text-text hover:bg-surface-2',
-        destructive: 'bg-danger text-white hover:bg-danger/90',
+        destructive: 'bg-danger-strong text-white hover:bg-danger-strong/90',
       },
       size: {
-        sm: 'h-8 px-3',
-        md: 'h-9 px-4',
-        icon: 'size-10',
+        // touch: ≥ 44 px targets (UI_UX_SPEC §7)
+        sm: 'h-8 px-3 pointer-coarse:h-11',
+        md: 'h-9 px-4 pointer-coarse:h-11',
+        icon: 'size-10 pointer-coarse:size-11',
       },
     },
     defaultVariants: { variant: 'accent', size: 'md' },

@@ -1,9 +1,11 @@
 import {
   ChangePasswordBodySchema,
   DeleteMeBodySchema,
+  PrefsResponseSchema,
   SessionIdParamsSchema,
   SessionsResponseSchema,
   UpdateMeBodySchema,
+  UpdatePrefsBodySchema,
   UserResponseSchema,
 } from '@rotationlab/shared';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
@@ -32,6 +34,16 @@ export const userRoutes: FastifyPluginCallbackZod<{
     '/me',
     { config: user, schema: { body: UpdateMeBodySchema, response: { 200: UserResponseSchema } } },
     async (req) => ({ user: await auth.updateMe(requireUser(req).id, req.body) }),
+  );
+
+  /** Phase 9: UI preferences that follow the user (the room tour), merged key by key. */
+  app.patch(
+    '/me/prefs',
+    {
+      config: user,
+      schema: { body: UpdatePrefsBodySchema, response: { 200: PrefsResponseSchema } },
+    },
+    async (req) => ({ prefs: await auth.updatePrefs(requireUser(req).id, req.body) }),
   );
 
   app.post(

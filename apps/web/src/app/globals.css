@@ -14,6 +14,8 @@
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
+  /* behind white text: #ef4444 is 3.8:1, below AA; this is 4.8:1 (UI_UX_SPEC §10) */
+  --danger-strong: #dc2626;
   --info: #38bdf8;
 
   color-scheme: dark;
@@ -32,6 +34,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
   --color-info: var(--info);
 
   /* shadcn/ui semantic aliases, mapped onto the spec tokens */
@@ -118,6 +121,15 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* ---- touch (UI_UX_SPEC §7) ------------------------------------------------------------------ */
+/* Leaflet leaves `touch-action: pan-x pan-y` once dragging is off, so the browser would take
+   one-finger strokes as a page pan and cancel them. Drawing tools own one finger; Leaflet's
+   touch-zoom still handles two (it listens to touch events, not native gestures). !important:
+   leaflet.css loads after this file with equally specific rules. */
+.leaflet-container.rl-drawing {
+  touch-action: none !important;
 }
 
 /* ---- board elements & cursors on the map (UI_UX_SPEC §6) ---------------------------------- */

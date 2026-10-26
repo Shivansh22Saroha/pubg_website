@@ -2,10 +2,8 @@ import {
   ApiErrorBodySchema,
   CSRF_HEADER,
   CSRF_HEADER_VALUE,
-  HealthResponseSchema,
   type ApiErrorDetail,
   type ErrorCode,
-  type HealthResponse,
 } from '@rotationlab/shared';
 import type { z } from 'zod';
 
@@ -97,20 +95,4 @@ export async function api<S extends z.ZodType | undefined = undefined>(
   if (!res.ok) throw await toError(res);
   if (!opts.schema || res.status === 204) return undefined as Result<S>;
   return opts.schema.parse(await res.json()) as Result<S>;
-}
-
-/**
- * Health lives at `/api/health`, outside the versioned base. Both 200 (ok) and 503 (degraded)
- * carry a valid HealthResponse body.
- */
-export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
-  const res = await fetch('/api/health', {
-    credentials: 'include',
-    cache: 'no-store',
-    ...(signal ? { signal } : {}),
-  });
-  if (res.status !== 200 && res.status !== 503) {
-    throw new Error(`Health check failed with HTTP ${res.status}`);
-  }
-  return HealthResponseSchema.parse(await res.json());
 }

@@ -155,6 +155,7 @@ export function createAccountService(d: AccountDeps) {
             emailVerifiedAt: null,
             failedLoginCount: 0,
             lockedUntil: null,
+            prefs: {},
             deletedAt: now,
           },
         });

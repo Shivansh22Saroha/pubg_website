@@ -1,7 +1,10 @@
 import { Prisma, type PrismaClient, type User } from '@prisma/client';
 import {
   USERNAME_PATTERN,
+  UserPrefsSchema,
   type ChangePasswordBodySchema,
+  type UpdatePrefsBodySchema,
+  type UserPrefs,
   type Me,
   type RegisterBodySchema,
   type Session,
@@ -43,7 +46,14 @@ export function toMe(u: User): Me {
     email: u.email,
     emailVerified: u.emailVerifiedAt !== null,
     createdAt: u.createdAt.toISOString(),
+    prefs: readPrefs(u.prefs),
   };
+}
+
+/** `users.prefs` → known keys with defaults; anything unexpected is ignored, never an error. */
+export function readPrefs(raw: unknown): UserPrefs {
+  const parsed = UserPrefsSchema.safeParse(raw ?? {});
+  return parsed.success ? parsed.data : UserPrefsSchema.parse({});
 }
 
 function uniqueViolation(err: unknown): string | null {
@@ -172,6 +182,17 @@ export function createAuthService(d: AuthDeps) {
         },
       });
       return toMe(user);
+    },
+
+    /**
+     * Phase 9: merge into `users.prefs` in one statement (`prefs || patch`), so two devices
+     * setting different keys never overwrite each other.
+     */
+    async updatePrefs(userId: string, patch: z.output<typeof UpdatePrefsBodySchema>) {
+      await activeUser(userId);
+      await prisma.$executeRaw`UPDATE users SET prefs = prefs || ${JSON.stringify(patch)}::jsonb WHERE id = ${userId}::uuid`;
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+      return readPrefs(user.prefs);
     },
 
     /** AUTH-6 / SECURITY A8: requires the current password, revokes every other session. */

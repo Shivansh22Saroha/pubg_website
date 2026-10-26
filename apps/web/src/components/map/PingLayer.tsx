@@ -8,18 +8,13 @@ import { clientToWorld, toLatLng } from '@/lib/coords';
 import { useFollowStore } from '@/stores/followStore';
 import { usePulseStore } from '@/stores/pulseStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { prefersReducedMotion } from '@/lib/motion';
 
 export const PULSE_PANE = 'pulses';
 const FLY_SECONDS = 0.3; // UI_UX_SPEC §5
 
 /** the latest focus request already flown to (survives the map remounting on a board switch) */
 let handledFocus = 0;
-
-export function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
 
 /**
  * Map pings (FEATURES F9, UI_UX_SPEC §5):

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Browser, Page } from '@playwright/test';
+import type { Browser, BrowserContextOptions, Page } from '@playwright/test';
 import type {} from '../src/lib/debug/rlDebug';
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tiles');
@@ -32,14 +32,21 @@ export async function serveFixtureTiles(page: Page): Promise<string[]> {
 
 export const PASSWORD = 'correct horse battery staple';
 
-/** Registers a fresh user through the UI and lands on the dashboard. */
-export async function registerViaUi(page: Page, username: string) {
+/**
+ * Registers a fresh user through the UI and lands on the dashboard. The first-visit room tour
+ * is marked done (it would sit over the toolbar in every other test) unless `tour: true`.
+ */
+export async function registerViaUi(page: Page, username: string, opts: { tour?: boolean } = {}) {
   await page.goto('/register');
   await page.getByLabel('Email').fill(`${username}@example.com`);
   await page.getByLabel('Username').fill(username);
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await page.getByLabel('Confirm password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
+  await page.waitForURL(/\/dashboard$/);
+  if (opts.tour) return;
+  await pageApi(page, 'PATCH', '/me/prefs', { roomTourDone: true });
+  await page.reload(); // the cached `me` predates the patch
   await page.waitForURL(/\/dashboard$/);
 }
 
@@ -76,10 +83,16 @@ export async function pageApi<T = unknown>(
   ) as Promise<T>;
 }
 
-/** Owner + second user in one room, both with the room open. */
-export async function twoUsersInRoom(browser: Browser) {
-  const ctxA = await browser.newContext();
-  const ctxB = await browser.newContext();
+/**
+ * Owner + second user in one room, both with the room open. `a` / `b` are context options
+ * (a phone or tablet device descriptor, …); default: the project's desktop.
+ */
+export async function twoUsersInRoom(
+  browser: Browser,
+  opts: { a?: BrowserContextOptions; b?: BrowserContextOptions } = {},
+) {
+  const ctxA = await browser.newContext(opts.a);
+  const ctxB = await browser.newContext(opts.b);
   const a = await ctxA.newPage();
   const b = await ctxB.newPage();
   await serveFixtureTiles(a);

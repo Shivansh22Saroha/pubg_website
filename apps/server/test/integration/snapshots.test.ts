@@ -309,38 +309,44 @@ describe('restore', () => {
 });
 
 describe('layer:clear auto snapshot', () => {
-  it('> 50 elements: auto snapshot of the whole board first + a system message; ≤ 50: none', async () => {
-    const { f, owner, layerId, state } = await boardWith(51);
+  it('any non-empty layer: auto snapshot of the whole board first + a system message', async () => {
+    const { f, owner, layerId, state } = await boardWith(3);
     const res = await ack(owner, 'layer:clear', { opId: opId(), boardId: f.boardId, layerId });
     expect(res.ok).toBe(true);
     const auto = await prisma.snapshot.findFirstOrThrow({
       where: { boardId: f.boardId, isAuto: true },
     });
     expect(auto.name).toBe(`Before clearing '${state.layers[0]!.name}'`);
-    expect(auto.elementCount).toBe(51);
+    expect(auto.elementCount).toBe(3);
     expect(await prisma.element.count({ where: { boardId: f.boardId } })).toBe(0);
     await app.chatIdle();
     const sys = await prisma.chatMessage.findMany({ where: { roomId: f.roomId, kind: 'SYSTEM' } });
     expect(
       sys.some((m) =>
-        m.body.startsWith(`owner cleared layer '${state.layers[0]!.name}' (51 elements)`),
+        m.body.startsWith(`owner cleared layer '${state.layers[0]!.name}' (3 elements)`),
       ),
     ).toBe(true);
 
-    // the clear is undoable: restoring the auto snapshot brings all 51 back
+    // the clear is undoable: restoring the auto snapshot brings all 3 back
     const r = await call(app, f.owner.jar, 'POST', `/api/v1/snapshots/${auto.id}/restore`);
     expect(r.statusCode).toBe(200);
-    expect(await prisma.element.count({ where: { boardId: f.boardId } })).toBe(51);
+    expect(await prisma.element.count({ where: { boardId: f.boardId } })).toBe(3);
   });
 
-  it('≤ 50 elements: no auto snapshot', async () => {
-    const small = await boardWith(50);
-    await ack(small.owner, 'layer:clear', {
+  it('an empty layer: nothing to save, no snapshot and no system message', async () => {
+    const empty = await boardWith(0);
+    const res = await ack(empty.owner, 'layer:clear', {
       opId: opId(),
-      boardId: small.f.boardId,
-      layerId: small.layerId,
+      boardId: empty.f.boardId,
+      layerId: empty.layerId,
     });
-    expect(await prisma.snapshot.count({ where: { boardId: small.f.boardId } })).toBe(0);
+    expect(res.ok).toBe(true);
+    expect(await prisma.snapshot.count({ where: { boardId: empty.f.boardId } })).toBe(0);
+    await app.chatIdle();
+    const sys = await prisma.chatMessage.findMany({
+      where: { roomId: empty.f.roomId, kind: 'SYSTEM' },
+    });
+    expect(sys.some((m) => m.body.includes('cleared layer'))).toBe(false);
   });
 });
 

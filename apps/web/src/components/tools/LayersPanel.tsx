@@ -3,7 +3,6 @@
 import {
   DRAWING_PALETTE,
   ROOM_LIMITS,
-  SNAPSHOT_LIMITS,
   type Layer,
   type LayerInput,
   type RoomRole,
@@ -385,11 +384,7 @@ export function LayersPanel({ role, session }: { role: RoomRole; session: LayerS
             description={
               confirm.kind === 'delete'
                 ? `“${confirm.layer.name}” and its ${confirm.count} element${confirm.count === 1 ? '' : 's'} will be deleted for everyone.`
-                : `All ${confirm.count} element${confirm.count === 1 ? '' : 's'} on “${confirm.layer.name}” will be removed for everyone. ${
-                    confirm.count > SNAPSHOT_LIMITS.clearAutoThreshold
-                      ? 'An automatic snapshot will be saved first.'
-                      : 'This can’t be undone.'
-                  }`
+                : `All ${confirm.count} element${confirm.count === 1 ? '' : 's'} on “${confirm.layer.name}” will be removed for everyone. An automatic snapshot will be saved first.`
             }
           >
             <div className="flex justify-end gap-2">
@@ -407,7 +402,7 @@ export function LayersPanel({ role, session }: { role: RoomRole; session: LayerS
                 onClick={() => {
                   const { kind, layer } = confirm;
                   setConfirm(null);
-                  // > 50 elements: the server saves an auto snapshot first (FEATURES F10)
+                  // the server saves an auto snapshot of the board first (FEATURES F10)
                   send({
                     kind: kind === 'delete' ? 'layer:delete' : 'layer:clear',
                     layerId: layer.id,

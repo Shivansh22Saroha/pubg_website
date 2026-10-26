@@ -12,8 +12,6 @@ export const SNAPSHOT_LIMITS = {
   autoPerBoard: 10,
   /** serialized `data` cap (enforced in app; a DB CHECK is the backstop) */
   maxBytes: 5 * 1024 * 1024,
-  /** `layer:clear` of more elements than this takes an auto snapshot first */
-  clearAutoThreshold: 50,
 } as const;
 
 export const SNAPSHOT_VERSION = 1;

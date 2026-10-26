@@ -65,7 +65,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - 1–10 layers per board. New elements go to the **active layer** (per user, local).
 - `visible` (board-wide) toggled by Editor+ affects everyone; each user can also locally "solo/hide" a layer (eye with slash in their own view only — shown as a different icon). v1: local hide only via Alt+click eye.
 - `locked`: server rejects element ops on that layer **for every role, the owner included** (the owner unlocks first); select and eraser ignore its elements for everyone, and drawing on it is blocked with a toast. Only the owner can lock / unlock, rename, recolor or delete a locked layer; nobody can clear it.
-- Deleting a layer deletes its elements (confirm shows count). Can't delete the last layer. "Clear layer" (kebab) removes its elements after a confirm that warns it can't be undone yet (Phase 8 adds the auto-snapshot).
+- Deleting a layer deletes its elements (confirm shows count). Can't delete the last layer. "Clear layer" (kebab) removes its elements after a confirm ("An automatic snapshot will be saved first."): every clear of a non-empty layer first saves an auto snapshot of the whole board, so it can be undone by restoring it (F10). Clearing an empty layer saves nothing.
 - Reorder changes rendering order (z of layer > z of element). The panel lists the **top-most layer first**.
 - Layer ops (add, rename, recolor, visibility, lock, reorder, clear, delete) are not part of undo / redo in v1.
 
@@ -166,7 +166,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 
 ## F10. Snapshots [BOARD-5]
 - Manual: name required (1–60 chars). Max 50 manual per board; at limit, oldest must be deleted by user.
-- Auto: before every restore and before `layer:clear` of > 50 elements; max 10, oldest pruned.
+- Auto: before every restore and before every `layer:clear` of a non-empty layer; max 10, oldest pruned.
 - Preview renders snapshot data read-only in a modal map (same renderer).
 - Restore is atomic and broadcast as `board:reset`. Element and layer ids are kept; every client reloads the board in full, clears its undo / redo stacks for it and shows "Board was restored by {name}"; the room gets a system message. A manual save also posts one.
 - Drawer from the board tab's kebab (any member; saving / restoring Editor+; deleting the owner or the author). Clicking an item opens a read-only preview map (hover prefetches it).
@@ -193,6 +193,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 ## F13. Demo / explore mode
 - `/explore` loads the demo boards read-only without auth via `GET /api/v1/public/demo-boards` (rate-limited, cached 5 min). Board IDs come from env `DEMO_BOARD_IDS` (comma-separated, one per map).
 - All tools except Measure disabled; map switcher swaps between three demo boards.
+- Phase 9 details: one entry per map in map order — the first demo board of each, or the bare map when none is set up (a note says so). Labels / grid (HUD, N / Shift+G) and Measure (R; the room's MeasureTool) work; nothing else is offered and **no socket is opened**. CTA bar: "Create a free account to save your own boards". The server only ever serves ids from `DEMO_BOARD_IDS`, without room or author ids (API_SPEC §8).
 
 ---
 

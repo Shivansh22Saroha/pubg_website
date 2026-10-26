@@ -15,10 +15,13 @@ export function MapThumb({
   mapId,
   className,
   variant = 'thumb',
+  priority = false,
 }: {
   mapId: MapId;
   className?: string;
   variant?: 'thumb' | 'preview';
+  /** above the fold and likely the LCP (the first dashboard card): fetch first, never lazy */
+  priority?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   return (
@@ -28,6 +31,9 @@ export function MapThumb({
         <img
           src={`${tilesBase}/${variant === 'preview' ? MAPS[mapId].preview : MAPS[mapId].thumbnail}`}
           alt=""
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          {...(priority ? { fetchPriority: 'high' as const } : {})}
           className="size-full object-cover"
           onError={() => {
             setFailed(true);

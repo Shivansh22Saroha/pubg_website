@@ -1,3 +1,4 @@
+import { DEMO_BOARDS_MAX } from '@rotationlab/shared';
 import { z } from 'zod';
 
 // Booleans from env: never z.coerce.boolean() — it turns "false" into true (ENVIRONMENT §6).
@@ -58,6 +59,20 @@ export const EnvSchema = z
     REFRESH_REUSE_GRACE_SEC: z.coerce.number().int().min(0).max(60).default(10),
     /** sockets are disconnected (code TOKEN_EXPIRED) this long after their access token expires */
     SOCKET_TOKEN_GRACE_SEC: z.coerce.number().int().min(0).max(600).default(60),
+    /**
+     * FEATURES F13: boards served read-only at `/explore`, comma-separated, one per map (≤ 3).
+     * Unset / empty → the demo list is empty. `pnpm --filter server seed` prints the ids.
+     */
+    DEMO_BOARD_IDS: z
+      .string()
+      .default('')
+      .transform((v) =>
+        v
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.uuid()).max(DEMO_BOARDS_MAX)),
     SENTRY_DSN: optionalString,
     METRICS_TOKEN: optionalString,
   })

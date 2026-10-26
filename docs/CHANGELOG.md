@@ -37,7 +37,83 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
     - FEATURES F10–F12: restore steps, auto-snapshot rules, measure behaviour, export contents.
     - DEPLOYMENT: the R2 CORS rule for exports.
 
+- 2026-10-26 — Phase 9 docs:
+  - Phase 8 follow-up: FEATURES F5 / F10 and API_SPEC — every `layer:clear` of a non-empty layer takes an auto snapshot (the > 50 threshold is gone); the confirm always says "An automatic snapshot will be saved first."
+  - API_SPEC §3 `PATCH /me/prefs` and `Me.prefs`; §8 the demo-boards allow-list and the stripped fields.
+  - DATABASE_SCHEMA §3.1 `users.prefs`; §7 how the seed builds the dev data and the demo boards.
+  - ENVIRONMENT: `DEMO_BOARD_IDS` (≤ 3), web server-only `ENABLE_DEV_PAGES` and `SECURITY_CONTACT`.
+  - FEATURES F13, SECURITY §6 (demo-boards limit) / §13 (security.txt), TECH_STACK (axe, Lighthouse), TESTING §7 (how Lighthouse runs).
+  - UI_UX_SPEC §7 / §9 / §10: what each layout offers, long-press, touch targets, the touch empty hint, the element list, the board-actions menu, the contrast fix.
+  - DEPLOYMENT: the demo seed in production, the web env, landing screenshots.
+
 ### Added
+- 2026-10-26 — Phase 8 follow-up: `layer:clear` always saves an auto snapshot "Before clearing '{layer}'" when the layer has ≥ 1 element (an empty layer saves nothing and posts no system message). `SNAPSHOT_LIMITS.clearAutoThreshold` is gone; the confirm says "An automatic snapshot will be saved first." for every clear. Integration tests now cover 3 elements and the empty layer; the layers E2E clears a layer and finds the auto snapshot in the drawer.
+- 2026-10-26 — **Phase 9: landing, explore, responsive layouts, onboarding, accessibility** (TODO Phase 9; UI_UX_SPEC §3.1 / §3.4 / §7 / §9 / §10, FEATURES F13, USER_FLOWS UF-3 / UF-9, TESTING E2E-12 / 13).
+  - **Landing `/`** (server component):
+    - Nav with logo, Log in, Get started — "Go to dashboard" when logged in.
+    - Hero "Plan your rotations together." with "Create a room" (register, or the dashboard when logged in) and "Explore maps".
+    - Three feature cards with static WebP screenshots of the seeded boards.
+    - Footer: KRAFTON attribution and the BGMI notice (brand.ts), Privacy, Terms, Security contact.
+    - The only client JS is a tiny session check (a plain `fetch('/api/v1/me')`); React Query, sonner and zod are no longer in the root layout, which wraps nothing — `(app)`, `(auth)`, `/explore` and the dev map page bring their own `Providers`.
+    - `pnpm --filter web shots` (`scripts/landing-shots.ts`) makes the screenshots against `pnpm dev`; Chromium encodes the WebP itself (`OffscreenCanvas.convertToBlob`), so no image library is involved. Results: 115 / 82 / 101 KB at 960×600.
+  - **Privacy / Terms** (`(site)` group): plain placeholders based on SECURITY §7 — what is stored, cookies (httpOnly only), no trackers, retention (30 / 90 days, 7-day room purge, 14-day backups), deletion. Marked `TODO(phase0)` with a visible "not reviewed by a lawyer" note.
+  - **`/.well-known/security.txt`**: a route handler with `Contact:` from `SECURITY_CONTACT`, a rolling RFC 9116 `Expires:`, `Canonical:` and the 90-day note; 404 when unset.
+  - **Explore `/explore`** (FEATURES F13, UF-9):
+    - `GET /api/v1/public/demo-boards`: public, 30 / min / IP, `Cache-Control: public, max-age=300`. Only `DEMO_BOARD_IDS` (≤ 3, env order); deleted rooms skipped; no room ids or author ids. Empty list when unset. In the authz matrix.
+    - Read-only page: a map switcher, labels / grid via the map HUD, Measure (R, the room's MeasureTool). No editing tools and no socket. CTA bar "Create a free account to save your own boards". Bare maps (with a note) when no demo board exists.
+    - `StaticElements` (shared with the snapshot preview) renders fixed data with the live ElementRenderer.
+  - **Seed** `pnpm --filter server seed [--demo-only]`: alice / bob + "Demo Squad" (dev only) and three demo boards (drop, rotation arrow, zone circle, three enemy squads, own squad, a note) in a locked room owned by an account nobody can log in as. Idempotent; prints `DEMO_BOARD_IDS=`. The E2E API supervisor seeds the demo boards and passes their ids to the API.
+  - **Dev page gating**: `/maps/[mapId]` is 404 unless `ENABLE_DEV_PAGES` allows it (default: on in development, off in production), checked per request.
+  - **Responsive layouts** (UI_UX_SPEC §7; `useBreakpoint`):
+    - Compact (1024–1279): the panel starts collapsed (300 px).
+    - Tablet (768–1023): the toolbar is a horizontally scrollable bottom bar with every tool; the panel is a half-height bottom sheet opened by a chat button with the unread count; the style bar sits above the toolbar.
+    - Phone (< 768): view + chat mode — full-screen map; Select / Marker / Measure / Laser (+ undo / redo for editors); "Use a larger screen for full drawing tools" banner; board dropdown; one top-bar menu (Invite, Members, Chat, Snapshots…, Export PNG, Room settings, Leave); chat as a full-screen sheet (a focus-trapping dialog).
+    - Touch: one finger draws, two pan / pinch. **Fixed:** with dragging off, Leaflet's own `touch-action: pan-x pan-y` (loaded after our CSS, same specificity) let the browser take one-finger strokes and cancel them; drawing mode now forces `touch-action: none`. Long-press (Select, 500 ms, ≤ 10 px) on an element selects it and opens Edit label / Delete. Touch targets ≥ 44 px on `pointer: coarse`. Chat message options are always visible on touch.
+    - Dashboard, auth, settings, join, explore, privacy and terms fit 360 px with no horizontal scroll.
+  - **Onboarding**:
+    - First room visit: a 3-step coach-mark tour (toolbar → board tabs → Invite; steps without an anchor are skipped). Next / Back / Skip / Esc, focus on the card and back afterwards, non-modal.
+    - Finishing or skipping calls `PATCH /me/prefs { roomTourDone: true }` (new `users.prefs` jsonb, migration `20261026230000_user_prefs`). It never repeats — after a reload, on another device. `Me.prefs` is defaulted in the schema so a client never breaks on an older API.
+    - Empty-board hint: "Pick a tool below and start drawing." on touch layouts.
+  - **Accessibility** (WCAG 2.2 AA on non-map UI; E2E-13 at 0 serious / critical):
+    - Landmarks on every page; the room's tab order is top bar → toolbar → map → panel.
+    - Focus ring everywhere: the presence avatars and tab panels no longer suppress it; menu items get an accent bar.
+    - Icon buttons labelled.
+    - Board tabs: the `tablist` now only owns tabs — the board actions moved to one "⋮" menu for the active board after the tabs.
+    - Labelled dots / badges have `role="img"`.
+    - The room-card link is named by its content (WCAG 2.5.3 label in name).
+    - Auth links are underlined (link-in-text-block).
+    - Destructive buttons `#DC2626` (4.8:1).
+    - Presence avatars no longer overlap (WCAG 2.2 target size).
+    - Toasts are announced (sonner's polite live region).
+    - Reduced motion also disables Leaflet's zoom / fade animations and follow mode's glide.
+    - **Element list** (P2): Layers tab → List; a table (type, label, layer, author) with Select / Delete.
+  - **Performance hygiene**:
+    - next/font for the three fonts; JetBrains Mono is no longer preloaded.
+    - Leaflet stays out of the landing bundle (E2E-checked).
+    - The room preloads its board's low-res placeholder with the room data (React `preload`, same CORS mode as the overlay).
+    - AppShell mounts pages while `/me` is in flight, so `/rooms` or the room starts in parallel instead of after it.
+    - The first dashboard card's image is `fetchpriority=high`; the others lazy-load.
+  - Tests:
+    - Shared 111.
+    - Server unit 52 (+5): `DEMO_BOARD_IDS` parsing, seed content against the element schemas and map bounds, `readPrefs`.
+    - Web unit 182 (+10 after dropping the 4 HealthStatus tests): breakpoints and tool sets per breakpoint / role, the toolbar at phone size, the tour reducer and card placement, `exploreBoards`, `ENABLE_DEV_PAGES`, `security.txt`, element labels.
+    - Integration 493 (+17): the demo-boards endpoint (empty when unset, cache header, only listed ids in env order, stripped fields, a non-demo id never served whatever the request says, deleted room dropped, 30 / min then 429, per IP), `PATCH /me/prefs` (defaults, merge, another device, strict body, bad stored JSON), both authz rows.
+    - E2E 43 (+9, `phase9.spec.ts`):
+      - **E2E-12** (iPhone 13, against a desktop context): layout, the four tools, banner, menu, 44 px targets, the chat sheet sending and receiving, a tapped marker syncing, long-press → delete.
+      - **Tablet** (iPad gen 7): every tool in the bottom bar, the half sheet, the style bar above the toolbar, a touch-dragged arrow syncing.
+      - **E2E-13**: axe on landing, login, register, privacy, terms, explore, join, room (+ Layers, Members, element list, invite dialog), dashboard and settings.
+      - **Keyboard only**: register → create room → tour (Esc) → invite → chat.
+      - **Explore**: no login, map switching, measure, no websocket or `/realtime` request.
+      - **Tour**: once, not after a reload or in another context.
+      - **360 px**: no horizontal scroll.
+      - **Landing**: dashboard link when logged in, credits, no Leaflet, `security.txt`.
+  - **Lighthouse** (`pnpm --filter web test:lighthouse`, mobile profile, cold cache, median of 3):
+    - Landing: Performance 95, Accessibility 100.
+    - Dashboard: Performance 83, Accessibility 100 — under the 85 target, see Decisions (Phase 9).
+  - **Bundle sizes** (production build, compressed):
+    - Landing: ~154 KB of JS in its own `<script>` tags, ≈ the App Router floor (React DOM 72 KB, Next runtime 45 KB, page + chunks ≈ 37 KB; the 112 KB core-js chunk is `noModule` and not fetched by modern browsers). Lighthouse counts 294 KB including the prefetch of linked routes.
+    - Dashboard: 268 KB of JS (adds the shared schemas / zod 37 KB, Radix ≈ 31 KB, React Query); fonts 88 KB; the card image 151 KB.
+  - **Perf, A/B back to back** (pan 5 s, 1 000 elements, 4 runs each, alternating order): Phase 8 commit avg 16.9 / 16.9 / 16.9 / 17.2 ms; Phase 9 avg 16.9 / 16.8 / 17.2 / 16.9 ms; p95 16.8 ms for both. No regression.
 - 2026-10-26 — **Phase 8: snapshots, measure, export, settings, email flows** (TODO Phase 8; FEATURES F10–F12, PRD BOARD-5 / STUDY-1 / STUDY-2 / AUTH-5…8, API_SPEC §3 / §5, DATABASE_SCHEMA §3.11 / §6, UI_UX_SPEC §3.8–3.9, USER_FLOWS UF-11 / 12 / 14).
   - Shared:
     - `schemas/snapshots.ts`: `SNAPSHOT_LIMITS` (name 1–60, 50 manual + 10 auto per board, 5 MB, clear threshold 50), the `{ version: 1, layers, elements }` data schema (≤ 10 layers, ≤ 5 000 elements, every element on one of the snapshot's layers), `buildSnapshotData` / `parseSnapshotData` / `snapshotBytes` (UTF-8 bytes), and the REST schemas.
@@ -341,6 +417,29 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
   - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
 
+### Decisions (Phase 9)
+- **Lighthouse target missed on the dashboard** (83 vs 85; landing 95). The LCP element is the first room card's 1024 px, 151 KB `preview.jpg` shown at 378 px. Under simulated slow 4G it can only start after the JS (268 KB), `/me` + `/rooms` and the image itself, because the list is client-rendered. Fixed what was legitimately wrong:
+  - the AppShell waterfall;
+  - `fetchpriority`;
+  - an unneeded font preload.
+
+  I did not lower the threshold or hide the image. The two real fixes are spec changes, so I'm asking first:
+  - a ~512 px WebP "card" image from the tile build (~25 KB, needs a new tile output in ARCHITECTURE / DEPLOYMENT);
+  - or server-rendering the room list.
+- Prefs: a `users.prefs` jsonb column (one row, merged with `||`) rather than a `user_prefs` table — one tiny object per user, read with `/me`, no join. Only `roomTourDone` today; unknown stored keys are ignored.
+- The demo-boards response drops `roomId` and the author ids (`null`): the public endpoint shouldn't leak which room or which people made them. ≤ 3 ids enforced by the config.
+- `/explore` with no demo boards shows the three bare maps instead of an empty page (so it is still useful in dev).
+- `ENABLE_DEV_PAGES` and `SECURITY_CONTACT` are server-only web settings read per request (`src/lib/serverEnv.ts`), not `NEXT_PUBLIC_*`: they change without a rebuild and don't reach the browser. The dev map page is now dynamic (no `generateStaticParams`).
+- Tablet keeps every tool of the role (the spec lists the ones that must work with touch; polygon and text work with taps too). Phone keeps undo / redo for editors.
+- The phone's collapsed top-bar menu also carries Chat, Snapshots… and Export PNG (otherwise unreachable on a phone).
+- Long-press only acts on elements the user may edit; viewers get nothing (they can't delete or relabel).
+- Board actions: one "⋮" for the active board instead of one per tab — a `tablist` may only contain tabs (axe critical). Acting on another board means selecting it first.
+- The tour is non-modal (the room stays usable) and stored as done on finish **or** skip / Esc. E2E users get it marked done at registration unless a test opts in (`registerViaUi(page, name, { tour: true })`).
+- `Me.prefs` is `.default({ roomTourDone: false })` in the shared schema: a web build deployed before the API (or an old cached response) still parses.
+- Landing / legal pages: the root layout no longer wraps `Providers` (React Query, sonner); route groups that need them add them. The nav's session check is a plain `fetch` (an expired access cookie reads as logged out; "Log in" then refreshes silently).
+- Screenshots: WebP encoded in Chromium by the script rather than adding sharp to the web app (sharp is only a map-tiles dependency).
+- New dev dependencies (named in the Phase 9 request, added to TECH_STACK): `@axe-core/playwright` 4.13.0 (4.14.0 was 11 days old), `lighthouse` 13.5.0.
+
 ### Decisions (Phase 8)
 - E2E-11 requires the image to be exactly viewport × DPR, so the footer strip is drawn **over** the bottom 24 px of the map rather than appended below it.
 - Clear layer of ≤ 50 elements still says "This can't be undone." (no snapshot is taken); above 50 it says "An automatic snapshot will be saved first."
@@ -426,6 +525,15 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 - New dependencies (all in TECH_STACK): `@node-rs/argon2` 2.2.2, `jose` 6.2.13, `@fastify/cookie` 11.1.3, `@fastify/rate-limit` 11.2.1, `uuid` 14.0.3, `@tanstack/react-query` 5.104.5, `react-hook-form` 7.91.0, `@hookform/resolvers` 6.0.0 (Zod 4 compatible), `sonner` 2.0.8.
 
 ### Fixed
+- 2026-10-26 — Accessibility issues found by the Phase 9 axe pass in earlier phases' UI:
+  - White on `#EF4444` destructive buttons (3.8:1).
+  - The presence stack's overlapping avatars (target size), with the focus outline suppressed.
+  - `aria-label` on plain spans (member online dot, unread badge, board presence dots).
+  - The board `tablist` owning menu buttons.
+  - The room card's "Open room …" label hiding its visible text.
+  - Auth-page links distinguishable by colour only.
+- 2026-10-26 — AppShell rendered pages only after `/me` returned, so every page's own data (`/rooms`, the room) waited one extra round trip.
+- 2026-10-26 — Toolbar showed undo / redo only when Pen was in the tool set (it is now based on `board.edit`), which would have hidden them on phones.
 - 2026-10-26 — `cleanText(…, { keepNewlines: true })` kept tab (U+0009) as well as `\n`; SECURITY V3 allows only `\n` in chat. Now stripped (found by the new chat normalization test).
 - 2026-10-26 — Realtime shutdown: follower-count notifications from sockets closing during `close()` published through the Redis adapter while its clients were quitting, which the adapter doesn't catch. Skipped once closing.
 - 2026-10-26 — Realtime server: the fire-and-forget `presence.leave` on socket disconnect, `evict` after leave / kick and `broadcastPresence` had no rejection handler. With Redis unavailable they were unhandled rejections, which crash Node 22 by default (seen as 2 "Connection is closed" errors in `pnpm test:int` teardown). They now log a warning. `close()` uses `quit()` instead of `disconnect()` on the adapter clients, so pending publishes complete.
@@ -464,7 +572,7 @@ Total 8 190 tiles, 93.6 MB (≈ 113 MB of `out/` including previews). Fetch took
 - Tooling: turbo 2.11.10, typescript 5.9.3, eslint 9.39.5, @eslint/js 9.39.5, typescript-eslint 8.72.0, eslint-config-prettier 10.1.8, @next/eslint-plugin-next 16.4.3, eslint-plugin-react-hooks 7.1.1, globals 17.13.0, prettier 3.9.10, husky 9.1.7, lint-staged 17.6.0, vitest 5.0.5, tsx 4.23.15, @types/node 22.20.5, pnpm 10.34.8
 - Shared: zod 4.6.7
 - Server: fastify 5.12.7, fastify-type-provider-zod 7.0.0, ioredis 5.11.1, prisma / @prisma/client 6.19.3, pino-pretty 13.2.0 (pino comes in through fastify), nodemailer 6.10.1, @types/nodemailer 6.4.24 (Phase 8)
-- Web: next 16.4.3, react / react-dom 19.3.1, tailwindcss / @tailwindcss/postcss 4.3.3, lucide-react 1.61.0, clsx 2.1.1, tailwind-merge 3.7.0, class-variance-authority 0.7.1, @types/react / @types/react-dom 19.3.0, @testing-library/react 16.3.3, @testing-library/dom 10.4.2, jsdom 30.1.3
+- Web: next 16.4.3, react / react-dom 19.3.1, tailwindcss / @tailwindcss/postcss 4.3.3, lucide-react 1.61.0, clsx 2.1.1, tailwind-merge 3.7.0, class-variance-authority 0.7.1, @types/react / @types/react-dom 19.3.0, @testing-library/react 16.3.3, @testing-library/dom 10.4.2, jsdom 30.1.3; dev (Phase 9): @axe-core/playwright 4.13.0, lighthouse 13.5.0
 - Images: postgres:17-alpine, redis:7-alpine, axllent/mailpit
 
 ---

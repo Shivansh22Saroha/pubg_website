@@ -40,7 +40,7 @@ export function DialogContent({
           </div>
           <DialogPrimitive.Close
             aria-label="Close"
-            className="rounded-control p-1 text-text-muted hover:bg-surface-2 hover:text-text"
+            className="rounded-control p-1 text-text-muted hover:bg-surface-2 hover:text-text pointer-coarse:p-3"
           >
             <X className="size-4" />
           </DialogPrimitive.Close>

@@ -214,3 +214,8 @@ Add the staging origin to `AllowedOrigins` too. Keep the CDN cache keyed on `Ori
 2. Run 2+ `server` replicas behind Caddy/Load balancer — Socket.IO Redis adapter already in place; use websocket-only transport or sticky sessions.
 3. Move element seq allocation to Redis `INCR` + batched write-behind if a single board becomes write-hot.
 4. Separate realtime and REST into two deployments if CPU profiles diverge.
+
+## Phase 9: public pages
+- **Demo boards**: after the first deploy run `pnpm --filter server seed --demo-only` once against production (idempotent; it refuses to seed dev users there) and put the printed `DEMO_BOARD_IDS=` line into the server env. `/explore` shows bare maps until then.
+- **Web env**: set `SECURITY_CONTACT` (otherwise `/.well-known/security.txt` is a 404) and leave `ENABLE_DEV_PAGES` unset (the `/maps/*` viewer stays a 404).
+- **Landing screenshots** are committed WebP files in `apps/web/public/landing/`; regenerate them with `pnpm --filter web shots` against `pnpm dev` + the dev seed when the UI changes.

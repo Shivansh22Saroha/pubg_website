@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { v7 as uuid } from 'uuid';
 import { textScale } from '@/components/map/ElementLayer';
 import { MANUAL_VIEW_EVENT } from '@/components/map/FollowController';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { clientToWorld, worldPerPx } from '@/lib/coords';
 import { editorActions, makeNameOf, toInput } from '@/lib/editing';
 import type { RoomSession } from '@/lib/realtime/roomSession';
@@ -33,11 +34,12 @@ import {
   initials,
   nextMarkerNumber,
   resolveActiveLayer,
-  toolsForRole,
+  toolsFor,
   type CreateBlock,
 } from './gating';
 import { GhostLayer } from './GhostLayer';
 import { InlineEditor } from './InlineEditor';
+import { LONG_PRESS_MS, LONG_PRESS_SLOP_PX, LongPressMenu, type LongPress } from './LongPressMenu';
 import { PreviewSender } from './previewSender';
 import {
   deleteChanges,
@@ -102,10 +104,17 @@ export function ToolLayer({
   const map = useMap();
   const tool = useToolStore((s) => s.tool);
   const [inline, setInline] = useState<Inline | null>(null);
+  const [menu, setMenu] = useState<LongPress | null>(null);
+  const breakpoint = useBreakpoint();
   const tools = useRef<Partial<Record<ToolId, AnyTool>>>({});
-  const live = useRef({ session, role, roomName, names, meId });
+  /** what the long-press menu needs from the tool context of the current map */
+  const ctxRef = useRef<{
+    editInline: (id: string) => void;
+    deleteIds: (ids: string[]) => void;
+  } | null>(null);
+  const live = useRef({ session, role, roomName, names, meId, breakpoint });
   useEffect(() => {
-    live.current = { session, role, roomName, names, meId };
+    live.current = { session, role, roomName, names, meId, breakpoint };
   });
 
   // tools + DOM plumbing, once per map
@@ -306,6 +315,15 @@ export function ToolLayer({
       },
     };
     tools.current = createTools(ctx);
+    ctxRef.current = {
+      editInline: (id) => {
+        ctx.editInline(id);
+      },
+      deleteIds: (ids) => {
+        if (!ctx.canEdit()) return;
+        if (actions().commit(deleteChanges(scene().elements, ids))) selection().clear();
+      },
+    };
 
     // ---- cursor ---------------------------------------------------------------------------
     let spaceHeld = false;
@@ -336,12 +354,45 @@ export function ToolLayer({
     const toolId = () => useToolStore.getState().tool;
     const usesLeafletDrag = () => toolId() === 'select';
 
+    // UI_UX_SPEC §7: a long press (Select, one finger, held still) on an element selects it
+    // and opens its context menu (delete / edit label) — touch has no right click or hover
+    let longPress: { id: number; x: number; y: number; timer: number } | null = null;
+    const endLongPress = () => {
+      if (longPress) window.clearTimeout(longPress.timer);
+      longPress = null;
+    };
+    const startLongPress = (e: PointerEvent) => {
+      endLongPress();
+      const at = { clientX: e.clientX, clientY: e.clientY };
+      const id = e.pointerId;
+      longPress = {
+        id,
+        x: e.clientX,
+        y: e.clientY,
+        timer: window.setTimeout(() => {
+          longPress = null;
+          if (!can(live.current.role, 'board.edit')) return;
+          const s = scene();
+          const hit = pickTop(s, clientToWorld(map, at, worldSize));
+          if (!hit || !isEditable(s, hit.id)) return;
+          current()?.cancel(); // no drag-move after the menu opens
+          if (press?.id === id && container.hasPointerCapture(id))
+            container.releasePointerCapture(id);
+          press = null;
+          selection().select([hit.id]);
+          if ('vibrate' in navigator) navigator.vibrate(10); // not in Safari
+          setMenu({ elementId: hit.id, x: at.clientX, y: at.clientY });
+        }, LONG_PRESS_MS),
+      };
+    };
+
     const onDown = (e: PointerEvent) => {
       if (fromOverlay(e)) return;
       if (e.pointerType === 'touch') {
         touches.add(e.pointerId);
         if (touches.size > 1) {
           // second finger: abandon the draft, Leaflet pans / pinches
+          endLongPress();
           current()?.cancel();
           if (press?.claimed && container.hasPointerCapture(press.id))
             container.releasePointerCapture(press.id);
@@ -361,6 +412,7 @@ export function ToolLayer({
       }
       const t = current();
       if (!t || e.button !== 0 || touchBlocked || press) return;
+      if (e.pointerType === 'touch' && t instanceof SelectTool) startLongPress(e);
       // only Select may leave a press to Leaflet (pan); every other tool owns it
       const p = pointer(e);
       const claimed = t instanceof SelectTool ? t.onPointerDown(p) : (t.onPointerDown(p), true);
@@ -406,6 +458,11 @@ export function ToolLayer({
         pan = { ...pan, x: e.clientX, y: e.clientY };
         return;
       }
+      if (
+        longPress?.id === e.pointerId &&
+        Math.hypot(e.clientX - longPress.x, e.clientY - longPress.y) > LONG_PRESS_SLOP_PX
+      )
+        endLongPress();
       if (touchBlocked || fromOverlay(e)) return;
       // touch moves only matter while that finger is pressed; mouse hover feeds rubber bands
       if (e.pointerType === 'touch' && e.pointerId !== press?.id) return;
@@ -414,6 +471,7 @@ export function ToolLayer({
     };
 
     const onUp = (e: PointerEvent) => {
+      if (longPress?.id === e.pointerId) endLongPress();
       if (e.pointerType === 'touch') {
         touches.delete(e.pointerId);
         if (touches.size === 0) touchBlocked = false;
@@ -429,6 +487,7 @@ export function ToolLayer({
     };
 
     const onCancel = (e: PointerEvent) => {
+      if (longPress?.id === e.pointerId) endLongPress();
       touches.delete(e.pointerId);
       if (touches.size === 0) touchBlocked = false;
       if (pan && e.pointerId === pan.id) pan = null;
@@ -451,8 +510,15 @@ export function ToolLayer({
       }
     };
 
+    // the OS long-press menu (copy / save image) would cover ours
+    const onContextMenu = (e: MouseEvent) => {
+      const touch = touches.size > 0 || (e as Partial<PointerEvent>).pointerType === 'touch';
+      if (touch && !fromOverlay(e)) e.preventDefault();
+    };
+
     const setTool = (id: ToolId) => {
-      if (!toolsForRole(live.current.role).includes(id) || !IMPLEMENTED_TOOLS.has(id)) return;
+      const allowed = toolsFor(live.current.role, live.current.breakpoint);
+      if (!allowed.includes(id) || !IMPLEMENTED_TOOLS.has(id)) return;
       useToolStore.getState().setTool(id);
     };
 
@@ -533,6 +599,7 @@ export function ToolLayer({
     container.addEventListener('pointerup', onUp);
     container.addEventListener('pointercancel', onCancel);
     container.addEventListener('dblclick', onDblClick, true);
+    container.addEventListener('contextmenu', onContextMenu);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
@@ -575,7 +642,10 @@ export function ToolLayer({
       container.removeEventListener('pointerup', onUp);
       container.removeEventListener('pointercancel', onCancel);
       container.removeEventListener('dblclick', onDblClick, true);
+      container.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('keydown', onKeyDown);
+      endLongPress();
+      ctxRef.current = null;
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
       cancelAnimationFrame(hoverFrame);
@@ -596,9 +666,13 @@ export function ToolLayer({
     const t = tools.current[useToolStore.getState().tool];
     if (t?.busy) t.cancel();
     useSelectionStore.getState().clear();
-    if (!toolsForRole(role).includes(useToolStore.getState().tool))
-      useToolStore.getState().setTool('select');
   }, [role]);
+
+  // a tool this role / screen size doesn't offer (demoted, or rotated to a phone) → Select
+  useEffect(() => {
+    if (!toolsFor(role, breakpoint).includes(useToolStore.getState().tool))
+      useToolStore.getState().setTool('select');
+  }, [role, breakpoint]);
 
   // per-tool Leaflet interaction; switching tools cancels the draft and (leaving Select) the
   // selection
@@ -624,6 +698,22 @@ export function ToolLayer({
       <GhostLayer />
       <SelectionLayer config={config} meId={meId} />
       <MeasureLayer />
+      {menu && (
+        <LongPressMenu
+          menu={menu}
+          onClose={() => {
+            setMenu(null);
+          }}
+          onEditLabel={(id) => {
+            setMenu(null);
+            ctxRef.current?.editInline(id);
+          }}
+          onDelete={(id) => {
+            setMenu(null);
+            ctxRef.current?.deleteIds([id]);
+          }}
+        />
+      )}
       {inline && (
         <InlineEditor
           key={`${inline.at[0]}:${inline.at[1]}:${inline.label}`}

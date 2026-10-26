@@ -97,6 +97,7 @@ Cross-Origin-Opener-Policy: same-origin
 | `/auth/forgot-password` | 3 / hour / email + 10 / hour / IP |
 | Room creation | 10 / day / user, max 30 owned rooms |
 | Invite accept | 20 / hour / user |
+| `GET /public/demo-boards` | 30 / min / IP (Phase 9) |
 | Socket limits | see API_SPEC §7.4 |
 | Body size | REST 100 KB (snapshots restore via id, not body); socket 64 KB |
 
@@ -153,3 +154,5 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 
 ## 13. Responsible disclosure
 Publish `/.well-known/security.txt` with contact email and a 90-day disclosure window.
+
+Implemented (Phase 9): a Next route handler serves it with `Contact:` from `SECURITY_CONTACT` (web, server-only env), an RFC 9116 `Expires:` one year out (rolling), `Preferred-Languages: en`, `Canonical:` and the 90-day note. Unset contact → 404. The footer of the public pages links it.

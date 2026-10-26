@@ -75,10 +75,28 @@ export const PublicUserSchema = z.object({
 });
 export type PublicUser = z.infer<typeof PublicUserSchema>;
 
+/**
+ * Per-user UI preferences kept server-side so they follow the user across devices (Phase 9:
+ * the room coach-mark tour). Stored as `users.prefs` jsonb; unknown keys are dropped on read.
+ */
+export const UserPrefsSchema = z.object({
+  /** the 3-step room tour (UF-3 step 4) was finished or dismissed */
+  roomTourDone: z.boolean().default(false),
+});
+export type UserPrefs = z.infer<typeof UserPrefsSchema>;
+
+export const UpdatePrefsBodySchema = z
+  .strictObject({ roomTourDone: z.boolean().optional() })
+  .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to update' });
+export type UpdatePrefsBody = z.input<typeof UpdatePrefsBodySchema>;
+export const PrefsResponseSchema = z.object({ prefs: UserPrefsSchema });
+
 export const MeSchema = PublicUserSchema.extend({
   email: z.string(),
   emailVerified: z.boolean(),
   createdAt: z.iso.datetime(),
+  /** defaulted so a client never breaks on an API that predates prefs (deploy skew) */
+  prefs: UserPrefsSchema.default({ roomTourDone: false }),
 });
 export type Me = z.infer<typeof MeSchema>;
 

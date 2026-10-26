@@ -19,7 +19,7 @@ import { useDeleteRoom, useLeaveRoom, useUpdateRoom } from '@/lib/rooms';
 import { MapThumb, RoleBadge, timeAgo } from './bits';
 
 /** Dashboard room card (UI_UX_SPEC §3.3). Thumbnails (P1) fall back to the room initial. */
-export function RoomCard({ room }: { room: RoomSummary }) {
+export function RoomCard({ room, priority = false }: { room: RoomSummary; priority?: boolean }) {
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
   const [text, setText] = useState('');
   const leave = useLeaveRoom(room.id);
@@ -33,9 +33,16 @@ export function RoomCard({ room }: { room: RoomSummary }) {
 
   return (
     <article className="group relative overflow-hidden rounded-panel border bg-surface transition-colors hover:border-accent/60">
-      <Link href={`/rooms/${room.id}`} className="block" aria-label={`Open room ${room.name}`}>
+      {/* named by its content (room name first): an aria-label would hide the visible text
+          from voice-control users (WCAG 2.5.3 label in name) */}
+      <Link href={`/rooms/${room.id}`} className="block">
         <div className="relative aspect-[16/9]">
-          <MapThumb mapId={room.primaryMapId} variant="preview" className="size-full opacity-80" />
+          <MapThumb
+            mapId={room.primaryMapId}
+            variant="preview"
+            priority={priority}
+            className="size-full opacity-80"
+          />
           <span className="absolute bottom-2 left-2 rounded-full bg-overlay px-2 py-0.5 text-[11px] font-medium">
             {MAPS[room.primaryMapId].name}
           </span>

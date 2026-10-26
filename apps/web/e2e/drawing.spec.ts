@@ -280,6 +280,22 @@ test('layers: reorder and visibility sync; Alt+click hides a layer only for that
   await expect(rowA('Plan')).toHaveAttribute('data-local-hidden', 'false');
   await expect(a.locator('.rl-marker')).toHaveCount(1);
 
+  // clear: any non-empty clear is saved as an auto snapshot first (FEATURES F10)
+  await rowA('Plan').getByTestId('layer-menu').click();
+  await a.getByRole('menuitem', { name: 'Clear layer' }).click();
+  await expect(a.getByRole('dialog', { name: 'Clear layer' })).toContainText(
+    'An automatic snapshot will be saved first.',
+  );
+  await a.getByTestId('confirm-layer-action').click();
+  await expect(a.locator('.rl-marker')).toHaveCount(0);
+  await expect.poll(() => debugCount(b)).toBe(0);
+  await a.getByTestId('more-menu').click();
+  await a.getByRole('menuitem', { name: 'Snapshots…' }).click();
+  await expect(
+    a.getByTestId('snapshot-item').filter({ hasText: "Before clearing 'Plan'" }),
+  ).toContainText('auto');
+  await a.keyboard.press('Escape');
+
   // add + rename + delete (confirm shows the element count)
   await a.getByRole('button', { name: 'Add layer' }).click();
   await expect.poll(() => layerRows(b)).toHaveLength(4);
