@@ -266,6 +266,7 @@ class FakeCtx {
         this.lockedToasts.push(l.name);
       },
       laser: () => undefined,
+      setMeasure: () => undefined,
     };
   }
 }

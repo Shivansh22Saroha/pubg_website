@@ -20,6 +20,9 @@ interface WorkspaceState {
   focusRequest: { boardId: string; x: number; y: number; n: number } | null;
   /** how many sockets follow me (`followers:update`); I send view updates only while > 0 */
   followerCount: number;
+  /** bumped by "Export PNG": the map's ExportController renders the current viewport */
+  exportRequest: number;
+  requestExport: () => void;
   setPanelOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   setTab: (tab: PanelTab) => void;
   setPingPick: (on: boolean) => void;
@@ -42,6 +45,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   boardRequest: null,
   focusRequest: null,
   followerCount: 0,
+  exportRequest: 0,
+  requestExport: () => {
+    set((s) => ({ exportRequest: s.exportRequest + 1 }));
+  },
   setPanelOpen: (open) => {
     set((s) => ({ panelOpen: typeof open === 'function' ? open(s.panelOpen) : open }));
   },

@@ -527,6 +527,10 @@ export function createRealtime(d: RealtimeDeps): {
   d.events.on('chat:message', ({ roomId, message }) =>
     io.to(ch.room(roomId)).emit('chat:message', { message }),
   );
+  // after a committed restore: everyone on that board reloads it in full
+  d.events.on('board:reset', ({ boardId, seq, reason, actorId }) =>
+    io.to(ch.board(boardId)).emit('board:reset', { boardId, seq, reason, actorId }),
+  );
   d.events.on('chat:deleted', ({ roomId, messageId }) =>
     io.to(ch.room(roomId)).emit('chat:deleted', { messageId }),
   );

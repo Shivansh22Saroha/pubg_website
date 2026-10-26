@@ -190,7 +190,9 @@ client                         server                                  other cli
 | `cursor:move` | ≤ 20 Hz | live cursors |
 | `stroke:preview` | ≤ 20 Hz | others see a pen stroke while it is being drawn; final stroke sent as `element:upsert` on pointer-up |
 | `laser:point` | ≤ 30 Hz | laser trail |
-| `view:update` | ≤ 10 Hz | viewport broadcast, only while someone follows you |
+| `view:update` | ≤ 10 Hz | viewport broadcast, only while someone follows you — the server tells a leader its follower count with `followers:update { count }` (on follow start/stop, a follower disconnecting, and the leader's `room:join`); the leader also re-sends every 1.5 s while followed |
+
+Summon (`summon`): receivers start following at once (opt-out toast). Chat unread counts ignore system messages. Chat pings are validated server-side: the board must be in the room and the point inside its map, else `VALIDATION_ERROR`.
 
 All ephemeral events are **best-effort**: volatile emits may be dropped and are never replayed, so receivers expire stale state (ghost after 3 s, cursor fade after 5 s).
 

@@ -15,7 +15,6 @@ const ROLE_NAME: Record<RoomRole, string> = {
  * so every path that changes membership or boards produces one. Fire-and-forget: a failure is
  * logged and never affects the request that raised the event. `idle()` resolves once every
  * message in flight is written (graceful shutdown; tests drain it before truncating tables).
- * TODO(phase8): snapshot saved / restored.
  */
 export function registerSystemMessages(
   events: RoomEvents,
@@ -65,6 +64,27 @@ export function registerSystemMessages(
   });
   events.on('board:deleted', ({ roomId, name }) => {
     say(roomId, `Board “${name}” was deleted`);
+  });
+  events.on('snapshot:saved', ({ roomId, userId, name }) => {
+    say(
+      roomId,
+      nameOf(userId).then((n) => `${n ?? 'Someone'} saved snapshot '${name}'`),
+    );
+  });
+  events.on('snapshot:restored', ({ roomId, userId, name }) => {
+    say(
+      roomId,
+      nameOf(userId).then((n) => `${n ?? 'Someone'} restored snapshot '${name}'`),
+    );
+  });
+  events.on('layer:cleared', ({ roomId, userId, layerName, count }) => {
+    say(
+      roomId,
+      nameOf(userId).then(
+        (n) =>
+          `${n ?? 'Someone'} cleared layer '${layerName}' (${count} elements) — an automatic snapshot was saved`,
+      ),
+    );
   });
 
   return {

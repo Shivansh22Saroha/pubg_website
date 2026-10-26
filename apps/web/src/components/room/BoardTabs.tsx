@@ -29,19 +29,25 @@ function defaultName(mapId: MapId, boards: Board[]) {
   return `${MAPS[mapId].name} – Plan ${n}`;
 }
 
-/** UI_UX_SPEC §3.5 board tabs: select, + new, kebab (rename/duplicate/delete), drag to reorder. */
+/**
+ * UI_UX_SPEC §3.5 board tabs: select, + new, kebab (snapshots for everyone; rename / duplicate /
+ * delete by role), drag to reorder.
+ */
 export function BoardTabs({
   roomId,
   role,
   boards,
   activeId,
   onSelect,
+  onSnapshots,
 }: {
   roomId: string;
   role: RoomRole;
   boards: Board[];
   activeId: string | undefined;
   onSelect: (id: string) => void;
+  /** open the snapshots drawer for this board (UI_UX_SPEC §3.8) */
+  onSnapshots: (board: Board) => void;
 }) {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [name, setName] = useState('');
@@ -112,7 +118,7 @@ export function BoardTabs({
                 <span className="max-w-40 truncate">{b.name}</span>
                 <BoardPresenceDots boardId={b.id} />
               </button>
-              {canManage && (
+              {
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     aria-label={`Board actions for ${b.name}`}
@@ -123,31 +129,43 @@ export function BoardTabs({
                   <DropdownMenuContent align="start">
                     <DropdownMenuItem
                       onSelect={() => {
-                        setName(b.name);
-                        setDialog({ kind: 'rename', board: b });
+                        onSnapshots(b);
                       }}
                     >
-                      Rename
+                      Snapshots…
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        create.mutate(
-                          {
-                            name: `${b.name} (copy)`.slice(0, 40),
-                            mapId: b.mapId,
-                            duplicateFrom: b.id,
-                          },
-                          {
-                            onSuccess: ({ board }) => {
-                              onSelect(board.id);
-                            },
-                            onError: fail,
-                          },
-                        );
-                      }}
-                    >
-                      Duplicate
-                    </DropdownMenuItem>
+                    {canManage && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setName(b.name);
+                            setDialog({ kind: 'rename', board: b });
+                          }}
+                        >
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            create.mutate(
+                              {
+                                name: `${b.name} (copy)`.slice(0, 40),
+                                mapId: b.mapId,
+                                duplicateFrom: b.id,
+                              },
+                              {
+                                onSuccess: ({ board }) => {
+                                  onSelect(board.id);
+                                },
+                                onError: fail,
+                              },
+                            );
+                          }}
+                        >
+                          Duplicate
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     {canDelete && (
                       <>
                         <DropdownMenuSeparator />
@@ -164,7 +182,7 @@ export function BoardTabs({
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
+              }
             </div>
           );
         })}

@@ -43,6 +43,9 @@ export function useRoomRealtime(
       onSummon: (userId, boardId) => {
         cb.current.onSummon(userId, boardId);
       },
+      onBoardReset: (reason, actorId) => {
+        cb.current.onBoardReset(reason, actorId);
+      },
     });
     s.start();
     setSession(s);

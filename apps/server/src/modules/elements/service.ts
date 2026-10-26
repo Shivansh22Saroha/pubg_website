@@ -6,6 +6,7 @@ import {
   elementWithinWorld,
   MAPS,
   ROOM_LIMITS,
+  SNAPSHOT_LIMITS,
   type BoardOp,
   type BoardSubscribeAck,
   type Element,
@@ -18,8 +19,10 @@ import type { Redis } from 'ioredis';
 import { AppError } from '../../lib/errors.js';
 import type { AuthUser } from '../../lib/policy.js';
 import { toLayer, toMapId } from '../rooms/mappers.js';
+import type { RoomEvents } from '../rooms/events.js';
 import type { RoomPolicy } from '../rooms/policy.js';
 import { touchRoom } from '../rooms/service.js';
+import { autoName, captureSnapshot } from '../snapshots/capture.js';
 
 /** One durable op as requested by a client (API_SPEC §7.2). */
 export type OpRequest =
@@ -73,6 +76,7 @@ export function createBoardOpsService(d: {
   prisma: PrismaClient;
   redis: Redis;
   policy: RoomPolicy;
+  events?: RoomEvents;
 }) {
   const { prisma, redis, policy } = d;
 
@@ -113,7 +117,7 @@ export function createBoardOpsService(d: {
     op: OpRequest,
     seq: bigint,
     elementCount: number,
-  ): Promise<{ body: OpBody; delta: number }> {
+  ): Promise<{ body: OpBody; delta: number; cleared?: { layerName: string; count: number } }> {
     switch (op.kind) {
       case 'element:upsert': {
         const el = op.element;
@@ -248,9 +252,24 @@ export function createBoardOpsService(d: {
       case 'layer:clear': {
         const layer = await lockedLayer(tx, boardId, op.layerId);
         if (layer.locked) throw new AppError('FORBIDDEN', 'Layer is locked');
+        // FEATURES F10: a big clear is undoable through an auto snapshot of the whole board,
+        // taken in the same transaction (the board row is already locked)
+        const onLayer = await tx.element.count({ where: { layerId: op.layerId } });
+        const big = onLayer > SNAPSHOT_LIMITS.clearAutoThreshold;
+        if (big) {
+          await captureSnapshot(tx, {
+            boardId,
+            name: autoName('Before clearing ', layer.name),
+            isAuto: true,
+            createdBy: user.id,
+          });
+        }
         const { count } = await tx.element.deleteMany({ where: { layerId: op.layerId } });
-        // TODO(phase8): auto-snapshot before a clear, like snapshot restore does
-        return { body: { kind: 'layer:clear', layerId: op.layerId }, delta: -count };
+        return {
+          body: { kind: 'layer:clear', layerId: op.layerId },
+          delta: -count,
+          ...(big ? { cleared: { layerName: layer.name, count } } : {}),
+        };
       }
     }
   }
@@ -286,6 +305,7 @@ export function createBoardOpsService(d: {
       }
       const todo = todoPairs.map((t) => t.op);
 
+      const clearedLayers: { layerName: string; count: number }[] = [];
       try {
         validate(boardId, MAPS[toMapId(board.mapId)].worldSize, todo);
         const result = await prisma.$transaction(async (tx) => {
@@ -297,7 +317,16 @@ export function createBoardOpsService(d: {
           const out: BoardOp[] = [];
           for (const op of todo) {
             seq += 1n;
-            const { body, delta } = await applyOne(tx, boardId, user, role, op, seq, count);
+            const { body, delta, cleared } = await applyOne(
+              tx,
+              boardId,
+              user,
+              role,
+              op,
+              seq,
+              count,
+            );
+            if (cleared) clearedLayers.push(cleared);
             count += delta;
             await tx.boardOp.create({
               data: {
@@ -323,6 +352,8 @@ export function createBoardOpsService(d: {
         );
         await pipe.exec();
         await touchRoom(prisma, board.roomId);
+        for (const c of clearedLayers)
+          d.events?.emit('layer:cleared', { roomId: board.roomId, userId: user.id, ...c });
         let next = 0;
         const seqs = known.map((seq) => seq ?? result[next++]?.seq ?? 0);
         return { ops: result, seqs, roomId: board.roomId, replay: false };

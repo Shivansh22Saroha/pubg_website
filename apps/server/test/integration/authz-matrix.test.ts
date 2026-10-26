@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../../src/app.js';
 import { newId } from '../../src/lib/ids.js';
+import { createMemoryMailer } from '../../src/lib/mailer.js';
 import {
   accept,
   call,
@@ -37,6 +38,8 @@ interface Ctx {
   bannedId: string;
   /** a chat message written by the editor (delete: author or owner) */
   messageId: string;
+  /** a snapshot saved by the editor (delete: author or owner) */
+  snapshotId: string;
 }
 
 interface Row {
@@ -336,13 +339,93 @@ const MATRIX: Row[] = [
     // the editor wrote it; the owner may delete anything
     expect: room(403, 204, 204),
   },
+  // ---- snapshots, account, email (Phase 8) ---------------------------------------------
+  {
+    method: 'GET',
+    url: '/api/v1/boards/:boardId/snapshots',
+    request: ({ f }) => ({ url: `/api/v1/boards/${f.boardId}/snapshots` }),
+    expect: room(200, 200, 200),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/boards/:boardId/snapshots',
+    request: ({ f }) => ({
+      url: `/api/v1/boards/${f.boardId}/snapshots`,
+      payload: { name: 'Plan B' },
+    }),
+    expect: room(403, 201, 201),
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/snapshots/:snapshotId',
+    request: ({ snapshotId }) => ({ url: `/api/v1/snapshots/${snapshotId}` }),
+    expect: room(200, 200, 200),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/snapshots/:snapshotId/restore',
+    request: ({ snapshotId }) => ({ url: `/api/v1/snapshots/${snapshotId}/restore` }),
+    expect: room(403, 200, 200),
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/snapshots/:snapshotId',
+    request: ({ snapshotId }) => ({ url: `/api/v1/snapshots/${snapshotId}` }),
+    // the editor saved it; the owner may delete any
+    expect: room(403, 204, 204),
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/me',
+    request: () => ({ url: '/api/v1/me', payload: { password: PASSWORD, confirm: 'DELETE' } }),
+    expect: authed(204), // everyone may delete their own account
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/config',
+    request: () => ({ url: '/api/v1/config' }),
+    expect: everyone(200),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/auth/verify-email',
+    request: () => ({ url: '/api/v1/auth/verify-email', payload: { token: 'A'.repeat(43) } }),
+    expect: everyone(400), // an unknown token, whoever asks
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/auth/resend-verification',
+    request: () => ({ url: '/api/v1/auth/resend-verification' }),
+    expect: authed(202),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/auth/forgot-password',
+    request: () => ({
+      url: '/api/v1/auth/forgot-password',
+      payload: { email: 'owner@example.com' },
+    }),
+    expect: everyone(202),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/auth/reset-password',
+    request: () => ({
+      url: '/api/v1/auth/reset-password',
+      payload: { token: 'A'.repeat(43), password: 'a brand new passphrase' },
+    }),
+    expect: everyone(400),
+  },
 ];
 
 useCleanState();
 
 let app: App;
 beforeAll(async () => {
-  ({ app } = await makeApp({ RATE_LIMITS_ENABLED: 'false' }));
+  ({ app } = await makeApp(
+    { RATE_LIMITS_ENABLED: 'false', EMAIL_ENABLED: 'true', SMTP_HOST: 'smtp.invalid' },
+    { mailer: createMemoryMailer() },
+  ));
 });
 
 async function context(): Promise<Ctx> {
@@ -370,9 +453,13 @@ async function context(): Promise<Ctx> {
       clientId: randomUUID(),
     },
   });
+  const snapshot = await call(app, f.editor.jar, 'POST', `/api/v1/boards/${f.boardId}/snapshots`, {
+    name: 'Plan A',
+  });
   return {
     f,
     messageId: message.id,
+    snapshotId: snapshot.json<{ snapshot: { id: string } }>().snapshot.id,
     spareBoardId: spare.json<{ board: { id: string } }>().board.id,
     inviteCode: inv.code,
     inviteId: inv.id,

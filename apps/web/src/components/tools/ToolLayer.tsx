@@ -22,6 +22,7 @@ import type { RoomSession } from '@/lib/realtime/roomSession';
 import { isMacPlatform, resolveShortcut, shortcutsBlocked } from '@/lib/shortcuts';
 import { MAX_PENDING } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
+import { useMeasureStore } from '@/stores/measureStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { styleFor, useDraftStore, useToolStore } from '@/stores/toolStore';
 import { DraftLayer } from './DraftLayer';
@@ -48,6 +49,7 @@ import {
   type Scene,
 } from './scene';
 import { SelectTool } from './selectTools';
+import { MeasureLayer } from './MeasureLayer';
 import { SelectionLayer } from './SelectionLayer';
 import { createTools, TextTool, type AnyTool } from './tools';
 import {
@@ -292,6 +294,9 @@ export function ToolLayer({
       },
       laser: ([x, y]) => {
         live.current.session?.laser(x, y);
+      },
+      setMeasure: (line) => {
+        useMeasureStore.setState({ line });
       },
       explainLocked: (layer) => {
         const key = `locked-hit:${layer.id}`;
@@ -601,7 +606,7 @@ export function ToolLayer({
     const container = map.getContainer();
     if (tool === 'select') map.dragging.enable();
     else map.dragging.disable();
-    if (tool === 'arrow' || tool === 'polygon') map.doubleClickZoom.disable();
+    if (tool === 'arrow' || tool === 'polygon' || tool === 'measure') map.doubleClickZoom.disable();
     else map.doubleClickZoom.enable();
     container.classList.toggle('rl-drawing', tool !== 'select');
     container.dataset.tool = tool;
@@ -618,6 +623,7 @@ export function ToolLayer({
       <DraftLayer />
       <GhostLayer />
       <SelectionLayer config={config} meId={meId} />
+      <MeasureLayer />
       {inline && (
         <InlineEditor
           key={`${inline.at[0]}:${inline.at[1]}:${inline.label}`}

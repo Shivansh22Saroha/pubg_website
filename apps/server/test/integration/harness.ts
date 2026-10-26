@@ -7,6 +7,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@rotationlab/sh
 import { io as ioClient, type Socket as ClientSocketBase } from 'socket.io-client';
 import { afterAll, afterEach, beforeEach, inject } from 'vitest';
 import { buildApp, type App } from '../../src/app.js';
+import type { Mailer } from '../../src/lib/mailer.js';
 import { APP_ORIGIN, CSRF, captureLogs, testConfig } from '../helpers.js';
 
 export { CSRF };
@@ -17,7 +18,10 @@ export const redis = new Redis(inject('redisUrl'), { maxRetriesPerRequest: 1 });
 const apps: App[] = [];
 
 /** Fresh app per call (config overrides allowed). Logs are captured, never printed. */
-export async function makeApp(overrides: Record<string, string> = {}) {
+export async function makeApp(
+  overrides: Record<string, string> = {},
+  opts: { mailer?: Mailer } = {},
+) {
   const logs = captureLogs();
   const config = testConfig({
     DATABASE_URL: inject('databaseUrl'),
@@ -25,7 +29,7 @@ export async function makeApp(overrides: Record<string, string> = {}) {
     LOG_LEVEL: 'trace',
     ...overrides,
   });
-  const app = await buildApp({ config, prisma, redis, logStream: logs });
+  const app = await buildApp({ config, prisma, redis, logStream: logs, ...opts });
   apps.push(app);
   await app.ready();
   return { app, logs, config };
@@ -37,7 +41,7 @@ export function useCleanState() {
     // fire-and-forget system messages of the previous test would deadlock with TRUNCATE
     await Promise.all(apps.map((a) => a.chatIdle()));
     await prisma.$executeRawUnsafe(
-      'TRUNCATE TABLE board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE audit_logs, snapshots, chat_messages, board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
     );
     await redis.flushdb();
   });

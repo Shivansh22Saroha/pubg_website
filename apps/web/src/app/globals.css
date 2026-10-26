@@ -237,3 +237,28 @@
     animation: none;
   }
 }
+
+/* ---- Phase 8: measure tool (FEATURES F11) --------------------------------------------------- */
+.rl-measure-icon {
+  background: none;
+  border: 0;
+}
+.rl-measure-segment,
+.rl-measure-total {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(11, 15, 20, 0.85);
+  color: #f8fafc;
+  font: 600 11px/1.4 var(--font-mono, monospace);
+  pointer-events: none;
+}
+.rl-measure-segment {
+  transform: translate(-50%, -50%);
+}
+.rl-measure-total {
+  transform: translate(10px, -50%);
+  font-size: 12px;
+  border: 1px solid rgba(248, 250, 252, 0.4);
+}

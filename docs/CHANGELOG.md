@@ -25,7 +25,100 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 
 - 2026-10-26 — Phase 7 docs: API_SPEC §1.5 / §6 / §7.2–7.3 (`ChatMessage.clientId`, nullable ping board, history and delete semantics, `chat:send` rules, `followers:update`, `chat:typing` not handled); DATABASE_SCHEMA §3.12 (`client_id`, CHECK details, delete semantics); FEATURES F8 (what counts as a manual move, the pill, follower count, summon) and F9 (text rules, optimistic send, unread rule, deleted-board chips, reduced motion); UI_UX_SPEC §3.5 (Chat is the default tab, removable chip, badge placement). FEATURES F5: the "can't be undone yet" warning on Clear layer.
 
+- 2026-10-26 — Phase 8 docs:
+  - Phase 7 follow-ups:
+    - API_SPEC §7.3 / FEATURES F8 / ARCHITECTURE: `followers:update`, the leader re-sending its view every 1.5 s while followed, summon following at once.
+    - FEATURES F9: the unread badge ignores system messages.
+    - API_SPEC §7.2: a ping to another room's board or outside the map is `VALIDATION_ERROR`.
+    - SECURITY §11 / TESTING §5.3: the E2E "no CSP violation" check only means something once the Phase 10 CSP ships.
+  - Phase 8:
+    - API_SPEC §3: `GET /api/v1/config`, `POST /auth/resend-verification`, the email routes' 404 when disabled, `DELETE /me { rooms }`.
+    - API_SPEC §5: snapshot notes and `board:reset { actorId }`.
+    - FEATURES F10–F12: restore steps, auto-snapshot rules, measure behaviour, export contents.
+    - DEPLOYMENT: the R2 CORS rule for exports.
+
 ### Added
+- 2026-10-26 — **Phase 8: snapshots, measure, export, settings, email flows** (TODO Phase 8; FEATURES F10–F12, PRD BOARD-5 / STUDY-1 / STUDY-2 / AUTH-5…8, API_SPEC §3 / §5, DATABASE_SCHEMA §3.11 / §6, UI_UX_SPEC §3.8–3.9, USER_FLOWS UF-11 / 12 / 14).
+  - Shared:
+    - `schemas/snapshots.ts`: `SNAPSHOT_LIMITS` (name 1–60, 50 manual + 10 auto per board, 5 MB, clear threshold 50), the `{ version: 1, layers, elements }` data schema (≤ 10 layers, ≤ 5 000 elements, every element on one of the snapshot's layers), `buildSnapshotData` / `parseSnapshotData` / `snapshotBytes` (UTF-8 bytes), and the REST schemas.
+    - `schemas/account.ts`: `DeleteMeBodySchema` with per-room choices, the email-token, verify, forgot and reset bodies, `EMAIL_TOKEN_TTL_MS` (verify 24 h, reset 30 min) and the public config.
+    - `measure.ts`: segments / total in metres and approximate foot / vehicle minutes from `SPEEDS`; `formatMeasure` uses a thin-space thousands separator.
+    - `brand.ts`: `MAP_IMAGERY_CREDIT`.
+    - `board:reset` now carries `actorId`.
+  - Snapshots (server):
+    - `snapshots` table and an `audit_logs` table (migration `20261026110646_snapshots_audit`, with CHECKs on the name, the element count, the data size and the audit action).
+    - REST: `GET` / `POST /boards/:boardId/snapshots`, `GET /snapshots/:id` (with data), `POST /snapshots/:id/restore`, `DELETE /snapshots/:id` (the author or the room owner). Editors save and restore; viewers list and preview.
+    - A manual save beyond 50 is `LIMIT_REACHED`. Auto snapshots prune the oldest beyond 10.
+    - Restore runs in one transaction:
+      1. lock the board;
+      2. auto-snapshot "Before restore of '{name}'";
+      3. replace the layers and elements, keeping their ids;
+      4. drop `board_ops`;
+      5. bump `last_seq` and fix `element_count`;
+      6. write the audit row.
+
+      After commit it emits `board:reset { reason: 'snapshot_restore', actorId }` and the system message "{user} restored snapshot '{name}'".
+    - `layer:clear` of more than 50 elements first takes an auto snapshot "Before clearing '{layer}'" and posts a system message. Saving a manual snapshot posts one too.
+  - Snapshots (web):
+    - Drawer from the board-tab kebab (and the ⋯ menu): save (name 1–60), and a list with name, author, time, element count and an "auto" tag.
+    - Hover prefetches; clicking opens a read-only preview in a modal map that reuses the ElementLayer renderer.
+    - Restore asks for confirmation. Delete only shows to those allowed.
+    - On `board:reset` every client resubscribes in full and clears that board's undo / redo stacks, with the toast "Board was restored by {name}".
+    - Clear layer's confirm: "An automatic snapshot will be saved first." above 50 elements; the `TODO(phase8)` is gone.
+  - **Measure (R)**, for every role:
+    - Click points; double-click or Enter finishes; Backspace removes the last point; Esc clears.
+    - Labels show each segment and the total with "~N min on foot · ~N min by vehicle (approx.)".
+    - Local only, drawn in a neutral white / dark-halo style in its own pane above every layer.
+  - **Export PNG** (⋯ menu, Editor and Viewer):
+    - An offscreen-canvas composite, no new dependency, of the current viewport at `devicePixelRatio` (max 2×).
+    - Draw order: background, loaded tile images of the current variant, the grid and its labels if visible, then the visible layers' vectors, markers and texts.
+    - Cursors, selection, HUD, laser, ghosts and the measure line are excluded.
+    - A 24 px footer strip "room · board · map · date · PUBG map imagery © KRAFTON".
+    - Filename `{room-slug}_{board-slug}_{YYYY-MM-DD}.png`.
+    - Tiles and the low-res overlay load with `crossOrigin="anonymous"`, so the canvas isn't tainted.
+  - **Settings page `/settings`** (UI_UX_SPEC §3.9):
+    - Profile: display name, IGN, avatar colour.
+    - Account: read-only email; change password, which revokes the other sessions.
+    - Sessions: list with this device marked; log out one, or all others.
+    - Danger zone: delete account with password + "DELETE". Each owned room gets a choice (transfer to a member, or delete), and the default is the longest-standing editor.
+  - **Account deletion** (`DELETE /me`), in one transaction per DATABASE_SCHEMA §6:
+    - Owned rooms are transferred or soft-deleted. Without a choice, the room goes to the longest-standing editor, else it is soft-deleted.
+    - Memberships are removed; chat is kept with `author_id = null`.
+    - Refresh and email tokens are revoked or deleted.
+    - The user is anonymised (`deleted+<id>@invalid`, `deleted_<short>`); audit rows are written.
+    - After commit: socket sessions are revoked, policy caches busted, and the client redirects to the landing page.
+  - **Email flows** behind `EMAIL_ENABLED` (AUTH-7, SECURITY A9):
+    - nodemailer SMTP transport (Mailpit in dev via the compose `email` profile), with an in-memory transport for tests.
+    - Templates: plain text plus simple HTML, with every interpolated value escaped.
+    - Verify email: sent on register; a banner with "Resend" (3 / h per user).
+    - `forgot-password` always returns 202 (10 / h per IP, 3 / h per email). `reset-password` revokes every session.
+    - Tokens: 256-bit base64url, stored as SHA-256, single use (atomic consume), purpose-bound; a new token voids the earlier unused ones of that purpose.
+    - With the flag off, the routes return 404 and the UI hides the links (`GET /api/v1/config`).
+  - **Jobs** (ARCHITECTURE §11), each with a leader lock:
+    - `purgeDeletedRooms`: hard delete 7 days after soft delete.
+    - `expireInvites`: sets `revoked_at` on expired invites.
+    - `cleanupTokens`: refresh / email tokens 30 days after expiry or use, audit rows after 90 days.
+  - Zone presets are still empty (`TODO(phase0)`), so the dropdown stays hidden. A unit test injects presets to prove the plumbing.
+  - Tests:
+    - Shared 111: snapshot (de)serialization and limits; measure maths and formatting.
+    - Server unit 47: ownership resolution, the email-token lifecycle with a fake store, template escaping, auto names.
+    - Web unit 176:
+      - export composition with a mock canvas (layer order, exclusions, footer);
+      - measure tool input; the drawer, preview and confirm;
+      - board:reset clearing history; injected zone presets; settings defaults.
+    - Integration 476 (+76):
+      - snapshot CRUD and permissions; restore atomicity with a forced id clash mid-transaction, after which nothing changes;
+      - auto pruning; `layer:clear` > 50 → auto snapshot; `board:reset` only after commit;
+      - account deletion with transfer, delete and fallback, plus the refusals;
+      - verify / reset happy paths and every failure (expired, reused, wrong purpose, disabled → 404); forgot-password not enumerating; the purge, invite-expiry and cleanup jobs.
+      - The authz matrix has every new route.
+    - E2E (`phase8.spec.ts`), all 34 passing on the production build:
+      - **E2E-7** save → modify → restore: both contexts equal the snapshot and the undo stacks are cleared.
+      - **E2E-11** the PNG downloads, is non-empty, has dimensions = viewport × DPR, and has the footer.
+      - Measure across the map.
+      - Settings: IGN change; a password change logs out the other context.
+      - Delete account with the room transferred to the other user, who then sees themselves as owner.
+  - **Perf, A/B back to back** (pan 5 s, 1 000 elements, 4 runs each, alternating order): Phase 7 commit avg 19.3 / 19.9 / 19.3 / 20.2 ms; Phase 8 avg 21.2 / 21.5 / 19.6 / 19.9 ms; p95 33.4 ms for both. In reverse order the gap disappears, so there is no regression. Absolute numbers are higher than Phase 7's recorded run because the machine was more loaded.
 - 2026-10-25 — **Phase 1 scaffold** (TODO Phase 1):
   - pnpm workspace + Turborepo with `apps/web`, `apps/server`, `packages/shared`, `packages/map-tiles` (stub CLI for Phase 2).
   - Strict TypeScript (`strict`, `noUncheckedIndexedAccess`), ESLint 9 flat config (`typescript-eslint` strict type-checked, Next + react-hooks rules, bans `dangerouslySetInnerHTML` and `localStorage`), Prettier, Husky pre-commit running lint-staged.
@@ -248,6 +341,24 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
   - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
 
+### Decisions (Phase 8)
+- E2E-11 requires the image to be exactly viewport × DPR, so the footer strip is drawn **over** the bottom 24 px of the map rather than appended below it.
+- Clear layer of ≤ 50 elements still says "This can't be undone." (no snapshot is taken); above 50 it says "An automatic snapshot will be saved first."
+- Snapshot list: hover prefetches the data and click opens the preview (a hover-opened modal would be hard to use).
+- New endpoints:
+  - `GET /api/v1/config { emailEnabled }`, so the UI can hide the email links before login;
+  - `POST /auth/resend-verification` for the banner.
+
+  `DELETE /me` gained `rooms: [{ roomId, action: 'transfer', toUserId } | { roomId, action: 'delete' }]`; a transfer target can be any member (viewers too), while the automatic fallback only picks editors.
+- The email routes are always registered and return 404 while `EMAIL_ENABLED=false`, so the flag can change without a code change.
+- `expireInvites` sets `revoked_at` on expired invites, so they leave the room's invite list.
+- `audit_logs` has no foreign keys (it must outlive users, rooms and boards) and is pruned after 90 days.
+- The snapshot being restored is never pruned by the restore's own auto snapshot, and it counts toward the 10 auto snapshots kept.
+- Restore drops the board's `board_ops`: the op log can't describe the jump, so every client gets `board:reset` and resubscribes in full.
+- Snapshots by a deleted account keep their row and show the anonymised author ("Deleted user").
+- The measure line is local and is not part of the PNG export.
+- The board-tab kebab is visible to viewers (it holds "Snapshots…"); rename / duplicate / delete inside it stay Editor+ / Owner.
+
 ### Decisions (Phase 7)
 - `chat:send` dedupe is durable: a `client_id` column with UNIQUE `(author_id, client_id)` (DATABASE_SCHEMA §3.12 updated) instead of the 10-minute Redis set used for `opId`. A resend at any time returns the stored message and is not broadcast again. `ChatMessage` gained `clientId`, so the sender matches its optimistic copy even when the broadcast beats the ack.
 - One broadcast path: the service raises a `chat:message` domain event and realtime emits it to the whole room, sender included. System messages use the same path.
@@ -352,7 +463,7 @@ Total 8 190 tiles, 93.6 MB (≈ 113 MB of `out/` including previews). Fetch took
 ### Dependencies (resolved)
 - Tooling: turbo 2.11.10, typescript 5.9.3, eslint 9.39.5, @eslint/js 9.39.5, typescript-eslint 8.72.0, eslint-config-prettier 10.1.8, @next/eslint-plugin-next 16.4.3, eslint-plugin-react-hooks 7.1.1, globals 17.13.0, prettier 3.9.10, husky 9.1.7, lint-staged 17.6.0, vitest 5.0.5, tsx 4.23.15, @types/node 22.20.5, pnpm 10.34.8
 - Shared: zod 4.6.7
-- Server: fastify 5.12.7, fastify-type-provider-zod 7.0.0, ioredis 5.11.1, prisma / @prisma/client 6.19.3, pino-pretty 13.2.0 (pino comes in through fastify)
+- Server: fastify 5.12.7, fastify-type-provider-zod 7.0.0, ioredis 5.11.1, prisma / @prisma/client 6.19.3, pino-pretty 13.2.0 (pino comes in through fastify), nodemailer 6.10.1, @types/nodemailer 6.4.24 (Phase 8)
 - Web: next 16.4.3, react / react-dom 19.3.1, tailwindcss / @tailwindcss/postcss 4.3.3, lucide-react 1.61.0, clsx 2.1.1, tailwind-merge 3.7.0, class-variance-authority 0.7.1, @types/react / @types/react-dom 19.3.0, @testing-library/react 16.3.3, @testing-library/dom 10.4.2, jsdom 30.1.3
 - Images: postgres:17-alpine, redis:7-alpine, axllent/mailpit
 

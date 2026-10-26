@@ -156,6 +156,21 @@ rclone sync packages/map-tiles/out r2:rotationlab-tiles/v1 \
 ```
 R2 bucket settings: public custom domain `tiles.example.com`; CORS rule allowing `GET` from `https://app.example.com` (required for PNG export canvas). Set `NEXT_PUBLIC_TILES_BASE_URL=https://tiles.example.com/v1`. New tile build → upload to `/v2`, switch env, redeploy web.
 
+**Tile CORS (required for Export PNG, FEATURES F12).** The web app loads every tile and the low-res placeholder with `crossOrigin="anonymous"`, so the browser sends an `Origin` header and needs an `Access-Control-Allow-Origin` back — otherwise the export canvas is tainted and `toBlob` throws (the UI says "Export blocked: the map tiles are not CORS-enabled"). R2 → bucket → Settings → CORS policy:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://app.example.com"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 86400
+  }
+]
+```
+
+Add the staging origin to `AllowedOrigins` too. Keep the CDN cache keyed on `Origin` (R2's public bucket does this) so a non-CORS response is never served to the app. In development and E2E the tiles are same-origin (`/tiles`), so no rule is needed.
+
 ## 5. CI/CD (GitHub Actions)
 
 ### `.github/workflows/ci.yml` (on PR and push)

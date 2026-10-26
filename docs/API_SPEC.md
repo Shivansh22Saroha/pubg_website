@@ -69,6 +69,9 @@ Snapshot   = { id, boardId, name, isAuto, elementCount, createdBy: PublicUser|nu
 | `POST /auth/verify-email` | – | `{ token }` | `204` (P1) |
 | `POST /auth/forgot-password` | – | `{ email }` | `202` always (no enumeration) (P1) |
 | `POST /auth/reset-password` | – | `{ token, password }` | `204`, revokes all sessions (P1) |
+| `POST /auth/resend-verification` | ✓ | – | `202` (3 / hour / user) (P1) |
+
+Email routes (Phase 8): always registered, `404` while `EMAIL_ENABLED=false`. Tokens are 32 random bytes, base64url (43 chars); unknown, used, expired and wrong-purpose tokens all answer `400 BAD_REQUEST` "This link is invalid or has expired". `forgot-password`: 3 / hour / email + 10 / hour / IP, and the lookup + mail happen after the `202`. `reset-password` also clears the login lockout and marks the email verified; it clears the caller's cookies. `GET /api/v1/config` (public) → `{ emailEnabled }` so the UI can hide the links.
 
 Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); password 10–128 chars, not in breached list.
 
@@ -81,7 +84,7 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 | `POST /me/password` | `{ currentPassword, newPassword }` | `204`, other sessions revoked |
 | `GET /me/sessions` | – | `{ items: [{ id, userAgent, createdAt, current }] }` |
 | `DELETE /me/sessions/:id` | – | `204` |
-| `DELETE /me` | `{ password, confirm: "DELETE" }` | `204` |
+| `DELETE /me` | `{ password, confirm: "DELETE", rooms?: ({ roomId, action: 'transfer', toUserId } \| { roomId, action: 'delete' })[] }` | `204`, cookies cleared. Rooms you own without a choice go to the longest-standing editor, else are soft-deleted. Wrong password → 401; a choice for a room you don't own, or a transfer to a non-member → 400 and nothing changes |
 
 ## 4. Rooms
 
@@ -128,6 +131,8 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 | `GET /snapshots/:snapshotId` | member | – | `{ snapshot, data: { layers, elements } }` |
 | `POST /snapshots/:snapshotId/restore` | EDITOR+ | – | `200 { seq }` + socket `board:reset` |
 | `DELETE /snapshots/:snapshotId` | OWNER, author | – | `204` |
+
+Snapshot notes (Phase 8): saving / restoring needs `board.manage` (OWNER / EDITOR); listing and reading any member; snapshots of boards you can't see are `404`. The 51st manual snapshot → `422 LIMIT_REACHED`. Restore runs in one transaction (auto snapshot "Before restore of '{name}'" → layers + elements replaced with the snapshot's ids at a new seq → op log dropped so a `sinceSeq` resync becomes a full load → audit row) and only then emits `board:reset` and a system chat message. A `layer:clear` of more than 50 elements first saves an auto snapshot "Before clearing '{layer}'". Auto snapshots: at most 10 per board (the one being restored is never pruned).
 
 Layer and element mutations go through **Socket.IO only** (§7).
 
@@ -181,14 +186,14 @@ Implementation notes (Phase 5A/5B):
 | `layer:delete` | `{ opId, boardId, layerId }` | `{ seq }` | deletes its elements |
 | `layer:reorder` | `{ opId, boardId, order: layerId[] }` | `{ seq }` | |
 | `layer:clear` | `{ opId, boardId, layerId }` | `{ seq }` | |
-| `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | body: NFC, control chars stripped except `\n`, trimmed, 1–500 code points; `room.interact` (viewers too) after `room:join`; ping board must be in this room and the point inside its map (`VALIDATION_ERROR`); 5 / 10 s per socket (`RATE_LIMITED`); a resent `clientId` returns the stored message and is not broadcast again |
+| `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | a ping to another room's (or a missing) board, or outside that board's map → `VALIDATION_ERROR` (never revealing whether the board exists); body: NFC, control chars stripped except `\n`, trimmed, 1–500 code points; `room.interact` (viewers too) after `room:join`; ping board must be in this room and the point inside its map (`VALIDATION_ERROR`); 5 / 10 s per socket (`RATE_LIMITED`); a resent `clientId` returns the stored message and is not broadcast again |
 | `chat:typing` | `{ roomId }` | – | volatile, ≤ 1 / 2 s — **P2, not handled yet** |
 | `cursor:move` | `{ boardId, x, y }` | – (no ack, volatile) | ≤ 20 Hz |
 | `stroke:preview` | `{ boardId, tempId, points: Pt[], style }` | – volatile, best-effort | only new points since last; ≤ 20 Hz |
 | `laser:point` | `{ boardId, x, y }` | – volatile | |
-| `view:update` | `{ boardId, center: Pt, zoom }` | – volatile | only sent while ≥ 1 follower |
+| `view:update` | `{ boardId, center: Pt, zoom }` | – volatile | only sent while ≥ 1 follower (`followers:update` count > 0): ≤ 10 Hz on moves, at once when a follower joins or the leader's new board is subscribed, and re-sent every 1.5 s so a dropped packet only delays followers |
 | `follow:start` / `follow:stop` | `{ targetUserId }` | – | |
-| `summon` | `{ boardId }` | – | asks all to follow you; permission `board.edit` (OWNER/EDITOR) |
+| `summon` | `{ boardId }` | – | asks all to follow you; permission `board.edit` (OWNER/EDITOR). Receivers start following **immediately** and may opt out ("Don't follow", 5 s) |
 | `presence:heartbeat` | `{ roomId, boardId, idle: boolean }` | – | every 20 s |
 
 `ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly.
@@ -197,7 +202,7 @@ Implementation notes (Phase 5A/5B):
 | Event | Payload |
 |---|---|
 | `board:op` | `{ boardId, seq, actorId, opId, op: { kind, ... } }` |
-| `board:reset` | `{ boardId, seq, reason: 'snapshot_restore' \| 'clear' }` → client resubscribes with full load |
+| `board:reset` | `{ boardId, seq, reason: 'snapshot_restore' \| 'clear', actorId }` → client resubscribes with full load and clears its undo / redo stacks for that board |
 | `op:reject` | `{ opId, code, message }` (only if ack lost; normally via ack) |
 | `board:created` / `board:updated` / `board:deleted` | `{ board }` / `{ board }` / `{ boardId }` |
 | `chat:message` | `{ message: ChatMessage }` (to the whole room, sender included — the client matches its optimistic copy by `clientId`) |

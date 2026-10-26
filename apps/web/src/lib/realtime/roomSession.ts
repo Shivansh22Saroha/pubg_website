@@ -50,6 +50,8 @@ export interface RoomSessionCallbacks {
   onReject: (message: string) => void;
   /** someone is presenting: start following them unless the user says no */
   onSummon: (userId: string, boardId: string) => void;
+  /** the board on screen was replaced (snapshot restore) */
+  onBoardReset: (reason: 'snapshot_restore' | 'clear', actorId: string | null) => void;
 }
 
 type AnyAck = AckResult<unknown>;
@@ -487,7 +489,10 @@ export class RoomSession {
         usePresenceStore.getState().dropGhost(op.actorId);
       this.watchGap();
     });
-    this.on('board:reset', ({ boardId }) => {
+    this.on('board:reset', ({ boardId, reason, actorId }) => {
+      // the board's history is meaningless after a restore: clear its undo / redo stacks
+      useBoardStore.getState().clearHistory(boardId);
+      if (boardId === this.boardId) this.cb.onBoardReset(reason, actorId);
       if (boardId === this.boardId) void this.subscribe(false);
     });
     this.on('presence:update', ({ roomId, users }) => {

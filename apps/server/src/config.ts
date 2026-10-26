@@ -43,6 +43,12 @@ export const EnvSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
     EMAIL_ENABLED: bool.default(false),
+    /** outgoing mail (AUTH-7); required when EMAIL_ENABLED=true. Dev: Mailpit on 1025 */
+    SMTP_HOST: optionalString,
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_USER: optionalString,
+    SMTP_PASS: optionalString,
+    SMTP_FROM: z.string().default('RotationLab <no-reply@example.com>'),
     /** Rate limits (SECURITY §6). Only for local E2E/dev convenience — forced on in production. */
     RATE_LIMITS_ENABLED: bool.default(true),
     /**
@@ -68,6 +74,13 @@ export const EnvSchema = z
         code: 'custom',
         path: ['RATE_LIMITS_ENABLED'],
         message: 'rate limits cannot be disabled in production',
+      });
+    }
+    if (e.EMAIL_ENABLED && !e.SMTP_HOST) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SMTP_HOST'],
+        message: 'required when EMAIL_ENABLED=true',
       });
     }
     if (e.COOKIE_SECURE && e.COOKIE_DOMAIN) {

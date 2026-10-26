@@ -5,4 +5,7 @@ export const PRODUCT_NAME = 'RotationLab';
 export const ATTRIBUTION_TEXT =
   'PUBG map imagery © KRAFTON, Inc. RotationLab is a fan project, not affiliated with or endorsed by KRAFTON.';
 
+/** Short credit for exported images (FEATURES F12 footer). */
+export const MAP_IMAGERY_CREDIT = 'PUBG map imagery © KRAFTON';
+
 export const BGMI_NOTICE = 'PC map art — BGMI versions of these maps may differ slightly.';

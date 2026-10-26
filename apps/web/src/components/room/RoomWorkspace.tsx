@@ -1,6 +1,6 @@
 'use client';
 
-import { can } from '@rotationlab/shared';
+import { can, type Board } from '@rotationlab/shared';
 import {
   ArrowLeft,
   ChevronDown,
@@ -9,12 +9,14 @@ import {
   PanelRightOpen,
   Settings,
   UserPlus,
+  MoreHorizontal,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { BoardMapView } from '@/components/map/BoardMapView';
+import { SnapshotsDrawer } from '@/components/snapshots/SnapshotsDrawer';
 import { ShortcutsDialog } from '@/components/tools/ShortcutsDialog';
 import { Toolbar } from '@/components/tools/Toolbar';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -66,6 +68,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const unread = useChatStore((s) => s.unread);
   const [dialog, setDialog] = useState<'invite' | 'settings' | 'help' | null>(null);
   const [gone, setGone] = useState<'kicked' | 'deleted' | null>(null);
+  const [snapshotsFor, setSnapshotsFor] = useState<Board | null>(null);
 
   const boards = useMemo(() => query.data?.boards ?? [], [query.data]);
   // fall back to the first board when the remembered one is gone (deleted / other room)
@@ -94,6 +97,10 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
     },
     onReject: (message) => {
       toast.error(message);
+    },
+    onBoardReset: (reason, actorId) => {
+      if (reason === 'snapshot_restore')
+        toast(`Board was restored by ${nameOfRef.current(actorId)}`, { id: 'board-reset' });
     },
     onSummon: (userId, boardId) => {
       const follow = useFollowStore.getState();
@@ -309,6 +316,9 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           boards={boards}
           activeId={active?.id}
           onSelect={select}
+          onSnapshots={(b) => {
+            setSnapshotsFor(b);
+          }}
         />
 
         <div className="ml-auto flex shrink-0 items-center gap-2 px-3">
@@ -332,6 +342,34 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               <UserPlus className="size-4" aria-hidden /> Invite
             </Button>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="More"
+              data-testid="more-menu"
+              className="flex size-8 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text"
+            >
+              <MoreHorizontal className="size-4" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={!active}
+                onSelect={() => {
+                  useWorkspaceStore.getState().requestExport();
+                }}
+              >
+                Export PNG
+              </DropdownMenuItem>
+              {active && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setSnapshotsFor(active);
+                  }}
+                >
+                  Snapshots…
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {can(role, 'room.manage') && (
             <Button
               variant="ghost"
@@ -385,6 +423,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               session={session}
               role={role}
               roomName={room.name}
+              boardName={active.name}
             />
           )}
         </main>
@@ -422,6 +461,17 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           setDialog(o ? 'help' : null);
         }}
       />
+      {snapshotsFor && (
+        <SnapshotsDrawer
+          // the latest copy of that board (renames)
+          board={boards.find((b) => b.id === snapshotsFor.id) ?? snapshotsFor}
+          role={role}
+          meId={me.data.id}
+          onClose={() => {
+            setSnapshotsFor(null);
+          }}
+        />
+      )}
       <RoomGoneDialog reason={gone} />
       <SessionExpiredDialog />
       {dialog === 'settings' && (

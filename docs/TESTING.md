@@ -70,7 +70,7 @@
 ## 5. Security testing
 1. **Authz matrix test** — generated: for every REST route and socket event × {anonymous, non-member, VIEWER, EDITOR, OWNER} assert expected status/ack. Fails CI if any route lacks an entry.
 2. **Input fuzzing** — fast-check property tests on Zod schemas and socket handlers (random JSON must never crash the server or write invalid rows).
-3. **XSS** — E2E: chat message and marker label `<img src=x onerror=alert(1)>` render as literal text; no dialog fires; CSP report count 0.
+3. **XSS** — E2E: chat message and marker label `<img src=x onerror=alert(1)>` render as literal text; no dialog fires; CSP report count 0. Until Phase 10 configures a CSP, "no CSP violation" holds trivially — the check only becomes meaningful once the policy ships; the literal-text, no-element and no-dialog checks are the real guards before then.
 4. **IDOR** — swap IDs between two users' rooms/boards/snapshots/messages in every endpoint.
 5. **Session** — refresh-token reuse detection; access token still valid after logout? (≤ 15 min accepted; sockets must be dropped immediately).
 6. **Headers** — integration test asserts CSP, HSTS (prod), nosniff, frame-ancestors.

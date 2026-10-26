@@ -94,13 +94,14 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 **Exit:** E2E-4, E2E-6 pass.
 
 ## Phase 8 — Snapshots, measure, export, settings (P1)
-- [ ] Snapshots: save, list, preview modal, restore with auto-snapshot, `board:reset`.
-- [ ] Auto-snapshot before "Clear layer" (moved from Phase 6; `TODO(phase8)` in the server and the layers panel).
-- [ ] Measure tool with travel time (approx. label).
-- [ ] Zone presets dropdown (values from Phase 0 or hidden behind flag).
-- [ ] PNG export with footer attribution (tiles CORS configured).
-- [ ] Settings page: profile, change password, sessions, delete account flow (ownership transfer).
-- [ ] Email verification + password reset behind `EMAIL_ENABLED`.
+- [x] Snapshots: save, list, preview modal, restore with auto-snapshot, `board:reset`.
+- [x] Auto-snapshot before "Clear layer" (moved from Phase 6; > 50 elements).
+- [x] Measure tool with travel time (approx. label).
+- [x] Zone presets dropdown (values from Phase 0 or hidden behind flag) — still empty (`TODO(phase0)`), dropdown hidden; plumbing unit-tested with injected presets.
+- [x] PNG export with footer attribution (tiles CORS configured — DEPLOYMENT §4 R2 rule).
+- [x] Settings page: profile, change password, sessions, delete account flow (ownership transfer).
+- [x] Email verification + password reset behind `EMAIL_ENABLED`.
+- [x] Background jobs: purgeDeletedRooms, expireInvites, cleanupTokens (ARCHITECTURE §11).
 
 **Exit:** E2E-7, E2E-11 pass.
 

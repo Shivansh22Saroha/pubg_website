@@ -525,6 +525,79 @@ function dedupe(points: Pt[]): Pt[] {
   return out;
 }
 
+/**
+ * Measure (R), every role, local only (FEATURES F11): click points, double-click or Enter to
+ * finish, Backspace removes the last point, Esc clears. A finished line stays until Esc or the
+ * next click, which starts a new one.
+ */
+export class MeasureTool extends BaseTool {
+  readonly id = 'measure';
+  private points: Pt[] = [];
+  private hover: Pt | null = null;
+  private finished = false;
+
+  get busy() {
+    return this.points.length > 0 && !this.finished;
+  }
+
+  override onPointerDown(p: ToolPointer) {
+    if (p.button !== 0) return;
+    if (this.finished) {
+      this.points = [];
+      this.finished = false;
+    }
+    const last = this.points.at(-1);
+    if (!last || this.px(last, p.world) >= SAME_POINT_PX) this.points.push(p.world);
+    this.publish();
+  }
+
+  override onPointerMove(p: ToolPointer) {
+    if (this.points.length === 0 || this.finished) return;
+    this.hover = p.world;
+    this.publish();
+  }
+
+  override onDoubleClick() {
+    this.finish();
+  }
+
+  override onKeyDown(k: ToolKey): boolean {
+    if (k.key === 'Escape' && this.points.length > 0) {
+      this.cancel();
+      return true;
+    }
+    if (k.key === 'Enter' && this.busy) {
+      this.finish();
+      return true;
+    }
+    if (k.key === 'Backspace' && this.points.length > 0) {
+      this.points.pop();
+      if (this.points.length === 0) this.cancel();
+      else this.publish();
+      return true;
+    }
+    return false;
+  }
+
+  override cancel() {
+    this.points = [];
+    this.hover = null;
+    this.finished = false;
+    this.ctx.setMeasure(null);
+  }
+
+  private finish() {
+    if (this.points.length === 0) return;
+    this.finished = true;
+    this.hover = null;
+    this.publish();
+  }
+
+  private publish() {
+    this.ctx.setMeasure({ points: [...this.points], hover: this.hover, finished: this.finished });
+  }
+}
+
 /** Laser (K): hold to draw a fading trail everyone on the board sees (never stored). */
 export class LaserTool extends BaseTool {
   readonly id = 'laser';
@@ -554,6 +627,7 @@ export class LaserTool extends BaseTool {
 }
 
 export type AnyTool =
+  | MeasureTool
   | LaserTool
   | SelectTool
   | EraserTool
@@ -565,7 +639,7 @@ export type AnyTool =
   | TextTool
   | MarkerTool;
 
-/** Tool instances for one map session (Measure arrives in Phase 8). */
+/** Tool instances for one map session. */
 export function createTools(ctx: ToolContext): Partial<Record<ToolId, AnyTool>> {
   return {
     select: new SelectTool(ctx),
@@ -578,5 +652,6 @@ export function createTools(ctx: ToolContext): Partial<Record<ToolId, AnyTool>> 
     marker: new MarkerTool(ctx),
     eraser: new EraserTool(ctx),
     laser: new LaserTool(ctx),
+    measure: new MeasureTool(ctx),
   };
 }

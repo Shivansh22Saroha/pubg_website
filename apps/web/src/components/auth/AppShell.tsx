@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { useMe } from '@/hooks/useMe';
 import { ApiError } from '@/lib/api';
+import { VerifyBanner } from './EmailFlows';
 import { UserMenu } from './UserMenu';
 
 /**
@@ -43,6 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <div className="ml-auto">{me.data && <UserMenu user={me.data} />}</div>
       </header>
+      {me.data && <VerifyBanner verified={me.data.emailVerified} />}
       <main className="flex-1">
         {me.data ? (
           children

@@ -2,7 +2,8 @@
 
 import type { Me } from '@rotationlab/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, MonitorX } from 'lucide-react';
+import { LogOut, MonitorX, Settings } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -94,6 +95,16 @@ export function UserMenu({ user }: { user: Me }) {
             <p className="truncate text-xs text-text-muted">@{user.username}</p>
           </div>
           <div className="my-1 h-px bg-border" />
+          <Link
+            href="/settings"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            <Settings className="size-4" aria-hidden /> Settings
+          </Link>
           <button
             type="button"
             role="menuitem"

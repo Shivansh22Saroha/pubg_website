@@ -1,3 +1,4 @@
+import { PublicConfigResponseSchema } from '@rotationlab/shared';
 import { randomUUID } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import type { PrismaClient } from '@prisma/client';
@@ -26,6 +27,12 @@ import { boardRoutes } from './modules/boards/routes.js';
 import { chatRoutes } from './modules/chat/routes.js';
 import { createChatService } from './modules/chat/service.js';
 import { registerSystemMessages } from './modules/chat/system.js';
+import { snapshotRoutes } from './modules/snapshots/routes.js';
+import { createAccountService } from './modules/users/account.js';
+import { createEmailFlows } from './modules/auth/emailFlows.js';
+import { createEmailTokens } from './modules/auth/emailTokens.js';
+import { createMemoryMailer, createSmtpMailer, type Mailer } from './lib/mailer.js';
+import { createSnapshotService } from './modules/snapshots/service.js';
 import { createBoardService } from './modules/boards/service.js';
 import { inviteRoutes } from './modules/invites/routes.js';
 import { createInviteService } from './modules/invites/service.js';
@@ -54,6 +61,8 @@ export interface AppDeps {
   logStream?: LogStream;
   /** attach Socket.IO (default true; REST-only unit tests turn it off) */
   realtime?: boolean;
+  /** outgoing mail (tests pass an in-memory mailer); default: SMTP when EMAIL_ENABLED */
+  mailer?: Mailer;
 }
 
 // SECURITY §7: never log credentials, cookies or tokens — even if a future log call includes them.
@@ -87,6 +96,7 @@ export async function buildApp({
   checks,
   logStream,
   realtime: withRealtime = true,
+  mailer,
 }: AppDeps) {
   const app = Fastify({
     logger: loggerOptions(config, logStream),
@@ -136,13 +146,36 @@ export async function buildApp({
     memoryCost: config.ARGON2_MEMORY_KIB,
     timeCost: config.ARGON2_ITERATIONS,
   });
+  const lockout = createLockout(prisma, redis);
   const auth = createAuthService({
     prisma,
     tokens,
     sessions,
     revocations,
     passwords,
-    lockout: createLockout(prisma, redis),
+    lockout,
+  });
+  const email = createEmailFlows({
+    prisma,
+    tokens: createEmailTokens(prisma),
+    mailer:
+      mailer ??
+      (config.EMAIL_ENABLED && config.SMTP_HOST
+        ? createSmtpMailer({
+            host: config.SMTP_HOST,
+            port: config.SMTP_PORT,
+            user: config.SMTP_USER,
+            pass: config.SMTP_PASS,
+            from: config.SMTP_FROM,
+          })
+        : createMemoryMailer()),
+    passwords,
+    sessions,
+    revocations,
+    lockout,
+    appOrigin: config.APP_ORIGIN,
+    enabled: config.EMAIL_ENABLED,
+    log: app.log,
   });
   const events = createRoomEvents();
   app.decorate('roomEvents', events);
@@ -163,7 +196,9 @@ export async function buildApp({
     appOrigin: config.APP_ORIGIN,
   });
   const boards = createBoardService({ prisma, policy, events });
-  const boardOps = createBoardOpsService({ prisma, redis, policy });
+  const boardOps = createBoardOpsService({ prisma, redis, policy, events });
+  const snapshots = createSnapshotService({ prisma, policy, events });
+  const account = createAccountService({ prisma, passwords, revocations, policy, events });
   const chat = createChatService({ prisma, policy, events });
   const systemMessages = registerSystemMessages(events, chat, prisma, app.log);
   app.decorate('chatIdle', systemMessages.idle);
@@ -197,13 +232,20 @@ export async function buildApp({
     redis,
     rateLimits: config.RATE_LIMITS_ENABLED,
     ipHashSalt: config.IP_HASH_SALT,
+    email,
   });
-  await app.register(userRoutes, { prefix: '/api/v1', auth });
+  await app.register(userRoutes, { prefix: '/api/v1', auth, account, cookies });
+  app.get(
+    '/api/v1/config',
+    { config: { access: 'public' }, schema: { response: { 200: PublicConfigResponseSchema } } },
+    () => ({ emailEnabled: config.EMAIL_ENABLED }),
+  );
   const rateLimits = config.RATE_LIMITS_ENABLED;
   await app.register(roomRoutes, { prefix: '/api/v1', rooms, invites, boards, redis, rateLimits });
   await app.register(inviteRoutes, { prefix: '/api/v1', invites, redis, rateLimits });
   await app.register(boardRoutes, { prefix: '/api/v1', boards });
   await app.register(chatRoutes, { prefix: '/api/v1', chat });
+  await app.register(snapshotRoutes, { prefix: '/api/v1', snapshots });
 
   // ---- realtime (Socket.IO on the same HTTP server, path /realtime) -------------------
   if (withRealtime) {

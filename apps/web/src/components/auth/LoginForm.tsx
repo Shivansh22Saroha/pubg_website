@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label } from '@/components/ui/input';
 import { ME_QUERY_KEY } from '@/hooks/useMe';
 import { api, refreshSession } from '@/lib/api';
+import { ForgotLink } from './EmailFlows';
 import { applyApiError } from './formErrors';
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
@@ -85,13 +86,8 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Password</Label>
-          {/* AUTH-7: reset flow ships behind EMAIL_ENABLED (Phase 8) */}
-          <span
-            className="text-xs text-text-muted"
-            title="Password reset arrives with email support"
-          >
-            Forgot password?
-          </span>
+          {/* AUTH-7: only when the server has email set up */}
+          <ForgotLink />
         </div>
         <div className="relative">
           <Input

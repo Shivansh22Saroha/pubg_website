@@ -13,6 +13,12 @@ export const LIMITS = {
   invitePreview: { max: 30, timeWindow: '1 minute' },
   roomCreateDaily: { max: 10, windowSec: 86_400 },
   inviteAcceptHourly: { max: 20, windowSec: 3600 },
+  /** SECURITY §6: forgot-password 3 / hour / email + 10 / hour / IP */
+  forgotEmailHourly: { max: 3, windowSec: 3600 },
+  forgotIpHourly: { max: 10, windowSec: 3600 },
+  verifyResendHourly: { max: 3, windowSec: 3600 },
+  /** verify / reset token submissions */
+  emailToken: { max: 10, timeWindow: '1 minute' },
 } as const;
 
 /** Keys a fixed window by the authenticated user (falls back to IP). */

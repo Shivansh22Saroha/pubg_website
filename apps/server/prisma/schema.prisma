@@ -33,6 +33,7 @@ model User {
   bans             RoomBan[]      @relation("BannedUser")
   bansIssued       RoomBan[]      @relation("BanIssuer")
   chatMessages     ChatMessage[]
+  snapshots        Snapshot[]
 
   @@map("users")
 }
@@ -161,6 +162,7 @@ model Board {
   elements     Element[]
   ops          BoardOp[]
   pings        ChatMessage[]
+  snapshots    Snapshot[]
 
   @@index([roomId, position])
   @@map("boards")
@@ -274,4 +276,37 @@ model ChatMessage {
   @@unique([authorId, clientId])
   @@index([roomId, id(sort: Desc)])
   @@map("chat_messages")
+}
+
+/// board snapshots (DATABASE_SCHEMA §3.11): data = { version: 1, layers, elements }, ≤ 5 MB
+model Snapshot {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId      String   @map("board_id") @db.Uuid
+  name         String   @db.VarChar(60)
+  isAuto       Boolean  @default(false) @map("is_auto")
+  data         Json
+  elementCount Int      @map("element_count")
+  createdBy    String?  @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  board        Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  author       User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([boardId, createdAt(sort: Desc)])
+  @@map("snapshots")
+}
+
+/// security-relevant actions (DATABASE_SCHEMA §3.13); retention 90 days
+model AuditLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  roomId    String?  @map("room_id") @db.Uuid
+  action    String   @db.VarChar(48)
+  targetId  String?  @map("target_id") @db.Uuid
+  meta      Json     @default("{}")
+  ipHash    String?  @map("ip_hash") @db.Char(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([roomId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@map("audit_logs")
 }

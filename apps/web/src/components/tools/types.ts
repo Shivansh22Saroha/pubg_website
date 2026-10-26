@@ -1,5 +1,6 @@
 import type { BBox, ElementInput, Layer, MarkerKind, Pt, Style } from '@rotationlab/shared';
 import type { Change } from '@/stores/boardModel';
+import type { MeasureLine } from '@/stores/measureStore';
 import type { Transform } from '@/stores/selectionStore';
 import type { Scene } from './scene';
 
@@ -28,11 +29,12 @@ export const CREATION_TOOLS = [
 ] as const satisfies readonly ToolId[];
 export type CreationToolId = (typeof CREATION_TOOLS)[number];
 
-/** Measure (Phase 8) shows in the toolbar but isn't built yet. */
+/** Every tool in the toolbar is built (Phase 8 added Measure). */
 export const IMPLEMENTED_TOOLS: ReadonlySet<ToolId> = new Set<ToolId>([
   'select',
   ...CREATION_TOOLS,
   'eraser',
+  'measure',
   'laser',
 ]);
 
@@ -117,6 +119,8 @@ export interface ToolContext {
   explainLocked(layer: Layer): void;
   /** laser tool: one point of the trail (ephemeral, every role) */
   laser(at: Pt): void;
+  /** measure tool: the local line (null clears it) */
+  setMeasure(line: MeasureLine | null): void;
 }
 
 export interface Tool {

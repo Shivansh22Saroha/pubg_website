@@ -137,7 +137,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - **Ephemeral events are best-effort**: cursors, laser, `stroke:preview` ghosts and follow-mode view updates may be dropped and are never replayed; the UI tolerates gaps (ghosts vanish after 3 s without updates, cursors fade).
 - **Cursors**: shown only for users on the same board; name pill; hidden while user is idle > 5 s (fade) or follow mode active.
 - **Presence**: online dot; idle (2 min no input) shows half-opacity avatar; board dots on tabs.
-- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following"). "Manual" = drag, wheel, double-click, pan/zoom keys, Space / middle-mouse pan, the HUD zoom / fit buttons, or opening a ping chip; programmatic moves never count. A "Following {name} · Stop" pill sits at the top of the map; the follower's own cursor isn't broadcast meanwhile. The leader learns its follower count (`followers:update`) and sends `view:update` (≤ 10 Hz) only while it is > 0. Started from a presence avatar's menu (Follow / Go to their board). If the leader leaves the room or goes offline, followers stop with a toast "{name} left — stopped following".
+- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following"). "Manual" = drag, wheel, double-click, pan/zoom keys, Space / middle-mouse pan, the HUD zoom / fit buttons, or opening a ping chip; programmatic moves never count. A "Following {name} · Stop" pill sits at the top of the map; the follower's own cursor isn't broadcast meanwhile. The leader learns its follower count (`followers:update`) and sends `view:update` (≤ 10 Hz) only while it is > 0, plus at once when a follower joins or its new board is subscribed, and every 1.5 s as a resend (view updates are best-effort). Started from a presence avatar's menu (Follow / Go to their board). If the leader leaves the room or goes offline, followers stop with a toast "{name} left — stopped following".
 - **Summon**: leader triggers (Editor+, own avatar → "Summon everyone"); each member starts following at once and gets a non-blocking toast "{name} is presenting — following" with a "Don't follow" button (5 s).
 - **Sync indicator** states defined in UI_UX_SPEC §3.5.
 - **Reconnect**: exponential backoff 0.5 s → 10 s with jitter; on reconnect rejoin room + resubscribe board with `sinceSeq`.
@@ -154,6 +154,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Ping chip text: `📍 {gridRef} · {board name}`; click → switch board if needed, fly to, pulse.
 - Pings also show a temporary pulse on the map for all users on that board when sent (3 s).
 - Typing indicator "Rudra is typing…" (P2 — not built in v1; the event contract exists).
+- Pings must point at a board of this room and inside that board's map; anything else is `VALIDATION_ERROR` (no hint whether a board exists).
 - Chat text: trimmed, NFC, control characters stripped except `\n`, 1–500 code points; shown as text only (no HTML, no auto-links). Viewers can chat and ping. Optimistic send with a pending state; a failed message offers Retry (same `clientId`, so never duplicated) or discard. Enter sends, Shift+Enter is a newline, a counter shows from 400 characters. Delete own messages (owner: any) from a hover menu.
 - Unread badge counts other people's **user** messages that arrive while the chat isn't on screen (panel closed → on the panel toggle; another tab → on the Chat tab). System messages don't count.
 - A ping on a board that was later deleted keeps its message; the chip shows disabled. Reduced motion: chips jump instantly and pulses don't animate (a still ring is shown).
@@ -167,7 +168,8 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Manual: name required (1–60 chars). Max 50 manual per board; at limit, oldest must be deleted by user.
 - Auto: before every restore and before `layer:clear` of > 50 elements; max 10, oldest pruned.
 - Preview renders snapshot data read-only in a modal map (same renderer).
-- Restore is atomic and broadcast as `board:reset`.
+- Restore is atomic and broadcast as `board:reset`. Element and layer ids are kept; every client reloads the board in full, clears its undo / redo stacks for it and shows "Board was restored by {name}"; the room gets a system message. A manual save also posts one.
+- Drawer from the board tab's kebab (any member; saving / restoring Editor+; deleting the owner or the author). Clicking an item opens a read-only preview map (hover prefetches it).
 
 ---
 
@@ -175,6 +177,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Distance = sum of segment lengths in metres (`world / 100`), shown with thin space thousands separator: `3 420 m`.
 - Travel time: `distance / speed` using `SPEEDS` config, formatted `~9 min`. Always labelled "approx.".
 - Optional P2: elevation is **not** available (no height data) — don't fake it.
+- Tool (R), every role, local only: click points, double-click / Enter finishes, Backspace removes the last point, Esc clears; per-segment lengths at midpoints, total + "~N min on foot · ~N min by vehicle (approx.)" at the end.
 
 ---
 
@@ -183,6 +186,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Adds a small footer strip: room · board · map · date · "PUBG map imagery © KRAFTON".
 - Filename `{room-slug}_{board-slug}_{YYYY-MM-DD}.png`.
 - Tiles must be served with `Access-Control-Allow-Origin` for the app origin so the canvas isn't tainted.
+- From the ⋯ menu (every role). It is a canvas composite (tiles of the shown variant, grid lines + letters when shown, the element canvas, markers and text re-drawn) — no screenshot library. The measure line, cursors, selection, drafts, ghosts, laser and pulses are left out. The footer overlays the bottom 24 px, so the image is exactly viewport × DPR (E2E-11).
 
 ---
 

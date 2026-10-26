@@ -143,6 +143,7 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 - Automated authz matrix tests for every endpoint and socket event × role.
 - OWASP ZAP baseline scan in CI against staging.
 - Manual checklist before each release: cookie flags, headers (securityheaders.com A), CSP violations in console = 0, rate limits verified.
+- Note: the automated "no CSP violation" assertion (TESTING §5.3) is only meaningful once Phase 10 ships the CSP (T4); before that it passes trivially.
 
 ## 12. Incident response (lightweight)
 1. Detect (Sentry alerts, error-rate spikes, user report to `security@` address in footer).

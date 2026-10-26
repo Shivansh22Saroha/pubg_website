@@ -9,6 +9,7 @@ import { makeNameOf } from '@/lib/editing';
 import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useBoardStore } from '@/stores/boardStore';
 import { CursorLayer } from './CursorLayer';
+import { ExportController } from './ExportController';
 import { ElementLayer } from './ElementLayer';
 import { FollowController } from './FollowController';
 import { LaserLayer } from './LaserLayer';
@@ -39,6 +40,7 @@ export default function BoardMap({
   session,
   role,
   roomName,
+  boardName,
 }: {
   boardId: string;
   mapId: MapId;
@@ -49,6 +51,7 @@ export default function BoardMap({
   session: RoomSession | null;
   role: RoomRole;
   roomName: string;
+  boardName: string;
 }) {
   const config = MAPS[mapId];
   const nameOf = useMemo(() => makeNameOf(meId, names), [meId, names]);
@@ -77,6 +80,7 @@ export default function BoardMap({
       <PingLayer config={config} boardId={boardId} />
       <LaserLayer meId={meId} />
       <FollowController boardId={boardId} session={session} />
+      <ExportController roomName={roomName} boardName={boardName} mapName={config.name} />
     </MapCanvas>
   );
 }

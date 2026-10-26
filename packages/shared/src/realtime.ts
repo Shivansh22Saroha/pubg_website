@@ -214,6 +214,8 @@ export interface ServerToClientEvents {
     boardId: string;
     seq: number;
     reason: 'snapshot_restore' | 'clear';
+    /** who caused it (the restorer) */
+    actorId: string | null;
   }) => void;
   'op:reject': (p: { opId: string; code: ErrorCode; message: string }) => void;
   'board:created': (p: { board: z.infer<typeof BoardSchema> }) => void;

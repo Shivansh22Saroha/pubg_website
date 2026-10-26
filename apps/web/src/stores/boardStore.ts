@@ -34,6 +34,8 @@ interface BoardActions {
   localMany: (ops: PendingOp[], online: boolean) => boolean;
   pushHistory: (boardId: string, step: HistoryStep, kind: 'action' | 'undo' | 'redo') => void;
   popHistory: (boardId: string, dir: 'undo' | 'redo') => HistoryStep | undefined;
+  /** after a board:reset (restore): nothing on that board can be undone any more */
+  clearHistory: (boardId: string) => void;
   ack: (opId: string, seq: number) => void;
   reject: (opId: string) => PendingOp | undefined;
   reset: () => void;
@@ -101,6 +103,11 @@ export const useBoardStore = create<BoardStore>()(
         step = popped && isDraft(popped) ? current(popped) : popped; // plain object, out of the draft
       });
       return step;
+    },
+    clearHistory: (boardId) => {
+      set((s) => {
+        Reflect.deleteProperty(s.history, boardId);
+      });
     },
     ack: (opId, seq) => {
       set((s) => {

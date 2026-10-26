@@ -12,6 +12,7 @@ import {
   type MapId,
   type RoomRole,
   type Style,
+  type ZonePreset,
 } from '@rotationlab/shared';
 import { ChevronDown, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
@@ -71,11 +72,14 @@ export function StyleBar({
   mapId,
   session,
   nameOf,
+  presets: injectedPresets,
 }: {
   role: RoomRole;
   mapId: MapId;
   session: EditSink | null;
   nameOf: (userId: string | null) => string;
+  /** zone presets for the circle tool (default: ZONE_PRESETS of the map; tests inject) */
+  presets?: readonly ZonePreset[];
 }) {
   const tool = useToolStore((s) => s.tool);
   const styles = useToolStore((s) => s.styles);
@@ -242,7 +246,7 @@ export function StyleBar({
   };
   const closed = tool === 'circle' || tool === 'polygon';
   const vector = tool !== 'text' && tool !== 'marker';
-  const presets = ZONE_PRESETS[mapId];
+  const presets = injectedPresets ?? ZONE_PRESETS[mapId];
   return (
     <Shell testId="style-bar" mode="tool">
       <Palette

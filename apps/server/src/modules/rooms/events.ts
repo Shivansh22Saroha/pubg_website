@@ -19,6 +19,20 @@ export interface RoomEventMap {
   /** a stored chat message (user or system) — realtime broadcasts it to the room */
   'chat:message': [{ roomId: string; message: ChatMessage }];
   'chat:deleted': [{ roomId: string; messageId: string }];
+  /** a restore replaced the board's state — clients reload it in full */
+  'board:reset': [
+    {
+      roomId: string;
+      boardId: string;
+      seq: number;
+      reason: 'snapshot_restore' | 'clear';
+      actorId: string | null;
+    },
+  ];
+  'snapshot:saved': [{ roomId: string; boardId: string; userId: string; name: string }];
+  'snapshot:restored': [{ roomId: string; boardId: string; userId: string; name: string }];
+  /** a layer:clear big enough to take an auto snapshot first */
+  'layer:cleared': [{ roomId: string; userId: string; layerName: string; count: number }];
 }
 
 export type RoomEvents = EventEmitter<RoomEventMap>;

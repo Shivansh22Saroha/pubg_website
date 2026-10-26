@@ -1,6 +1,9 @@
 import {
+  ForgotPasswordBodySchema,
   LoginBodySchema,
   RegisterBodySchema,
+  ResetPasswordBodySchema,
+  VerifyEmailBodySchema,
   UserResponseSchema,
   UsernameAvailableQuerySchema,
   UsernameAvailableResponseSchema,
@@ -10,8 +13,9 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import type { Redis } from 'ioredis';
 import { hashIp } from '../../lib/crypto.js';
 import { AppError } from '../../lib/errors.js';
-import { LIMITS, fixedWindowLimit } from '../../plugins/rateLimit.js';
+import { LIMITS, byUser, fixedWindowLimit } from '../../plugins/rateLimit.js';
 import type { AuthCookies } from './cookies.js';
+import type { EmailFlows } from './emailFlows.js';
 import type { AuthService } from './service.js';
 
 export interface AuthRouteDeps {
@@ -20,9 +24,13 @@ export interface AuthRouteDeps {
   redis: Redis;
   rateLimits: boolean;
   ipHashSalt: string;
+  email: EmailFlows;
 }
 
-/** /api/v1/auth/* (API_SPEC §2). Email verification / reset (P1) arrive with EMAIL_ENABLED. */
+/**
+ * /api/v1/auth/* (API_SPEC §2). Email verification / reset (AUTH-7) are always registered and
+ * answer 404 while EMAIL_ENABLED=false.
+ */
 export const authRoutes: FastifyPluginCallbackZod<AuthRouteDeps> = (app, deps, done) => {
   const { auth, cookies } = deps;
   const meta = (req: FastifyRequest) => ({
@@ -44,6 +52,7 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteDeps> = (app, deps, d
     },
     async (req, reply) => {
       const s = await auth.register(req.body, meta(req));
+      deps.email.afterRegister(s.user.id);
       cookies.set(reply, s);
       return reply.status(201).send({ user: s.user });
     },
@@ -90,6 +99,74 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteDeps> = (app, deps, d
     cookies.clear(reply);
     return reply.status(204).send();
   });
+
+  // ---- email flows (SECURITY A9) -------------------------------------------------------
+  app.post(
+    '/verify-email',
+    {
+      config: { access: 'public', rateLimit: LIMITS.emailToken },
+      schema: { body: VerifyEmailBodySchema },
+    },
+    async (req, reply) => {
+      await deps.email.verify(req.body.token);
+      return reply.status(204).send();
+    },
+  );
+
+  app.post(
+    '/resend-verification',
+    {
+      config: { access: 'user' },
+      preHandler: fixedWindowLimit(
+        deps.redis,
+        deps.rateLimits,
+        'verify-resend',
+        LIMITS.verifyResendHourly,
+        byUser,
+      ),
+    },
+    async (req, reply) => {
+      const user = req.user;
+      if (!user) throw new AppError('UNAUTHENTICATED', 'Log in to continue');
+      await deps.email.resendVerification(user.id);
+      return reply.status(202).send();
+    },
+  );
+
+  app.post(
+    '/forgot-password',
+    {
+      config: { access: 'public' },
+      preHandler: [
+        fixedWindowLimit(deps.redis, deps.rateLimits, 'forgot-ip', LIMITS.forgotIpHourly),
+        fixedWindowLimit(
+          deps.redis,
+          deps.rateLimits,
+          'forgot-email',
+          LIMITS.forgotEmailHourly,
+          (r) => `e:${(r.body as { email?: string } | undefined)?.email ?? ''}`,
+        ),
+      ],
+      schema: { body: ForgotPasswordBodySchema },
+    },
+    async (req, reply) => {
+      deps.email.forgot(req.body.email); // same 202 whether or not the address exists
+      return reply.status(202).send();
+    },
+  );
+
+  app.post(
+    '/reset-password',
+    {
+      config: { access: 'public', rateLimit: LIMITS.emailToken },
+      schema: { body: ResetPasswordBodySchema },
+    },
+    async (req, reply) => {
+      await deps.email.reset(req.body.token, req.body.password);
+      cookies.clear(reply); // every session ended, this browser's too
+      return reply.status(204).send();
+    },
+  );
 
   app.get(
     '/username-available',

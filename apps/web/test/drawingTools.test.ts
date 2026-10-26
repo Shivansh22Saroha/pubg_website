@@ -18,6 +18,7 @@ import {
 } from '@/components/tools/tools';
 import type { Draft, NewElement, ToolContext, ToolPointer } from '@/components/tools/types';
 import type { ViewElement } from '@/stores/boardModel';
+import type { MeasureLine } from '@/stores/measureStore';
 
 /** TESTING §3 (web): each tool class — pointer sequences → the expected element. */
 
@@ -32,6 +33,7 @@ class Fake {
   textOpen: Pt | null = null;
   preset: number | null = null;
   allowed = true;
+  measure: MeasureLine | null = null;
 
   ctx(): ToolContext {
     return {
@@ -72,6 +74,9 @@ class Fake {
       editInline: () => undefined,
       explainLocked: () => undefined,
       laser: () => undefined,
+      setMeasure: (line) => {
+        this.measure = line;
+      },
     };
   }
 }

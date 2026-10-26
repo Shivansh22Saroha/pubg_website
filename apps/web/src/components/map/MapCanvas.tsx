@@ -112,6 +112,8 @@ export default function MapCanvas({
     minNativeZoom: 0,
     maxNativeZoom,
     keepBuffer: 4,
+    // CORS-clean tiles so a PNG export can read the canvas (FEATURES F12; DEPLOYMENT: R2 CORS)
+    crossOrigin: 'anonymous',
   } as const;
 
   return (
@@ -143,6 +145,7 @@ export default function MapCanvas({
         >
           <Pane name="placeholder" style={{ zIndex: 150 }}>
             <ImageOverlay
+              crossOrigin="anonymous"
               url={`${tilesBase}/${config.lowres}`}
               bounds={bounds}
               pane="placeholder"

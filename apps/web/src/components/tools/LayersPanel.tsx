@@ -3,6 +3,7 @@
 import {
   DRAWING_PALETTE,
   ROOM_LIMITS,
+  SNAPSHOT_LIMITS,
   type Layer,
   type LayerInput,
   type RoomRole,
@@ -384,7 +385,11 @@ export function LayersPanel({ role, session }: { role: RoomRole; session: LayerS
             description={
               confirm.kind === 'delete'
                 ? `“${confirm.layer.name}” and its ${confirm.count} element${confirm.count === 1 ? '' : 's'} will be deleted for everyone.`
-                : `All ${confirm.count} element${confirm.count === 1 ? '' : 's'} on “${confirm.layer.name}” will be removed for everyone. This can’t be undone yet.`
+                : `All ${confirm.count} element${confirm.count === 1 ? '' : 's'} on “${confirm.layer.name}” will be removed for everyone. ${
+                    confirm.count > SNAPSHOT_LIMITS.clearAutoThreshold
+                      ? 'An automatic snapshot will be saved first.'
+                      : 'This can’t be undone.'
+                  }`
             }
           >
             <div className="flex justify-end gap-2">
@@ -402,7 +407,7 @@ export function LayersPanel({ role, session }: { role: RoomRole; session: LayerS
                 onClick={() => {
                   const { kind, layer } = confirm;
                   setConfirm(null);
-                  // TODO(phase8): auto-snapshot before a clear (the server keeps the same TODO)
+                  // > 50 elements: the server saves an auto snapshot first (FEATURES F10)
                   send({
                     kind: kind === 'delete' ? 'layer:delete' : 'layer:clear',
                     layerId: layer.id,

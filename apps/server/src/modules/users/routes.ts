@@ -1,5 +1,6 @@
 import {
   ChangePasswordBodySchema,
+  DeleteMeBodySchema,
   SessionIdParamsSchema,
   SessionsResponseSchema,
   UpdateMeBodySchema,
@@ -7,14 +8,16 @@ import {
 } from '@rotationlab/shared';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { requireUser } from '../../lib/policy.js';
+import type { AuthCookies } from '../auth/cookies.js';
 import type { AuthService } from '../auth/service.js';
+import type { AccountService } from './account.js';
 
-/** /api/v1/me* (API_SPEC §3). `DELETE /me` (account deletion) is Phase 8. */
-export const userRoutes: FastifyPluginCallbackZod<{ auth: AuthService }> = (
-  app,
-  { auth },
-  done,
-) => {
+/** /api/v1/me* (API_SPEC §3). */
+export const userRoutes: FastifyPluginCallbackZod<{
+  auth: AuthService;
+  account: AccountService;
+  cookies: AuthCookies;
+}> = (app, { auth, account, cookies }, done) => {
   const user = { access: 'user' } as const;
 
   app.get(
@@ -49,6 +52,13 @@ export const userRoutes: FastifyPluginCallbackZod<{ auth: AuthService }> = (
       return { items: await auth.sessions(u.id, u.sid) };
     },
   );
+
+  /** AUTH-8: password + "DELETE"; owned rooms per `rooms` (or the fallback); logs out everywhere. */
+  app.delete('/me', { config: user, schema: { body: DeleteMeBodySchema } }, async (req, reply) => {
+    await account.deleteAccount(requireUser(req), req.body);
+    cookies.clear(reply);
+    return reply.status(204).send();
+  });
 
   app.delete(
     '/me/sessions/:id',
