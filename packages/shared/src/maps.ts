@@ -93,13 +93,5 @@ export function tileWorldSize(map: Pick<MapConfig, 'worldSize' | 'sourceSize' | 
   return (map.worldSize * map.paddedSize) / map.sourceSize;
 }
 
-/** Zone phase radii in world units, per map. `null` = presets hidden in the UI. */
-// TODO(phase0): collect verified zone phase radii per map; until then presets ship disabled.
-export const ZONE_PRESETS: Record<MapId, readonly number[] | null> = {
-  erangel: null,
-  miramar: null,
-  rondo: null,
-};
-
 /** Travel-time estimates in m/s (ARCHITECTURE §5.5) — labelled "approx." in the UI. */
 export const SPEEDS = { foot: 6, vehicle: 22 } as const;

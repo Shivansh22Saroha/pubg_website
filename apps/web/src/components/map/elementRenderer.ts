@@ -191,7 +191,7 @@ export class ElementRenderer {
   // ---- sync -------------------------------------------------------------------------------
 
   /** Diff the store view against what's on the map. */
-  sync(elements: Record<string, ViewElement>, layers: BoardLayer[]): SyncStats {
+  sync(elements: Readonly<Record<string, ViewElement>>, layers: readonly BoardLayer[]): SyncStats {
     const stats: SyncStats = { created: 0, replaced: 0, removed: 0, reordered: false };
     let layersChanged = false;
     for (const l of layers) {

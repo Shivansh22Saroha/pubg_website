@@ -1,11 +1,12 @@
 'use client';
 
 import { can, type AssignableRole, type Member, type RoomRole } from '@rotationlab/shared';
-import { Eye, EyeOff, Lock, LockOpen, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/auth/UserMenu';
 import { RoleBadge } from '@/components/rooms/bits';
+import { LayersPanel, type LayerSink } from '@/components/tools/LayersPanel';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
@@ -13,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useKickMember, useSetMemberRole } from '@/lib/rooms';
-import { useBoardStore } from '@/stores/boardStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 
 /** Right panel (UI_UX_SPEC §3.5): Chat · Layers · Members. */
@@ -22,11 +22,13 @@ export function SidePanel({
   role,
   meId,
   members,
+  session,
 }: {
   roomId: string;
   role: RoomRole;
   meId: string;
   members: Member[];
+  session: LayerSink | null;
 }) {
   return (
     <Tabs defaultValue="members" className="flex h-full flex-col">
@@ -43,44 +45,12 @@ export function SidePanel({
         Room chat with map pings arrives with live collaboration.
       </TabsContent>
       <TabsContent value="layers" className="overflow-y-auto p-2">
-        <LayersList />
+        <LayersPanel role={role} session={session} />
       </TabsContent>
       <TabsContent value="members" className="overflow-y-auto p-2">
         <MembersList roomId={roomId} role={role} meId={meId} members={members} />
       </TabsContent>
     </Tabs>
-  );
-}
-
-/** Read-only in Phase 4; layer editing goes over the socket (Phase 5/6). */
-function LayersList() {
-  // live from the board store (realtime); editing arrives with the Phase 6 layers panel
-  const layers = useBoardStore((st) => st.view.layers);
-  const ready = useBoardStore((st) => st.ready);
-  if (!ready) return <p className="p-2 text-sm text-text-muted">Loading layers…</p>;
-  return (
-    <ul className="flex flex-col" aria-label="Layers">
-      {layers.map((l) => (
-        <li
-          key={l.id}
-          className="flex items-center gap-2 rounded-control px-2 py-2 text-sm hover:bg-surface-2"
-        >
-          {/* color validated as #RRGGBB (SECURITY V5) */}
-          <span aria-hidden className="size-3 rounded-full" style={{ backgroundColor: l.color }} />
-          <span className="flex-1 truncate">{l.name}</span>
-          {l.visible ? (
-            <Eye className="size-4 text-text-muted" aria-label="Visible" />
-          ) : (
-            <EyeOff className="size-4 text-text-muted" aria-label="Hidden" />
-          )}
-          {l.locked ? (
-            <Lock className="size-4 text-text-muted" aria-label="Locked" />
-          ) : (
-            <LockOpen className="size-4 text-text-muted opacity-40" aria-label="Unlocked" />
-          )}
-        </li>
-      ))}
-    </ul>
   );
 }
 

@@ -31,6 +31,9 @@ export function makeConfig(mode: 'prod' | 'dev') {
   return defineConfig({
     testDir: './e2e',
     fullyParallel: true,
+    // the realtime tests assert ≤ 1 s sync; with half of a 12-thread machine's cores each test
+    // runs two browsers next to Next, the API and Dockerised Postgres, and latency spikes past it
+    workers: isCI ? undefined : 3,
     forbidOnly: isCI,
     retries: isCI ? 1 : 0,
     reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',

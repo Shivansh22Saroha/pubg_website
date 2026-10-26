@@ -1,6 +1,8 @@
 export * from './brand.js';
 export * from './coords.js';
+export * from './drawing.js';
 export * from './errors.js';
+export * from './geometry.js';
 export * from './maps.js';
 export * from './permissions.js';
 export * from './realtime.js';
@@ -9,3 +11,4 @@ export * from './schemas/elements.js';
 export * from './schemas/health.js';
 export * from './schemas/rooms.js';
 export * from './text.js';
+export * from './zones.js';

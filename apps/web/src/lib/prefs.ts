@@ -1,6 +1,7 @@
 /**
- * Per-device UI conveniences the spec keeps in localStorage (FEATURES F3/F4: labels choice,
- * last board per room). Never tokens or anything secret — those live in httpOnly cookies only.
+ * Per-device UI conveniences the spec keeps in localStorage (FEATURES F3/F4/F6: labels choice,
+ * last board per room, tool styles, marker kind). Never tokens or anything secret — those
+ * live in httpOnly cookies only.
  * Every access is wrapped: storage can be missing or throw (private mode, blocked site data).
  */
 /* eslint-disable no-restricted-syntax -- the one sanctioned localStorage access point */
@@ -25,4 +26,8 @@ export function writePref(key: string, value: string): void {
 
 export const prefKeys = {
   lastBoard: (roomId: string) => `lastBoard:${roomId}`,
+  /** last-used style per drawing tool (FEATURES F6) */
+  toolStyles: 'toolStyles',
+  /** last marker kind picked in the flyout (FEATURES F6) */
+  markerKind: 'markerKind',
 } as const;

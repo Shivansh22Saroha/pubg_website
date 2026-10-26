@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { ImageOverlay, MapContainer, Pane, TileLayer } from 'react-leaflet';
 import { env } from '@/env';
 import { createCrs, worldBounds } from '@/lib/coords';
+import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { GRID_PANE, GridLayer } from './GridLayer';
 import { GridLabels } from './GridLabels';
 import { MapHud } from './MapHud';
@@ -16,13 +17,6 @@ export type BaseVariant = 'labels' | 'clean';
 const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 const tileUrl = (path: string) => `${tilesBase}/${path}/{z}/{y}/{x}.webp`;
 
-function isTypingTarget(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  );
-}
-
 /**
  * Client-only map (load with next/dynamic, ssr: false). Both base variants stay mounted and
  * swap by opacity, so the labels toggle never flashes blank; the 819 px low-res art sits
@@ -31,11 +25,14 @@ function isTypingTarget(target: EventTarget | null) {
 export default function MapCanvas({
   mapId,
   children,
+  overlay,
   onCursor,
 }: {
   mapId: MapId;
   /** board layers (elements, cursors…) rendered inside the Leaflet map */
   children?: ReactNode;
+  /** DOM floating over the map, outside Leaflet (style bar, hints) */
+  overlay?: ReactNode;
   /** world-unit pointer position over the map (null when it leaves) */
   onCursor?: (pt: Pt | null) => void;
 }) {
@@ -48,17 +45,21 @@ export default function MapCanvas({
 
   useEffect(() => {
     if (!map || !onCursor) return;
-    const move = (e: L.LeafletMouseEvent) => {
-      onCursor([e.latlng.lng, e.latlng.lat]);
+    // pointer events, not Leaflet's mouse events: a tool that claims a press cancels the
+    // compat mouse events, and the cursor must keep streaming while dragging
+    const container = map.getContainer();
+    const move = (e: PointerEvent) => {
+      const ll = map.mouseEventToLatLng(e);
+      onCursor([ll.lng, ll.lat]);
     };
     const out = () => {
       onCursor(null);
     };
-    map.on('mousemove', move);
-    map.on('mouseout', out);
+    container.addEventListener('pointermove', move);
+    container.addEventListener('pointerleave', out);
     return () => {
-      map.off('mousemove', move);
-      map.off('mouseout', out);
+      container.removeEventListener('pointermove', move);
+      container.removeEventListener('pointerleave', out);
     };
   }, [map, onCursor]);
   const [variant, setVariant] = useState<BaseVariant>('labels');
@@ -76,10 +77,11 @@ export default function MapCanvas({
 
   // UI_UX_SPEC §8: N = labels, Shift+G = grid; never while typing.
   useEffect(() => {
+    const mac = isMacPlatform();
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
-      if (e.key.toLowerCase() === 'n' && !e.shiftKey) toggleLabels();
-      else if (e.key.toLowerCase() === 'g' && e.shiftKey) toggleGrid();
+      const action = resolveShortcut(e, mac);
+      if (action?.kind === 'labels') toggleLabels();
+      else if (action?.kind === 'grid') toggleGrid();
       else return;
       e.preventDefault();
     };
@@ -154,6 +156,7 @@ export default function MapCanvas({
         </MapContainer>
       </div>
       {map && grid && <GridLabels map={map} worldSize={worldSize} cells={gridCells} />}
+      {overlay}
       {map && (
         <MapHud
           map={map}

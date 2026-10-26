@@ -4,11 +4,13 @@ import type {
   AckResult,
   Board,
   BoardSubscribeAck,
+  Pt,
   ErrorCode,
   RoomDetailResponse,
   RoomJoinAck,
   RoomRole,
   ServerToClientEvents,
+  Style,
 } from '@rotationlab/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { v7 as uuid } from 'uuid';
@@ -16,6 +18,7 @@ import { keys } from '@/lib/rooms';
 import { hasGap, type LocalOp, type PendingOp } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
 import { usePresenceStore } from '@/stores/presenceStore';
+import { planSends, toWire } from './batching';
 import { getSocket, startRealtime } from './socket';
 import type { RtSocket } from './connection';
 
@@ -23,8 +26,6 @@ export const HEARTBEAT_MS = 20_000;
 export const IDLE_AFTER_MS = 120_000;
 export const CURSOR_INTERVAL_MS = 50; // 20 Hz (RT-2)
 const ACK_TIMEOUT_MS = 10_000;
-const BATCH_MAX_OPS = 50;
-const BATCH_MAX_BYTES = 60 * 1024;
 const GAP_RESYNC_MS = 2_000;
 /** transient server answers: keep the op and try again */
 const RETRY_CODES = new Set<ErrorCode>(['CONFLICT', 'RATE_LIMITED', 'INTERNAL']);
@@ -112,8 +113,9 @@ export class RoomSession {
     if (this.boardId === boardId) return;
     this.boardId = boardId;
     useBoardStore.getState().switchBoard(boardId);
-    for (const id of Object.keys(usePresenceStore.getState().cursors))
-      usePresenceStore.getState().dropCursor(id);
+    const presence = usePresenceStore.getState();
+    for (const id of Object.keys(presence.cursors)) presence.dropCursor(id);
+    for (const id of Object.keys(presence.ghosts)) presence.dropGhost(id);
     if (this.joined && this.socket.connected) void this.subscribe(false);
   }
 
@@ -179,31 +181,11 @@ export class RoomSession {
   }
 
   private emitAll(list: PendingOp[]) {
-    let chunk: PendingOp[] = [];
-    let bytes = 0;
-    const flushChunk = () => {
+    for (const chunk of planSends(list)) {
       const [first] = chunk;
       if (chunk.length === 1 && first) this.emitOp(first);
       else if (chunk.length > 1) this.emitBatch(chunk);
-      chunk = [];
-      bytes = 0;
-    };
-    for (const p of list) {
-      const isElement = p.op.kind === 'element:upsert' || p.op.kind === 'element:delete';
-      const size = JSON.stringify(toWire(p).payload).length;
-      const fits =
-        chunk.length < BATCH_MAX_OPS &&
-        bytes + size < BATCH_MAX_BYTES &&
-        chunk[0]?.boardId === p.boardId;
-      if (!isElement || !fits) flushChunk();
-      if (isElement) {
-        chunk.push(p);
-        bytes += size;
-      } else {
-        this.emitOp(p);
-      }
     }
-    flushChunk();
   }
 
   private emitBatch(chunk: PendingOp[]) {
@@ -243,28 +225,34 @@ export class RoomSession {
       });
   }
 
-  /** Several local edits at once (bulk add, multi-select move…) — sent batched. */
-  sendMany(ops: LocalOp[]): number {
-    if (!this.boardId) return 0;
-    const accepted: PendingOp[] = [];
-    for (const op of ops) {
-      const pending: PendingOp = { opId: uuid(), boardId: this.boardId, op };
-      if (!useBoardStore.getState().local(pending)) break;
-      accepted.push(pending);
-    }
-    if (this.socket.connected && this.joined) this.emitAll(accepted);
-    return accepted.length;
+  /** Joined over a live socket: ops leave right away instead of waiting in the queue. */
+  get online(): boolean {
+    return this.socket.connected && this.joined;
+  }
+
+  /**
+   * Several local edits as one action (multi-move, eraser sweep, undo…): sent as
+   * `element:batch` chunks of ≤ 50 ops. All or nothing — offline, an action that doesn't fit
+   * the queue's remaining room is refused whole (null) and nothing is queued.
+   */
+  sendMany(ops: LocalOp[]): string[] | null {
+    if (!this.boardId) return null;
+    const boardId = this.boardId;
+    const list = ops.map((op): PendingOp => ({ opId: uuid(), boardId, op }));
+    if (!useBoardStore.getState().localMany(list, this.online)) return null;
+    if (this.online) this.emitAll(list);
+    return list.map((p) => p.opId);
   }
 
   // ---- ops -------------------------------------------------------------------------------
 
-  /** A local edit. Returns false when the offline queue is full (edits blocked). */
-  send(op: LocalOp): boolean {
-    if (!this.boardId) return false;
+  /** A local edit. Returns its opId, or null when the offline queue is full (edits blocked). */
+  send(op: LocalOp): string | null {
+    if (!this.boardId) return null;
     const pending: PendingOp = { opId: uuid(), boardId: this.boardId, op };
-    if (!useBoardStore.getState().local(pending)) return false;
-    if (this.socket.connected && this.joined) this.emitOp(pending);
-    return true;
+    if (!useBoardStore.getState().local(pending)) return null;
+    if (this.online) this.emitOp(pending);
+    return pending.opId;
   }
 
   private emitOp(p: PendingOp) {
@@ -336,6 +324,21 @@ export class RoomSession {
     this.socket.volatile.emit('cursor:move', { boardId: this.boardId, x: c.x, y: c.y });
   }
 
+  /** `stroke:preview` (throttling and chunking happen in the tools' PreviewSender) */
+  strokePreview(tempId: string, points: Pt[], style: Style) {
+    if (!this.boardId || !this.socket.connected || !this.joined || points.length === 0) return;
+    this.socket.volatile.emit('stroke:preview', {
+      boardId: this.boardId,
+      tempId,
+      points: points.map(([x, y]): [number, number] => [x, y]),
+      style,
+    });
+  }
+
+  get activeBoardId() {
+    return this.boardId;
+  }
+
   // ---- server events ---------------------------------------------------------------------
 
   private on<E extends keyof ServerToClientEvents | 'connect'>(
@@ -358,6 +361,9 @@ export class RoomSession {
     this.on('connect', () => void this.onConnect());
     this.on('board:op', (op) => {
       useBoardStore.getState().remote(op);
+      // the drawer's committed element replaces their ghost
+      if (op.op.kind === 'element:upsert' && op.actorId)
+        usePresenceStore.getState().dropGhost(op.actorId);
       this.watchGap();
     });
     this.on('board:reset', ({ boardId }) => {
@@ -368,6 +374,10 @@ export class RoomSession {
     });
     this.on('cursor:move', (c) => {
       if (c.boardId === this.boardId) usePresenceStore.getState().moveCursor(c);
+    });
+    this.on('stroke:preview', ({ userId, boardId, tempId, points, style }) => {
+      if (boardId !== this.boardId || userId === this.meId) return;
+      usePresenceStore.getState().previewGhost({ userId, tempId, points, style });
     });
     this.on('board:created', ({ board }) => {
       this.updateRoom((p) =>
@@ -432,23 +442,5 @@ export class RoomSession {
       this.gapTimer = null;
       if (hasGap(useBoardStore.getState())) void this.subscribe(true);
     }, GAP_RESYNC_MS);
-  }
-}
-
-/** Pending op → socket event + payload (same opId every time it is sent). */
-export function toWire(p: PendingOp): { event: string; payload: unknown } {
-  const { opId, boardId, op } = p;
-  switch (op.kind) {
-    case 'element:upsert':
-      return { event: op.kind, payload: { opId, boardId, element: op.element } };
-    case 'element:delete':
-      return { event: op.kind, payload: { opId, boardId, elementId: op.elementId } };
-    case 'layer:upsert':
-      return { event: op.kind, payload: { opId, boardId, layer: op.layer } };
-    case 'layer:delete':
-    case 'layer:clear':
-      return { event: op.kind, payload: { opId, boardId, layerId: op.layerId } };
-    case 'layer:reorder':
-      return { event: op.kind, payload: { opId, boardId, order: op.order } };
   }
 }

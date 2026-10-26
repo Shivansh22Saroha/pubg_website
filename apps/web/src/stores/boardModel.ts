@@ -37,6 +37,32 @@ export interface PendingOp {
 
 export type ViewElement = Element & { pending?: true };
 
+// ---- undo / redo (ARCHITECTURE §7.5) ---------------------------------------------------------
+
+/**
+ * One element's part of a user action: its state before and after (null = didn't exist /
+ * deleted). Undo re-applies `before`, redo `after` — both as ordinary ops with new opIds.
+ */
+export interface Change {
+  id: string;
+  before: ElementInput | null;
+  after: ElementInput | null;
+}
+
+/** One undo step = one user action (a create, a batch move, an erase sweep, a style change). */
+export interface HistoryStep {
+  changes: Change[];
+  /** element id → opId of the op that applied this step's state (to drop it on reject) */
+  opIds: Record<string, string>;
+}
+
+export interface History {
+  undo: HistoryStep[];
+  redo: HistoryStep[];
+}
+
+export const MAX_HISTORY = 100;
+
 export interface BoardModel {
   boardId: string | null;
   meId: string;
@@ -54,6 +80,15 @@ export interface BoardModel {
   pending: PendingOp[];
   view: { elements: Record<string, ViewElement>; layers: Layer[] };
   ready: boolean;
+  /** per board, this session only (FEATURES F6: 100 steps, not persisted) */
+  history: Record<string, History>;
+  /**
+   * element id → the newest seq this user has acted on: the confirmed seq an edit was based on
+   * when it was made, raised to the seq of their own op once acknowledged (undo's seq rule)
+   */
+  mySeq: Record<string, number>;
+  /** element id → who removed it (delete / layer clear / layer delete), for "Changed by" */
+  removedBy: Record<string, string | null>;
 }
 
 export const MAX_PENDING = 500;
@@ -71,6 +106,9 @@ export function emptyModel(meId = ''): BoardModel {
     pending: [],
     view: { elements: {}, layers: [] },
     ready: false,
+    history: {},
+    mySeq: {},
+    removedBy: {},
   };
 }
 
@@ -293,12 +331,17 @@ export function applyRemote(m: BoardModel, op: BoardOp) {
   if (op.boardId !== m.boardId) return;
   const { ids, layers } = applyConfirmed(m, op.op, op.seq);
   markSeen(m, op.seq);
+  const body = op.op;
+  if (body.kind === 'element:delete') m.removedBy[body.elementId] = op.actorId;
+  else if (body.kind === 'layer:clear' || body.kind === 'layer:delete')
+    for (const id of ids) m.removedBy[id] = op.actorId;
   const idx = m.pending.findIndex((p) => p.opId === op.opId); // our own op, seen via resync
   let touched = { ids: [] as string[], layers: false };
   const mine = m.pending[idx];
   if (mine) {
     touched = idsTouchedBy(m, mine.op);
     m.pending.splice(idx, 1);
+    noteMine(m, mine.op, op.seq);
   }
   refreshView(m, [...ids, ...touched.ids], layers || touched.layers);
 }
@@ -312,10 +355,33 @@ export function applyDelta(m: BoardModel, ack: Extract<BoardSubscribeAck, { mode
   }
 }
 
+/**
+ * A bulk local edit (FEATURES F6 "Bulk operations"): all ops or none. Offline, it is refused
+ * whole when it needs more room than the queue has left; online the queue may briefly go past
+ * the cap, since the ops leave in ≤ 50-op batches right away.
+ */
+export function addLocalMany(m: BoardModel, list: PendingOp[], online: boolean): boolean {
+  if (list.length === 0) return true;
+  if (!online && m.pending.length + list.length > MAX_PENDING) return false;
+  m.pending.push(...list);
+  for (const p of list) noteBase(m, p.op);
+  const ids: string[] = [];
+  let layers = false;
+  for (const p of list) {
+    if (p.boardId !== m.boardId) continue;
+    const t = idsTouchedBy(m, p.op);
+    ids.push(...t.ids);
+    layers ||= t.layers;
+  }
+  refreshView(m, ids, layers);
+  return true;
+}
+
 /** A local edit: queued, shown immediately via the overlay. Returns false when the queue is full. */
 export function addLocal(m: BoardModel, pending: PendingOp): boolean {
   if (m.pending.length >= MAX_PENDING) return false;
   m.pending.push(pending);
+  noteBase(m, pending.op);
   if (pending.boardId === m.boardId) {
     const t = idsTouchedBy(m, pending.op);
     refreshView(m, t.ids, t.layers);
@@ -363,6 +429,7 @@ export function ackOp(m: BoardModel, opId: string, seq: number) {
   const p = m.pending[idx];
   if (!p) return;
   m.pending.splice(idx, 1);
+  noteMine(m, p.op, seq);
   if (p.boardId !== m.boardId) return; // acked while we're on another board — next load has it
   const touched = idsTouchedBy(m, p.op);
   const { ids, layers } = applyConfirmed(m, toConfirmedBody(m, p), seq);
@@ -379,10 +446,114 @@ export function rejectOp(m: BoardModel, opId: string): PendingOp | undefined {
     const t = idsTouchedBy(m, p.op);
     refreshView(m, t.ids, t.layers);
   }
+  if (p) forgetOp(m, p.boardId, opId);
   return p;
 }
 
 /** True while some seq above lastSeq arrived before the one right after it. */
 export function hasGap(m: BoardModel): boolean {
   return m.seenAbove.length > 0;
+}
+
+// ---- history -----------------------------------------------------------------------------
+
+/** A local edit is based on the element as confirmed right now. */
+function noteBase(m: BoardModel, op: LocalOp) {
+  const id =
+    op.kind === 'element:upsert'
+      ? op.element.id
+      : op.kind === 'element:delete'
+        ? op.elementId
+        : undefined;
+  if (id === undefined) return;
+  const seen = m.elements[id]?.seq ?? m.tombstones[id] ?? 0;
+  m.mySeq[id] = Math.max(m.mySeq[id] ?? 0, seen);
+}
+
+function noteMine(m: BoardModel, op: LocalOp, seq: number) {
+  if (op.kind === 'element:upsert') {
+    m.mySeq[op.element.id] = Math.max(m.mySeq[op.element.id] ?? 0, seq);
+  } else if (op.kind === 'element:delete') {
+    m.mySeq[op.elementId] = Math.max(m.mySeq[op.elementId] ?? 0, seq);
+    m.removedBy[op.elementId] = m.meId;
+  }
+}
+
+/**
+ * Pushes a step. `action` = a new user action (clears redo); `undo` = the step just undone
+ * goes to the redo stack; `redo` = the step just redone goes back on the undo stack.
+ */
+export function pushHistory(
+  m: BoardModel,
+  boardId: string,
+  step: HistoryStep,
+  kind: 'action' | 'undo' | 'redo',
+) {
+  if (step.changes.length === 0) return;
+  const h = (m.history[boardId] ??= { undo: [], redo: [] });
+  if (kind === 'action') h.redo = [];
+  const stack = kind === 'undo' ? h.redo : h.undo;
+  stack.push(step);
+  if (stack.length > MAX_HISTORY) stack.shift();
+}
+
+export function popHistory(
+  m: BoardModel,
+  boardId: string,
+  dir: 'undo' | 'redo',
+): HistoryStep | undefined {
+  return m.history[boardId]?.[dir].pop();
+}
+
+/** A rejected op never changed anything: its change leaves whichever step holds it. */
+function forgetOp(m: BoardModel, boardId: string, opId: string) {
+  const h = m.history[boardId];
+  if (!h) return;
+  for (const stack of [h.undo, h.redo]) {
+    for (const step of stack) {
+      const id = Object.keys(step.opIds).find((k) => step.opIds[k] === opId);
+      if (id === undefined) continue;
+      step.changes = step.changes.filter((c) => c.id !== id);
+      Reflect.deleteProperty(step.opIds, id);
+    }
+    const kept = stack.filter((st) => st.changes.length > 0);
+    stack.splice(0, stack.length, ...kept);
+  }
+}
+
+export interface PlannedStep {
+  /** the changes that still apply, as recorded (undo writes `before`, redo writes `after`) */
+  apply: Change[];
+  /** elements someone else changed since the step was recorded (and who did it) */
+  skipped: { id: string; by: string | null }[];
+}
+
+/**
+ * Undo / redo planning with the seq rule (ARCHITECTURE §7.5). Each element must still be as
+ * this user left it: present or absent as expected and, when present, with no confirmed write
+ * newer than the newest seq this user acted on (`mySeq`). Anything else was changed by someone
+ * else and is skipped; the rest of the step still applies.
+ */
+export function planHistory(m: BoardModel, step: HistoryStep, dir: 'undo' | 'redo'): PlannedStep {
+  const out: PlannedStep = { apply: [], skipped: [] };
+  for (const c of step.changes) {
+    const expected = dir === 'undo' ? c.after : c.before;
+    const view = m.view.elements[c.id];
+    const confirmed = m.elements[c.id];
+    const shouldExist = expected !== null;
+    if (shouldExist !== (view !== undefined)) {
+      out.skipped.push({ id: c.id, by: view ? view.updatedBy : (m.removedBy[c.id] ?? null) });
+    } else if (confirmed && confirmed.seq > (m.mySeq[c.id] ?? 0)) {
+      out.skipped.push({ id: c.id, by: confirmed.updatedBy });
+    } else {
+      out.apply.push(c);
+    }
+  }
+  return out;
+}
+
+/** Undo / redo availability for the toolbar. */
+export function historySize(m: BoardModel, boardId: string | null): { undo: number; redo: number } {
+  const h = boardId ? m.history[boardId] : undefined;
+  return { undo: h?.undo.length ?? 0, redo: h?.redo.length ?? 0 };
 }

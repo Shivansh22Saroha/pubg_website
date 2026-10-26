@@ -15,6 +15,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { BoardMapView } from '@/components/map/BoardMapView';
+import { ShortcutsDialog } from '@/components/tools/ShortcutsDialog';
+import { Toolbar } from '@/components/tools/Toolbar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,8 +29,10 @@ import { useMe } from '@/hooks/useMe';
 import { useRoomRealtime } from '@/hooks/useRoomRealtime';
 import { ApiError } from '@/lib/api';
 import { loadDebugHook } from '@/lib/debug/loadDebugHook';
+import { makeNameOf } from '@/lib/editing';
 import { prefKeys, readPref, writePref } from '@/lib/prefs';
 import { useLeaveRoom, useRoom } from '@/lib/rooms';
+import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { BoardTabs } from './BoardTabs';
 import { InviteDialog } from './InviteDialog';
 import { RoomSettingsDialog } from './RoomSettingsDialog';
@@ -40,17 +44,10 @@ import {
 } from './RealtimeStatus';
 import { SidePanel } from './SidePanel';
 
-function isTypingTarget(t: EventTarget | null) {
-  return (
-    t instanceof HTMLElement &&
-    (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
-  );
-}
-
 /**
- * Room workspace (UI_UX_SPEC §3.5): board tabs, live map of the active board, presence, sync
- * state, invite / settings dialogs, members & layers panel. Drawing tools arrive in Phase 6,
- * chat in Phase 7.
+ * Room workspace (UI_UX_SPEC §3.5): board tabs, toolbar, live map of the active board with the
+ * drawing tools, presence, sync state, invite / settings dialogs, members & layers panel,
+ * shortcut help. Chat arrives in Phase 7.
  */
 export function RoomWorkspace({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -61,7 +58,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
     typeof window === 'undefined' ? null : readPref(prefKeys.lastBoard(roomId)),
   );
   const [panelOpen, setPanelOpen] = useState(true);
-  const [dialog, setDialog] = useState<'invite' | 'settings' | null>(null);
+  const [dialog, setDialog] = useState<'invite' | 'settings' | 'help' | null>(null);
   const [gone, setGone] = useState<'kicked' | 'deleted' | null>(null);
 
   const boards = useMemo(() => query.data?.boards ?? [], [query.data]);
@@ -113,21 +110,40 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       Object.fromEntries((query.data?.members ?? []).map((m) => [m.user.id, m.user.displayName])),
     [query.data],
   );
+  const meId = me.data?.id;
+  const nameOf = useMemo(() => makeNameOf(meId ?? '', names), [meId, names]);
 
-  // UI_UX_SPEC §8: 1–9 switch board tab, ] toggles the right panel
+  // UI_UX_SPEC §8: 1–9 switch board tab, ] toggles the right panel, ? help, / chat
   useEffect(() => {
+    const mac = isMacPlatform();
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
-      if (e.key === ']') {
-        setPanelOpen((o) => !o);
-        return;
+      const action = resolveShortcut(e, mac);
+      switch (action?.kind) {
+        case 'panel':
+          setPanelOpen((o) => !o);
+          break;
+        case 'help':
+          setDialog('help');
+          break;
+        case 'chat': {
+          // Phase 7 adds the chat input; until then `/` does nothing
+          const input = document.querySelector<HTMLElement>('[data-chat-input]');
+          if (!input) return;
+          setPanelOpen(true);
+          input.focus();
+          break;
+        }
+        case 'board': {
+          const target = boards[action.index];
+          if (!target) return;
+          setPicked(target.id);
+          writePref(prefKeys.lastBoard(roomId), target.id);
+          break;
+        }
+        default:
+          return;
       }
-      const n = Number(e.key);
-      const target = Number.isInteger(n) && n >= 1 && n <= 9 ? boards[n - 1] : undefined;
-      if (target) {
-        setPicked(target.id);
-        writePref(prefKeys.lastBoard(roomId), target.id);
-      }
+      e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -161,7 +177,6 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
 
   const { room, members } = query.data;
   const role = room.role;
-  const meId = me.data.id;
 
   return (
     <div className="flex h-dvh flex-col">
@@ -276,14 +291,18 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       </header>
 
       <div className="flex min-h-0 flex-1">
+        <Toolbar role={role} session={session} nameOf={nameOf} />
         <main className="relative min-w-0 flex-1" aria-label="Map">
           {active && (
             <BoardMapView
               key={active.id}
               mapId={active.mapId}
-              meId={meId}
+              meId={me.data.id}
               names={names}
               onCursor={onCursor}
+              session={session}
+              role={role}
+              roomName={room.name}
             />
           )}
         </main>
@@ -292,7 +311,13 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             className="w-[340px] shrink-0 border-l bg-surface max-xl:w-[300px]"
             aria-label="Room panel"
           >
-            <SidePanel roomId={roomId} role={role} meId={meId} members={members} />
+            <SidePanel
+              roomId={roomId}
+              role={role}
+              meId={me.data.id}
+              members={members}
+              session={session}
+            />
           </aside>
         )}
       </div>
@@ -308,6 +333,12 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           }}
         />
       )}
+      <ShortcutsDialog
+        open={dialog === 'help'}
+        onOpenChange={(o) => {
+          setDialog(o ? 'help' : null);
+        }}
+      />
       <RoomGoneDialog reason={gone} />
       <SessionExpiredDialog />
       {dialog === 'settings' && (

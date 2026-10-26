@@ -5,7 +5,9 @@
 import { MAPS, MARKER_KINDS, type ElementInput, type MapId } from '@rotationlab/shared';
 import { v7 as uuid } from 'uuid';
 import type { RoomSession } from '@/lib/realtime/roomSession';
+import { getSocket } from '@/lib/realtime/socket';
 import { useBoardStore } from '@/stores/boardStore';
+import { useSelectionStore } from '@/stores/selectionStore';
 
 const COLORS = ['#F2A900', '#EF4444', '#22C55E', '#38BDF8', '#EC4899', '#F8FAFC'] as const;
 const TYPES = ['STROKE', 'LINE', 'ARROW', 'CIRCLE', 'POLYGON', 'TEXT', 'MARKER'] as const;
@@ -21,6 +23,13 @@ export interface RlDebug {
   lastSeq(): number;
   /** the active board is subscribed and has layers */
   ready(): boolean;
+  /** the board's elements (view), compact */
+  elements(): { id: string; type: string; layerId: string; geometry: unknown; props: unknown }[];
+  layers(): { id: string; name: string; position: number; visible: boolean; locked: boolean }[];
+  selection(): string[];
+  history(): { undo: number; redo: number };
+  /** a raw socket emit with ack — to prove the server rejects what the UI hides (E2E-5) */
+  emit(event: string, payload: unknown): Promise<unknown>;
 }
 
 declare global {
@@ -108,11 +117,13 @@ export function installRlDebug(session: RoomSession, mapId: MapId): () => void {
       const layer = s.view.layers.find((l) => !l.locked && l.visible);
       if (!s.boardId || !layer) return 0;
       const boardId = s.boardId;
-      return session.sendMany(
-        Array.from({ length: n }, (_, i) => ({
-          kind: 'element:upsert' as const,
-          element: randomElement(boardId, layer.id, mapId, i),
-        })),
+      return (
+        session.sendMany(
+          Array.from({ length: n }, (_, i) => ({
+            kind: 'element:upsert' as const,
+            element: randomElement(boardId, layer.id, mapId, i),
+          })),
+        )?.length ?? 0
       );
     },
     moveElement(id) {
@@ -141,8 +152,9 @@ export function installRlDebug(session: RoomSession, mapId: MapId): () => void {
     },
     deleteAll() {
       const ids = Object.keys(useBoardStore.getState().view.elements);
-      return session.sendMany(
-        ids.map((elementId) => ({ kind: 'element:delete' as const, elementId })),
+      return (
+        session.sendMany(ids.map((elementId) => ({ kind: 'element:delete' as const, elementId })))
+          ?.length ?? 0
       );
     },
     count: () => Object.keys(useBoardStore.getState().view.elements).length,
@@ -154,6 +166,34 @@ export function installRlDebug(session: RoomSession, mapId: MapId): () => void {
       const s = useBoardStore.getState();
       return s.ready && s.view.layers.length > 0;
     },
+    elements: () =>
+      Object.values(useBoardStore.getState().view.elements).map((e) => ({
+        id: e.id,
+        type: e.type,
+        layerId: e.layerId,
+        geometry: e.geometry,
+        props: e.props,
+      })),
+    layers: () =>
+      useBoardStore.getState().view.layers.map((l) => ({
+        id: l.id,
+        name: l.name,
+        position: l.position,
+        visible: l.visible,
+        locked: l.locked,
+      })),
+    selection: () => [...useSelectionStore.getState().ids],
+    history: () => {
+      const s = useBoardStore.getState();
+      const h = s.boardId ? s.history[s.boardId] : undefined;
+      return { undo: h?.undo.length ?? 0, redo: h?.redo.length ?? 0 };
+    },
+    emit: (event, payload) =>
+      (
+        getSocket().timeout(5_000) as unknown as {
+          emitWithAck: (e: string, p: unknown) => Promise<unknown>;
+        }
+      ).emitWithAck(event, payload),
   };
   window.__rlDebug = api;
   return () => {

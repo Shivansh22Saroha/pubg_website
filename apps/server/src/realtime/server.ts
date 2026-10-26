@@ -191,8 +191,16 @@ export function createRealtime(d: RealtimeDeps): {
   });
 
   // ---- presence broadcast ---------------------------------------------------------------
+  /** Never rejects (it is often fire-and-forget): a Redis failure is logged, not thrown. */
   async function broadcastPresence(roomId: string) {
-    io.to(ch.room(roomId)).emit('presence:update', { roomId, users: await presence.list(roomId) });
+    try {
+      io.to(ch.room(roomId)).emit('presence:update', {
+        roomId,
+        users: await presence.list(roomId),
+      });
+    } catch (err) {
+      log.warn({ err, roomId }, 'presence broadcast failed');
+    }
   }
 
   function broadcastOps(socket: RtSocket, boardId: string, ops: BoardOp[]) {
@@ -446,7 +454,13 @@ export function createRealtime(d: RealtimeDeps): {
     socket.on('disconnect', () => {
       clearTimeout(expiryTimer);
       for (const roomId of socket.data.rooms) {
-        void presence.leave(roomId, user.id, socket.id).then(() => broadcastPresence(roomId));
+        // fire-and-forget, but never an unhandled rejection (Redis gone → process crash)
+        presence
+          .leave(roomId, user.id, socket.id)
+          .then(() => broadcastPresence(roomId))
+          .catch((err: unknown) => {
+            log.warn({ err, roomId }, 'presence leave on disconnect failed');
+          });
       }
     });
   });
@@ -474,11 +488,15 @@ export function createRealtime(d: RealtimeDeps): {
   );
   d.events.on('member:left', ({ roomId, userId }) => {
     io.to(ch.room(roomId)).emit('member:left', { userId });
-    void evict(roomId, userId, false);
+    evict(roomId, userId, false).catch((err: unknown) => {
+      log.warn({ err, roomId }, 'evict after leave failed');
+    });
   });
   d.events.on('member:kicked', ({ roomId, userId }) => {
     io.to(ch.room(roomId)).emit('member:kicked', { userId });
-    void evict(roomId, userId, true);
+    evict(roomId, userId, true).catch((err: unknown) => {
+      log.warn({ err, roomId }, 'evict after kick failed');
+    });
   });
   d.events.on('member:roleChanged', ({ roomId, userId, role }) =>
     io.to(ch.room(roomId)).emit('member:roleChanged', { userId, role }),
@@ -511,8 +529,9 @@ export function createRealtime(d: RealtimeDeps): {
         io.engine.close();
         resolve();
       });
-      pub.disconnect();
-      sub.disconnect();
+      // quit, not disconnect: disconnectSockets just published through the adapter, and a
+      // hard disconnect rejects that pending reply ("Connection is closed", unhandled)
+      await Promise.allSettled([pub.quit(), sub.quit()]);
     },
   };
 }

@@ -158,6 +158,8 @@ Implementation notes (Phase 5A/5B):
 - `element:batch` broadcasts one `board:op` per op (consecutive seqs). Deleting an element that is already gone still gets a seq (no-op) so every client converges.
 - Locked layer → `FORBIDDEN`; element outside the map → `VALIDATION_ERROR`; > 5 000 elements or > 10 layers → `LIMIT_REACHED`; last layer → `CONFLICT`.
 - A resent `opId` (same user, within 10 min) returns the original seq(s) and is not re-applied or re-broadcast.
+- **Batch semantics:** each *attempt* of `element:batch` is all-or-nothing (one transaction — any invalid op rejects the whole attempt). Resends are deduped **per op** (`opId`), so a retry of a batch whose ops were partly applied by an earlier attempt replays the known seqs and applies only the rest. Partial application across retries is therefore safe and converges.
+- **Ephemeral events are best-effort:** `cursor:move`, `laser:point`, `stroke:preview` and `view:update` are volatile — they can be dropped (rate cap, invalid payload, a receiver still flushing, reconnects) and are never replayed. Clients must not depend on receiving every one (ghosts expire after 3 s without updates, cursors fade after 5 s).
 - Volatile events are dropped silently when invalid, over the cap, or not on the board the socket subscribed to; `stroke:preview` only flows from roles that can draw; `view:update` goes only to sockets that sent `follow:start` for that user.
 
 ### 7.2 Client → server
@@ -176,7 +178,7 @@ Implementation notes (Phase 5A/5B):
 | `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | body trimmed 1–500 chars |
 | `chat:typing` | `{ roomId }` | – | volatile, ≤ 1 / 2 s |
 | `cursor:move` | `{ boardId, x, y }` | – (no ack, volatile) | ≤ 20 Hz |
-| `stroke:preview` | `{ boardId, tempId, points: Pt[], style }` | – volatile | only new points since last |
+| `stroke:preview` | `{ boardId, tempId, points: Pt[], style }` | – volatile, best-effort | only new points since last; ≤ 20 Hz |
 | `laser:point` | `{ boardId, x, y }` | – volatile | |
 | `view:update` | `{ boardId, center: Pt, zoom }` | – volatile | only sent while ≥ 1 follower |
 | `follow:start` / `follow:stop` | `{ targetUserId }` | – | |

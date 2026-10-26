@@ -120,7 +120,7 @@ Desktop ≥ 1280 px:
 
 **Left toolbar (56 px, vertical)** — buttons 40×40, tooltip with name + shortcut on hover:
 Select (V) · Pen (P) · Line (L) · Arrow (A) · Circle (C) · Polygon (G) · Text (T) · Marker (M, opens marker picker flyout) · Eraser (E) · Measure (R) · Laser (K) · — · Undo (Ctrl+Z) · Redo (Ctrl+Shift+Z).
-Active tool: `--accent` background, `--accent-fg` icon. Viewers see only Select, Measure, Laser.
+Active tool: `--accent` background, `--accent-fg` icon. Viewers see only Select, Measure, Laser. Until Measure (Phase 8) and Laser (Phase 7) exist, their buttons are shown disabled with a "coming in a later update" tooltip. Undo / Redo are disabled while their stack is empty and hidden for viewers.
 
 **Style bar** (floating, bottom-center of map, appears when a drawing tool or a selection is active): palette swatches, custom color, stroke width (S/M/L = 2/4/7 px), dashed toggle, fill opacity slider (closed shapes), for circle tool a "Zone presets ▾" dropdown. With a selection: also Delete and "Move to layer ▾".
 
@@ -128,7 +128,7 @@ Active tool: `--accent` background, `--accent-fg` icon. Viewers see only Select,
 
 **Right panel (340 px, collapsible to 0 with `]`)**, three tabs:
 - *Chat*: message list (avatar, name in presence color, time, text; pings render as a chip `📍 F-M 4,7 · Erangel – Drop A`), system messages centered muted; input with 📍 ping button and send; Enter sends, Shift+Enter newline; char counter after 400.
-- *Layers*: list of layers (drag handle, color dot, name, eye toggle, lock toggle, kebab: rename/color/delete); "+ Add layer"; active layer highlighted — new elements go to active layer.
+- *Layers*: list of layers, **top-most first** (drag handle, color dot, name + element count, eye toggle, lock toggle, kebab: rename / color / clear layer / delete); "+ Add layer" (≤ 10); active layer highlighted — click a row to make it active; new elements go to the active layer. Eye: board-wide visibility (Editor+); Alt+click hides it for you only (closed-eye icon in the accent colour). Lock: a button for the owner, a read-only icon for everyone else. Delete and Clear ask for confirmation and show the element count.
 - *Members*: online first, then offline; role badge; Owner sees role dropdown + Kick.
 
 ### 3.6 Room settings (dialog)
@@ -209,7 +209,7 @@ Touch: one finger draws in drawing tools, two fingers always pan/zoom. Long-pres
 | \] | toggle right panel |
 | ? | shortcut help dialog |
 
-Shortcuts disabled while focus is in an input.
+Shortcuts disabled while focus is in an input, a dialog or a menu. On macOS the modifier is Cmd; Ctrl+Y (redo) works everywhere. While a drawing tool is busy, Enter / Esc / Backspace go to the tool first (finish, cancel, remove last polygon vertex).
 
 ## 9. States & feedback
 - **Loading**: skeleton cards on dashboard; on room load show low-res map preview (819 px image) blurred → crisp tiles.

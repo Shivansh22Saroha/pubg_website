@@ -192,15 +192,23 @@ client                         server                                  other cli
 | `laser:point` | ≤ 30 Hz | laser trail |
 | `view:update` | ≤ 10 Hz | viewport broadcast, only while someone follows you |
 
+All ephemeral events are **best-effort**: volatile emits may be dropped and are never replayed, so receivers expire stale state (ghost after 3 s, cursor fade after 5 s).
+
 ### 7.4 Join / resync
 1. `room:join {roomId}` → server checks membership → returns `{ room, members, presence, boards[] }`.
 2. `board:subscribe {boardId, sinceSeq?}`
    - if `sinceSeq` given and op log still holds `sinceSeq+1 … last` → server sends `board:ops {ops[]}` (delta).
    - else → `board:state {layers, elements, seq}` (full snapshot; elements of a board are ≤ 5 000 so a full load is acceptable, gzip via perMessageDeflate).
 3. Pending local ops that were never acked are re-sent after resync (idempotent by `opId`: server keeps a 10-minute `opId` dedupe set in Redis).
+4. **Offline queue and bulk ops:** the client queues at most **500 ops** while unacknowledged (the cap counts ops, not user actions). Online, bulk actions go out as `element:batch` chunks of ≤ 50 ops. Offline, a bulk action whose op count exceeds the remaining queue capacity is refused whole with a toast — never partially queued. `layer:clear` counts as one op.
 
 ### 7.5 Undo / redo
 Client-side only. Each local action pushes an **inverse op** onto the user's undo stack. Undo = send the inverse as a normal op. If the element was since changed by someone else (`seq` moved), undo of that item is skipped with a toast "changed by X".
+
+Implementation (Phase 6, `stores/boardModel.ts` + `lib/editing.ts`):
+- A step stores, per element, its state **before and after** the action (`null` = absent). Undo writes `before`, redo writes `after`, each as a new op with a new opId; bulk steps go out as `element:batch` chunks of ≤ 50.
+- The seq rule uses `mySeq[id]` = the newest seq this user acted on: the confirmed seq an edit was based on when it was queued, raised to the user's own op's seq on ack. An element is "changed by someone else" when its confirmed seq is above `mySeq[id]`, or when it exists / doesn't exist contrary to the step. The name comes from `updatedBy`, or from whoever deleted it.
+- 100 steps per board, session-only; a rejected op removes its element from the step that holds it.
 
 ### 7.6 Presence
 Redis hash `presence:{roomId}` → `userId → {socketCount, boardId, lastActive, color}` with 60 s TTL refreshed by heartbeat. Multiple tabs counted. Broadcast `presence:update` on change.

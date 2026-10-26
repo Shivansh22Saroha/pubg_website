@@ -64,9 +64,10 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 **Rules**
 - 1–10 layers per board. New elements go to the **active layer** (per user, local).
 - `visible` (board-wide) toggled by Editor+ affects everyone; each user can also locally "solo/hide" a layer (eye with slash in their own view only — shown as a different icon). v1: local hide only via Alt+click eye.
-- `locked`: server rejects element ops on that layer; select tool ignores its elements.
-- Deleting a layer deletes its elements (confirm shows count). Can't delete the last layer.
-- Reorder changes rendering order (z of layer > z of element).
+- `locked`: server rejects element ops on that layer **for every role, the owner included** (the owner unlocks first); select and eraser ignore its elements for everyone, and drawing on it is blocked with a toast. Only the owner can lock / unlock, rename, recolor or delete a locked layer; nobody can clear it.
+- Deleting a layer deletes its elements (confirm shows count). Can't delete the last layer. "Clear layer" (kebab) removes its elements after a confirm.
+- Reorder changes rendering order (z of layer > z of element). The panel lists the **top-most layer first**.
+- Layer ops (add, rename, recolor, visibility, lock, reorder, clear, delete) are not part of undo / redo in v1.
 
 ---
 
@@ -75,7 +76,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 
 | Tool | Interaction | Stored as | Notes |
 |---|---|---|---|
-| **Select (V)** | click to select, Shift+click multi, drag on empty map = pan, Shift+drag = marquee select; drag selected to move; circle shows radius handle; text double-click to edit | – | moving many elements → single `element:batch` on drop |
+| **Select (V)** | click to select, Shift+click multi, drag on empty map = pan, Shift+drag = marquee select; drag selected to move; circle shows radius handle; text double-click to edit | – | moving many elements → single `element:batch` on drop (chunked ≤ 50 ops) |
 | **Pen (P)** | press-drag-release | STROKE | points sampled every ≥ 4 px screen distance, simplified (simplify-js, tolerance = 1.5 px in world units at current zoom), max 2 000 points (auto-commit and start a new stroke when exceeded) |
 | **Line (L)** | press-drag-release | LINE | Shift snaps to 15° |
 | **Arrow (A)** | click start, click bends, double-click / Enter to finish; or press-drag-release for a straight arrow | ARROW | max 50 points; head at last point; optional "double-headed" in style bar (P2) |
@@ -87,6 +88,14 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 | **Measure (R)** | click points, double-click to finish; shows segment + total metres + travel time; Esc clears | – (local only) | P2: "Save as line" button converts to LINE element |
 | **Laser (K)** | hold mouse button/finger to show a fading trail to everyone | – (ephemeral) | trail lifetime 1.5 s |
 
+**Select details** (Phase 6)
+- Hit priority: topmost on screen — layer order, then z (markers / text above vectors on ties); only shown, unlocked layers. Tolerance ≈ 6 px on screen around paths; markers hit inside their 28 px icon, text inside its label pill.
+- Pressing an unselected element selects it (Shift adds), so a press-drag moves it straight away. A click on an already selected element of a multi-selection selects just that one. A press that pans (or moves < 3 px) on empty map clears the selection.
+- Marquee (Shift+drag on empty map) is **additive**: it adds elements whose bounding box intersects it. Ctrl/Cmd+A selects every element of the active layer and switches to Select.
+- While dragging, the move / resize is shown locally only; one batch is sent on release. A move is clamped so the whole selection stays on the map.
+- Double-click edits a text's text or a marker's label inline (textContent only, same length limits as creation). Ctrl/Cmd+D duplicates with new ids, offset +2 000 cm on x and y (clamped to the map), as one batch; the copies become the selection.
+- Viewers: Select only pans; nothing can be selected. Other users' selections are not shown in v1.
+
 **Styles**
 - Color, width S/M/L (2/4/7 px screen), dashed, fill opacity (0–60 %, closed shapes).
 - Last-used style remembered per tool.
@@ -95,7 +104,10 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 **Undo / redo**
 - Per user, 100 steps, session-only (not persisted across reloads).
 - Undo of create → delete; of delete → re-create with same id; of update → previous values.
-- If target changed by someone else since (seq mismatch) → skip + toast.
+- If target changed by someone else since (seq mismatch) → skip + toast "Changed by {name}"; the rest of the step still applies, and only the applied part can be redone.
+- One step per user action: a create, a batch move, an erase sweep, a delete / duplicate, one style-bar change, an inline text edit. Stacks are kept per board; a new action clears redo.
+
+**Bulk operations** — the offline queue cap (500, ARCHITECTURE §7.4) counts **ops**, not actions. Online, bulk actions (multi-move, paste, eraser drag, group undo) are sent as `element:batch` messages of ≤ 50 ops. Offline, a bulk action that needs more ops than the queue has room for is **refused whole** with a toast ("Too many changes while offline — reconnect first"), never partially queued. `layer:clear` is a single op however many elements it removes.
 
 **Limits** — 5 000 elements/board: at 4 500 show warning; at 5 000 tool commits fail with toast "Board is full — duplicate to a new board or clean up".
 
@@ -122,6 +134,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 ---
 
 ## F8. Realtime collaboration [RT-1…7]
+- **Ephemeral events are best-effort**: cursors, laser, `stroke:preview` ghosts and follow-mode view updates may be dropped and are never replayed; the UI tolerates gaps (ghosts vanish after 3 s without updates, cursors fade).
 - **Cursors**: shown only for users on the same board; name pill; hidden while user is idle > 5 s (fade) or follow mode active.
 - **Presence**: online dot; idle (2 min no input) shows half-opacity avatar; board dots on tabs.
 - **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following").

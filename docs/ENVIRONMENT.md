@@ -17,8 +17,8 @@ Generate secrets with: `openssl rand -base64 48`
 | `NODE_ENV` | ✓ | `development` | `development` \| `test` \| `production` |
 | `PORT` | ✓ | `4000` | HTTP + Socket.IO port |
 | `APP_ORIGIN` | ✓ | `http://localhost:3000` | exact browser origin; used for Origin/CSRF checks and cookie logic |
-| `DATABASE_URL` | ✓ | `postgresql://rl:rl_dev_pw@localhost:5432/rotationlab?schema=public` | Postgres connection |
-| `REDIS_URL` | ✓ | `redis://:redis_dev_pw@localhost:6379/0` | Redis connection |
+| `DATABASE_URL` | ✓ | `postgresql://rl:rl_dev_pw@127.0.0.1:5432/rotationlab?schema=public` | Postgres connection. Use `127.0.0.1`, not `localhost`: compose binds IPv4 only, and on Windows the Prisma engine tries `::1` first, so every new pooled connection waits ≈ 2 s for the refusal (P2028 "Unable to start a transaction in the given time" under load) |
+| `REDIS_URL` | ✓ | `redis://:redis_dev_pw@127.0.0.1:6379/0` | Redis connection (`127.0.0.1` for the same reason) |
 | `JWT_SECRET` | ✓ | *(48+ random bytes base64)* | HS256 signing key for access tokens |
 | `JWT_SECRET_PREVIOUS` | – | | accepted for verification during rotation |
 | `JWT_ISSUER` | ✓ | `rotationlab` | `iss` claim |

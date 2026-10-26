@@ -1,19 +1,23 @@
 'use client';
 
 import type { BoardOp, BoardSubscribeAck } from '@rotationlab/shared';
-import { enableMapSet } from 'immer';
+import { current, enableMapSet, isDraft } from 'immer';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import {
   ackOp,
   addLocal,
+  addLocalMany,
   applyDelta,
   applyRemote,
   emptyModel,
   loadFull,
   MAX_PENDING,
+  popHistory,
+  pushHistory,
   rejectOp,
   type BoardModel,
+  type HistoryStep,
   type PendingOp,
 } from './boardModel';
 
@@ -26,6 +30,10 @@ interface BoardActions {
   subscribed: (boardId: string, ack: BoardSubscribeAck) => void;
   remote: (op: BoardOp) => void;
   local: (op: PendingOp) => boolean;
+  /** all or nothing (bulk-op rule) */
+  localMany: (ops: PendingOp[], online: boolean) => boolean;
+  pushHistory: (boardId: string, step: HistoryStep, kind: 'action' | 'undo' | 'redo') => void;
+  popHistory: (boardId: string, dir: 'undo' | 'redo') => HistoryStep | undefined;
   ack: (opId: string, seq: number) => void;
   reject: (opId: string) => PendingOp | undefined;
   reset: () => void;
@@ -73,6 +81,26 @@ export const useBoardStore = create<BoardStore>()(
         ok = addLocal(s, op);
       });
       return ok;
+    },
+    localMany: (ops, online) => {
+      let ok = false;
+      set((s) => {
+        ok = addLocalMany(s, ops, online);
+      });
+      return ok;
+    },
+    pushHistory: (boardId, step, kind) => {
+      set((s) => {
+        pushHistory(s, boardId, step, kind);
+      });
+    },
+    popHistory: (boardId, dir) => {
+      let step: HistoryStep | undefined;
+      set((s) => {
+        const popped = popHistory(s, boardId, dir);
+        step = popped && isDraft(popped) ? current(popped) : popped; // plain object, out of the draft
+      });
+      return step;
     },
     ack: (opId, seq) => {
       set((s) => {

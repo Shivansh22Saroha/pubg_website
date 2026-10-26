@@ -16,6 +16,12 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 ### Docs
 - 2026-10-25 — Initial specification pack created: README, PRD, ARCHITECTURE, UI_UX_SPEC, DATABASE_SCHEMA, API_SPEC, SECURITY, TECH_STACK, USER_FLOWS, FEATURES, ENVIRONMENT, TESTING, DEPLOYMENT, CHANGELOG, TODO.
 - Verified PUBG `api-assets` map files: high-res art for Erangel (~95 MB), Miramar (~112 MB) and Rondo (~118–122 MB) is stored in Git LFS with labelled (`_Main_`) and unlabelled (`_Main_No_Text_`) variants; low-res variants are 819×819; `Rondo_Main_Low_Res.png` is actually JPEG data. Telemetry names: Erangel `Erangel_Main`/`Baltic_Main`, Miramar `Desert_Main`, Rondo `Neon_Main`.
+- 2026-10-26 — Phase 6 spec clarifications. No 6A report with spec problems was found in the repo (6A was uncommitted), so these are the problems found while finishing Phase 6:
+  - FEATURES F5: locked = element ops refused for every role, owner included (matches API_SPEC and the server); the panel lists the top-most layer first; layer ops are not undoable in v1; "Clear layer" confirms.
+  - FEATURES F6: a "Select details" block (hit priority and tolerance, additive marquee, press-to-select-and-drag, move clamping, inline edit, duplicate offset, viewers pan only); what one undo step is; per-board stacks; redo only what applied.
+  - ARCHITECTURE §7.5: before/after steps and the `mySeq` baseline of the seq rule.
+  - UI_UX_SPEC §3.5: Measure / Laser disabled until built, layer-row contents, local-hide icon, lock read-only for non-owners. §8: Cmd on macOS, Ctrl+Y everywhere, tools take Enter / Esc / Backspace first, off inside dialogs and menus.
+  - TESTING §7: end-of-phase perf claims use an A/B run on the same machine.
 
 ### Added
 - 2026-10-25 — **Phase 1 scaffold** (TODO Phase 1):
@@ -149,6 +155,37 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - Tests: web unit 74 (store rules incl. the remote-higher-seq-while-pending edge case, socket refresh flow with a fake socket, renderer diffing + marker DOM safety); E2E realtime (two contexts): 20 elements synced < 1 s + a move, presence + cursors, offline queue, API kill/restart mid-session (supervisor `scripts/e2e-api.ts`), kick; perf benchmark.
   - **Perf (headless Chromium, software rendering), pan 5 s:** empty board 319 frames · avg 16.7 ms · p95 16.7 ms; **1 000 mixed elements 275 frames · avg 18.6 ms · p95 33.3 ms · max 50.0 ms.**
   - Smoke script rerun: ack and broadcast p50 21.1 ms / p95 27.1 ms / max 45.6 ms.
+- 2026-10-26 — **Phase 6: drawing tools** (TODO Phase 6; DRAW-1…9, BOARD-4; FEATURES F5/F6/F7, UI_UX_SPEC §3.5/§6/§8, ARCHITECTURE §7.5). 6A (tools) was found uncommitted and not wired into the room, so it was finished here together with 6B.
+  - Shared:
+    - `geometry.ts`: boxes, point/segment/polyline distances, point-in-polygon, `hitTest`, circle helpers, 15° snap, `clampToWorld` (6A); `unionBBox`, `bboxFromCorners`, `anchorBBox`, `clampTranslation`, `translateGeometry`, `sweepPoints` (6B).
+    - `drawing.ts`: palette, marker default colours, stroke widths. `zones.ts`: per-map zone presets, shipped empty (`TODO(phase0)`), which hides the dropdown.
+  - Tools (`components/tools`), all as state machines over integer world units:
+    - Pen (≥ 4 px sampling, simplify-js at 1.5 px, 2 000-point auto-split), Line (Shift = 15°), Arrow (clicks + Enter / double-click, or press-drag-release), Circle (radius label in m, Shift = from the edge, presets), Polygon (close on the first vertex / Enter, Backspace removes the last vertex), Text (inline input), Marker (flyout, remembered kind, auto-number: enemy 1–25, own player 1–4).
+    - `stroke:preview` at 20 Hz in ≤ 200-point chunks; other users' ghosts at 50 % in their presence colour, expiring after 3 s.
+    - **Select (V)**: topmost hit by layer order, then z; Shift+click toggles; click on empty map clears; plain drag on empty map pans (Leaflet); Shift+drag = additive marquee by bounding box; dragging moves the whole selection, previewed locally and committed once on release; radius handle on circles; double-click edits a text / marker label inline. Selection outline: 1.5 px dashed in your presence colour with handles.
+    - **Eraser (E)**: click deletes the topmost element; a drag deletes everything the path touches (sampled ≤ 6 px apart, so fast drags don't skip), highlighted during the drag, one batch on release. Hover shows what a click would erase.
+    - Both ignore hidden and locked layers, and tell the user once per layer that it is locked.
+  - Toolbar (UI_UX_SPEC §3.5): per-role tools (viewers: Select, Measure, Laser — the last two disabled until Phases 8 / 7), marker picker flyout, Undo / Redo disabled while empty.
+  - Style bar:
+    - With a drawing tool: palette + custom colour, S/M/L width, dashed, fill 0–60 % (closed shapes), text size, marker label, zone presets; the last style is remembered per tool.
+    - With a selection: edits the selected elements (colour, width, dashed, fill, label / text, one batch per change), plus Delete and "Move to layer ▾". Viewers get the "View only" banner instead.
+  - **Undo / redo** (ARCHITECTURE §7.5):
+    - Per board, 100 steps, session-only, in `boardStore`. A step stores before/after per element; undo and redo go out as normal ops with new opIds.
+    - Seq rule: an element someone else changed since is skipped with the toast "Changed by {name}", and the rest of the step applies. A new action clears redo; a rejected op leaves the history.
+  - **Bulk ops** (FEATURES F6): `RoomSession.sendMany` is all-or-nothing and sends ≤ 50-op `element:batch` chunks (`planSends`). Offline, an action larger than the queue's remaining room is refused whole with "Too many changes while offline — reconnect first"; online it may briefly exceed the 500 cap.
+  - **Layers panel** (UI_UX_SPEC §3.5):
+    - Rows list the top-most layer first: drag handle (reorder → `layer:reorder`), colour dot, name + element count, eye, lock, kebab (rename / colour / clear layer / delete). Add layer (≤ 10); never the last layer.
+    - Clicking a row makes it the active layer (local). The eye sets board-wide visibility (Editor+); Alt+click hides a layer only for you (closed-eye icon).
+    - Lock is a button for the owner and a read-only icon for everyone else. Delete and Clear confirm with the element count. The auto-snapshot before a clear stays `TODO(phase8)`.
+  - **Shortcuts** (UI_UX_SPEC §8):
+    - One resolver (`lib/shortcuts.ts`) covers tools, Ctrl/Cmd+Z / Shift+Z / Ctrl+Y, Delete / Backspace, Ctrl/Cmd+D (duplicate +2 000 cm), Ctrl/Cmd+A (active layer), Esc, Enter, Space-hold pan, 1–9, Shift+G, N, `/` (no-op until Phase 7) and `]`. `?` opens the help dialog built from the same table.
+    - Shortcuts are off while focus is in an input, a dialog or a menu; macOS uses Cmd.
+  - Empty-board hint (UI_UX_SPEC §9). The map's cursor broadcast now uses pointer events, so it keeps streaming while a tool owns a drag.
+  - Dev/E2E debug hook: `elements()`, `layers()`, `selection()`, `history()`, raw `emit()` (to prove the server rejects what the UI hides).
+  - Tests:
+    - Shared 98 (+ selection geometry); web unit 150 (+76): every drawing tool's pointer sequences, preview throttling, gating, hit priority, marquee, move batching, eraser sweep, duplicate offsets, every undo / redo case incl. the seq-skip toast, redo clearing, rejects and the bulk-op rule, ≤ 50-op chunking, shortcuts incl. focused inputs and macOS, layer panel permissions.
+    - E2E `drawing.spec.ts` (two contexts, real mouse + keyboard): **E2E-3** (arrow, circle, enemy marker < 1 s; B moves the marker), select + move + undo / redo for both, "Changed by" on a remotely changed element, eraser sweep of 3, **E2E-9** (lock: no select / erase / draw, read-only lock icon, server refuses a crafted delete), layer reorder + visibility sync + Alt+click local hide + add / delete, Ctrl+A / Ctrl+D / Delete / `?` / typing in a field, **E2E-5** (viewer: 3 tools, crafted `element:upsert` → `FORBIDDEN`), **E2E-8** with tools (3 shapes offline → exactly 3), ghosts + double-click text edit.
+  - **Perf, A/B on the same machine back to back** (headless Chromium, software rendering, pan 5 s): Phase 5B code: empty 23.3 ms, 1 000 elements avg 29.5 ms · p95 50.0 ms. Phase 6: empty 20.9 ms, 1 000 elements avg 20.5 ms · p95 33.4 ms. No regression. Those runs were made while every new DB connection cost ≈ 2 s (see Fixed: `localhost` → `127.0.0.1`). With that fixed, two full `pnpm test:e2e` runs gave empty 16.7 ms, 1 000 elements **17.3 / 16.9 ms** avg (p95 16.8 ms), against the recorded 5B baseline of 18.6 ms.
 - 2026-10-25 — Phase 5A follow-ups:
   - Layer lock/unlock and edits to a locked layer are OWNER-only (`layer.lock` permission); editors still create / rename / recolour / reorder / delete unlocked layers. SECURITY §3, API_SPEC, both authz matrices updated.
   - Socket session expiry: the server records the token `exp` per socket, emits `session { expiresAt }`, and disconnects with `TOKEN_EXPIRED` `SOCKET_TOKEN_GRACE_SEC` (60 s) after it — one timer per socket, cleared on disconnect. Integration-tested.
@@ -159,6 +196,17 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - **Kick + block**: `room_bans`, `DELETE …/members/:userId { ban?: true }`, `GET /rooms/:roomId/bans`, `DELETE /rooms/:roomId/bans/:userId`, invite accept → generic 403 for banned users. UI: "Also block them from rejoining" in the kick dialog; Room settings → Security → Blocked users with Unban.
   - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
   - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
+
+### Decisions (Phase 6)
+- **Locked layers are locked for every role, the owner included.** FEATURES F5, API_SPEC §7.2 ("layer unlocked") and the server agree: element ops on a locked layer are refused for everyone. The 6A client let the owner draw on a locked layer, which the server would then roll back. That is fixed, and select / eraser ignore locked layers for every role. The owner unlocks first. (The Phase 6B brief said "non-owners can't select" — see the report.)
+- The layers panel lists the top-most layer first, the usual layer-panel convention; rendering order is unchanged (higher `position` draws on top).
+- The marquee is additive (it needs Shift, which already means "add" for clicks). Pressing an unselected element selects it, so a press-drag moves it straight away.
+- Undo / redo stacks are kept per board; switching boards keeps them for the session. Layer ops are not undoable in v1. Only the part of a step that applied can be redone.
+- The seq baseline (`mySeq`) is taken when an op is queued, not only when it is acknowledged, so undoing right after an edit works before the ack arrives.
+- Online, bulk actions may push the pending count past 500 for a moment (they leave in ≤ 50-op batches at once); the 500 cap and the "refused whole" rule apply offline.
+- Measure (Phase 8) and Laser (Phase 7) are in the toolbar but disabled, so viewers see exactly 3 tools (E2E-5).
+- Selection corner handles are visual only (v1 has no scaling); the circle's radius handle is the one that works.
+- Dependencies (TECH_STACK): simplify-js 1.2.4 (web).
 
 ### Decisions (Phase 5B)
 - Dev/E2E sockets connect directly to the API (`NEXT_PUBLIC_SOCKET_URL`); the Next dev rewrite does not carry websocket upgrades. Production is unchanged (same origin via Caddy).
@@ -202,6 +250,11 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 - New dependencies (all in TECH_STACK): `@node-rs/argon2` 2.2.2, `jose` 6.2.13, `@fastify/cookie` 11.1.3, `@fastify/rate-limit` 11.2.1, `uuid` 14.0.3, `@tanstack/react-query` 5.104.5, `react-hook-form` 7.91.0, `@hookform/resolvers` 6.0.0 (Zod 4 compatible), `sonner` 2.0.8.
 
 ### Fixed
+- 2026-10-26 — Realtime server: the fire-and-forget `presence.leave` on socket disconnect, `evict` after leave / kick and `broadcastPresence` had no rejection handler. With Redis unavailable they were unhandled rejections, which crash Node 22 by default (seen as 2 "Connection is closed" errors in `pnpm test:int` teardown). They now log a warning. `close()` uses `quit()` instead of `disconnect()` on the adapter clients, so pending publishes complete.
+- 2026-10-26 — Dev env defaults (`apps/server/.env.example`, ENVIRONMENT.md): `DATABASE_URL` / `REDIS_URL` now use `127.0.0.1` instead of `localhost`. Compose binds IPv4 only, and on Windows the Prisma engine tries `::1` first, so every new pooled connection waited ≈ 2 050 ms (13 ms with `127.0.0.1`). Under concurrent load that surfaced as P2028 "Unable to start a transaction in the given time" (500 on `POST /rooms`) and > 1 s sync in the E2E latency tests.
+- 2026-10-26 — Local Playwright runs are capped at 3 workers (CI unchanged). With 6 workers on a 12-thread machine, 12 browsers plus Next, the API and Postgres pushed op latency past the 1 s E2E-3 assertion.
+- 2026-10-26 — `apps/server/package.json` and the lockfile had never declared the server's runtime deps `@fastify/cookie`, `@fastify/rate-limit`, `@node-rs/argon2`, `jose` and `uuid` (added in Phases 3 / 5A, versions recorded below). They only resolved from an existing local `node_modules`, so a fresh clone or CI install could not start the API. Now declared at the recorded versions (11.1.3, 11.2.1, 2.2.2, 6.2.13, 14.0.3).
+- 2026-10-26 — 6A drawing gating let the owner draw on a locked layer, which the server refuses; fixed (see Decisions (Phase 6)). Web typecheck errors left by 6A in `roomSession.ts` (readonly `Pt[]` in `stroke:preview`, nullable `actorId`) fixed.
 - 2026-10-25 — README / DEPLOYMENT: `pnpm --filter map-tiles fetch` runs pnpm's built-in `fetch` command, not our script. They now say `pnpm --filter map-tiles run fetch` / `run build`.
 
 ### Map tile build results (pubg/api-assets@32b13b5, 2026-10-25)

@@ -74,14 +74,14 @@ _Status 2026-10-25: met — E2E-2 green; authz matrix 33 routes × 5 callers (16
 _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 74-cell socket authz matrix) green, two-instance Redis-adapter test green, `scripts/realtime-smoke.ts` p50 27 ms / p95 40 ms on loopback. **5B (client) done** — exit met: two browsers see each other's elements live (E2E: 20 elements < 1 s + move, presence + cursors, offline queue, API kill/restart, kick); 1 000-element pan avg 18.6 ms/frame (headless); 369 integration tests, 12 E2E, smoke p50 21 ms / p95 27 ms._
 
 ## Phase 6 — Drawing tools (P0)
-- [ ] Tool framework (pointer handling, drafts, cursor per tool, Esc cancel).
-- [ ] Select (click, multi, marquee, move, circle resize, delete, duplicate).
-- [ ] Pen (sampling + simplify), Line, Arrow (multi-point), Circle, Polygon, Text, Marker (flyout + auto-number), Eraser.
-- [ ] Style bar (palette, width, dashed, fill), last style per tool.
-- [ ] Layers panel (add, rename, color, visibility, lock, reorder, delete, active layer).
-- [ ] Undo/redo (inverse ops, seq-mismatch skip).
-- [ ] `stroke:preview` ghosts for others.
-- [ ] Keyboard shortcuts + `?` help dialog.
+- [x] Tool framework (pointer handling, drafts, cursor per tool, Esc cancel).
+- [x] Select (click, multi, marquee, move, circle resize, delete, duplicate).
+- [x] Pen (sampling + simplify), Line, Arrow (multi-point), Circle, Polygon, Text, Marker (flyout + auto-number), Eraser.
+- [x] Style bar (palette, width, dashed, fill), last style per tool.
+- [x] Layers panel (add, rename, color, visibility, lock, reorder, delete, active layer).
+- [x] Undo/redo (inverse ops, seq-mismatch skip).
+- [x] `stroke:preview` ghosts for others.
+- [x] Keyboard shortcuts + `?` help dialog.
 
 **Exit:** E2E-3, E2E-5, E2E-8, E2E-9 pass; 1 000-element perf benchmark within target.
 
@@ -95,6 +95,7 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 
 ## Phase 8 — Snapshots, measure, export, settings (P1)
 - [ ] Snapshots: save, list, preview modal, restore with auto-snapshot, `board:reset`.
+- [ ] Auto-snapshot before "Clear layer" (moved from Phase 6; `TODO(phase8)` in the server and the layers panel).
 - [ ] Measure tool with travel time (approx. label).
 - [ ] Zone presets dropdown (values from Phase 0 or hidden behind flag).
 - [ ] PNG export with footer attribution (tiles CORS configured).
