@@ -100,7 +100,7 @@ export default function ExploreMap({
   measuring: boolean;
 }) {
   return (
-    <MapCanvas mapId={board.mapId}>
+    <MapCanvas mapId={board.mapId} minimap>
       <StaticElements mapId={board.mapId} elements={board.elements} layers={board.layers} />
       <MeasureLayer />
       <ExploreMeasure mapId={board.mapId} active={measuring} />

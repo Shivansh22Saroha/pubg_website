@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import type { AssetStorage } from '../lib/storage.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** ARCHITECTURE §11: soft-deleted rooms are hard-deleted after 7 days */
@@ -12,10 +13,23 @@ export const AUDIT_RETENTION_MS = 90 * DAY_MS;
  * Hard-deletes rooms soft-deleted more than 7 days ago. Boards, layers, elements, ops,
  * snapshots, members, invites, bans and chat go with them (ON DELETE CASCADE).
  */
-export async function purgeDeletedRooms(prisma: PrismaClient, now = new Date()): Promise<number> {
-  const { count } = await prisma.room.deleteMany({
-    where: { deletedAt: { lt: new Date(now.getTime() - PURGE_ROOMS_AFTER_MS) } },
-  });
+export async function purgeDeletedRooms(
+  prisma: PrismaClient,
+  now = new Date(),
+  assets?: AssetStorage,
+): Promise<number> {
+  const where = { deletedAt: { lt: new Date(now.getTime() - PURGE_ROOMS_AFTER_MS) } };
+  // their boards' thumbnails go too (Phase 11); a failed object delete never blocks the purge
+  const keys = assets
+    ? (
+        await prisma.board.findMany({
+          where: { room: where, thumbnailKey: { not: null } },
+          select: { thumbnailKey: true },
+        })
+      ).flatMap((b) => (b.thumbnailKey ? [b.thumbnailKey] : []))
+    : [];
+  const { count } = await prisma.room.deleteMany({ where });
+  if (assets) await Promise.allSettled(keys.map((key) => assets.remove(key)));
   return count;
 }
 

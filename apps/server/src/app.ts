@@ -37,6 +37,9 @@ import { createSnapshotService } from './modules/snapshots/service.js';
 import { publicRoutes } from './modules/public/routes.js';
 import { createPublicService } from './modules/public/service.js';
 import { shareRoutes } from './modules/share/routes.js';
+import { thumbnailRoutes } from './modules/thumbnails/routes.js';
+import { createThumbnailService } from './modules/thumbnails/service.js';
+import { createAssetStorage, type AssetStorage } from './lib/storage.js';
 import { createShareService } from './modules/share/service.js';
 import { createBoardService } from './modules/boards/service.js';
 import { inviteRoutes } from './modules/invites/routes.js';
@@ -70,6 +73,8 @@ export interface AppDeps {
   realtime?: boolean;
   /** outgoing mail (tests pass an in-memory mailer); default: SMTP when EMAIL_ENABLED */
   mailer?: Mailer;
+  /** board thumbnail storage (tests pass a temp dir); default: from config (S3 or local disk) */
+  assets?: AssetStorage;
 }
 
 // SECURITY §7: never log credentials, cookies or tokens — even if a future log call includes them.
@@ -137,6 +142,7 @@ export async function buildApp({
   logStream,
   realtime: withRealtime = true,
   mailer,
+  assets = createAssetStorage(config),
 }: AppDeps) {
   const app = Fastify({
     logger: loggerOptions(config, logStream),
@@ -229,6 +235,7 @@ export async function buildApp({
     events,
     passwords,
     limits: { maxOwnedRooms: config.MAX_OWNED_ROOMS, maxRoomMembers: config.MAX_ROOM_MEMBERS },
+    assetUrl: (key) => assets.url(key),
   });
   const invites = createInviteService({
     prisma,
@@ -238,7 +245,8 @@ export async function buildApp({
     passwords,
     appOrigin: config.APP_ORIGIN,
   });
-  const boards = createBoardService({ prisma, policy, events });
+  const boards = createBoardService({ prisma, policy, events, assets });
+  app.decorate('assets', assets);
   const boardOps = createBoardOpsService({ prisma, redis, policy, events });
   const snapshots = createSnapshotService({ prisma, policy, events });
   const account = createAccountService({ prisma, passwords, revocations, policy, events });
@@ -293,6 +301,11 @@ export async function buildApp({
     prefix: '/api/v1',
     service: createPublicService({ prisma, demoBoardIds: config.DEMO_BOARD_IDS }),
   });
+  await app.register(thumbnailRoutes, {
+    prefix: '/api/v1',
+    storage: assets,
+    thumbnails: createThumbnailService({ prisma, policy, storage: assets, log: app.log }),
+  });
   await app.register(shareRoutes, {
     prefix: '/api/v1',
     share: createShareService({ prisma, policy, appOrigin: config.APP_ORIGIN }),
@@ -339,5 +352,7 @@ declare module 'fastify' {
     roomEvents: RoomEvents;
     /** resolves when no system chat message is still being written */
     chatIdle: () => Promise<void>;
+    /** board thumbnail storage (Phase 11) — also used by the purge job */
+    assets: AssetStorage;
   }
 }

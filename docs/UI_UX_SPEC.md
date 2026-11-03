@@ -124,7 +124,7 @@ Active tool: `--accent` background, `--accent-fg` icon. Viewers see only Select,
 
 **Style bar** (floating, bottom-center of map, appears when a drawing tool or a selection is active): palette swatches, custom color, stroke width (S/M/L = 2/4/7 px), dashed toggle, fill opacity slider (closed shapes), for circle tool a "Zone presets ▾" dropdown. With a selection: also Delete and "Move to layer ▾".
 
-**Map HUD (bottom)**: left — cursor grid ref + world metres (mono font); right — labels toggle (◐), grid toggle (#), zoom −/+, fit map (⤢). Minimap (P2) bottom-right 160×160, collapsible.
+**Map HUD (bottom)**: left — cursor grid ref + world metres (mono font); right — labels toggle (◐), grid toggle (#), zoom −/+, fit map (⤢). Minimap (P2, Phase 11) bottom-right above the HUD controls, 160×160, collapsible (header "Minimap" ▾, remembered per device): the map's low-res image with the view rectangle in `--accent`; click or drag moves the view, arrow keys pan by 1/10 of the map while it has focus. Room, `/explore` and `/s/[token]`; never on phones (< 768 px); not part of PNG export.
 
 **Right panel (340 px, collapsible to 0 with `]`)**, three tabs:
 - *Chat* (the default tab): message list (avatar, name in presence color, time, text; pings render as a chip `📍 F-M 4,7 · Erangel – Drop A`), system messages centered muted; input with 📍 ping button and send; Enter sends, Shift+Enter newline; char counter after 400. A ping chip in the input is removable (×). Unread badge on the Chat tab, or on the panel toggle while the panel is closed.

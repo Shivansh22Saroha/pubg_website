@@ -124,3 +124,97 @@ test('share link: a malformed or unknown token shows the same message', async ({
     await expect(page.getByTestId('shared-error')).toContainText('invalid or has expired');
   }
 });
+
+test('thumbnails: an edit arms the upload, the dashboard card shows the board image', async ({
+  page,
+}) => {
+  const roomName = `Thumbs ${Date.now().toString(36)}`;
+  await ownerInRoom(page, roomName);
+  // nothing armed before an edit
+  expect(await page.evaluate(() => window.__rlDebug?.flushThumbnail())).toBe(false);
+  await page.evaluate(() => window.__rlDebug?.addRandomElements(10));
+  await expect.poll(() => debugPending(page)).toBe(0);
+  // the 30 s timer is armed by the edit; run it now
+  expect(await page.evaluate(() => window.__rlDebug?.flushThumbnail())).toBe(true);
+
+  await page.goto('/dashboard');
+  const card = page.locator('article', { hasText: roomName });
+  const img = card.locator('img').first();
+  await expect(img).toHaveAttribute(
+    'src',
+    /\/api\/v1\/assets\/thumbnails\/[0-9a-f-]{36}\/[\w-]{22}\.jpg$/,
+  );
+  await expect
+    .poll(() => img.evaluate((i: HTMLImageElement) => (i.complete ? i.naturalWidth : 0)))
+    .toBe(256);
+});
+
+test('minimap: viewport rectangle, click / drag moves the view, collapses, hidden on phone', async ({
+  page,
+  browser,
+}) => {
+  await ownerInRoom(page, `Minimap ${Date.now().toString(36)}`);
+  const minimap = page.getByTestId('minimap');
+  await expect(minimap).toBeVisible();
+  const surface = page.getByTestId('minimap-surface');
+  await expect(surface).toHaveCSS('width', '160px');
+  const viewport = page.getByTestId('minimap-viewport');
+  await expect(viewport).toBeVisible();
+  const canvas = page.getByTestId('map-canvas');
+  const center = async () =>
+    ((await canvas.getAttribute('data-center')) ?? '0,0').split(',').map(Number) as [
+      number,
+      number,
+    ];
+
+  // zoom well in (maxBounds would clamp a wider view), then click the top-left quarter
+  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: 'Zoom in' }).click();
+  const box = await surface.boundingBox();
+  if (!box) throw new Error('no minimap');
+  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.25);
+  await expect
+    .poll(async () => {
+      const [x, y] = await center();
+      return Math.abs(x - 204_000) < 15_000 && Math.abs(y - 204_000) < 15_000;
+    })
+    .toBe(true);
+  // the rectangle follows (its centre near the click)
+  const r = await viewport.boundingBox();
+  if (!r) throw new Error('no viewport rect');
+  expect(Math.abs(r.x + r.width / 2 - (box.x + box.width * 0.25))).toBeLessThan(6);
+
+  // drag to the bottom-right quarter
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.6, { steps: 5 });
+  await page.mouse.move(box.x + box.width * 0.75, box.y + box.height * 0.75, { steps: 5 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const [x, y] = await center();
+      return Math.abs(x - 612_000) < 15_000 && Math.abs(y - 612_000) < 15_000;
+    })
+    .toBe(true);
+
+  // keyboard: focus + arrow
+  await surface.focus();
+  const [x0] = await center();
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await center())[0]).toBeLessThan(x0 - 50_000);
+
+  // collapse, and it stays collapsed after a reload
+  await minimap.getByRole('button', { name: 'Minimap' }).click();
+  await expect(minimap).toHaveAttribute('data-collapsed', 'true');
+  await expect(surface).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('minimap')).toHaveAttribute('data-collapsed', 'true');
+
+  // phone: none
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  const p = await phone.newPage();
+  await serveFixtureTiles(p);
+  await p.goto('/explore');
+  await expect(p.getByTestId('map-canvas')).toBeVisible();
+  await expect(p.getByTestId('minimap')).toHaveCount(0);
+  await phone.close();
+});

@@ -42,6 +42,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - HUD shows cursor grid ref `F-M 4,7` + metres from top-left.
 - Sea / out-of-bounds: `maxBounds` with 10 % padding, `maxBoundsViscosity: 0.8`.
 - While tiles load, show the 819 px low-res image as an `ImageOverlay` under the tile layer.
+- Minimap [MAP-5] (Phase 11): bottom-right, 160×160, collapsible; the low-res image plus the current view's rectangle (clamped to the map). Click / drag on it re-centres the map; arrow keys pan while focused. Using it is a manual move (ends follow mode, F8). Hidden on phones.
 
 **AC**
 - Pan/zoom 60 fps on a 2020 mid-range laptop with 1 000 elements.
@@ -56,7 +57,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - Delete: Owner only, confirm dialog, cannot delete the last board. Users on a deleted board are moved to the first board with a toast.
 - Tab order via drag & drop (Editor+), persisted in `position`.
 - Each user's current board is local state; switching does `board:subscribe`. Last board per room remembered in `localStorage`.
-- Thumbnail: generated client-side (256×256 JPEG of fit view) by the last editor 30 s after their last edit, uploaded via `PUT /boards/:id/thumbnail` (P1; until then show map thumbnail).
+- Thumbnail (Phase 11): generated client-side (256×256 JPEG of the fit view) by an editor 30 s after **their** last edit of the board (each local op restarts the clock; remote ops don't), uploaded via `PUT /boards/:id/thumbnail`. Drawn from the board model, not the live map: the map's low-res image, then visible layers bottom → top (markers as dots, no text labels). Leaving the board before the 30 s cancels it; failures are silent. The dashboard card shows the thumbnail of the room's most recently updated board, else the map's card image (also when the thumbnail fails to load).
 
 ### F4b. Public read-only share link (Phase 11, v1.1)
 - Board kebab → **Share link…** (owner / editor). The dialog creates the link with an expiry (24 h, **7 days** default, 30 days, never), shows the URL once with Copy ("Copy it now — for safety the link is only shown once"), and afterwards shows "A link is active · Expires … · created …" with **Regenerate link** (new URL; the old one stops working at once) and **Revoke** (two clicks). One link per board.
@@ -143,7 +144,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - **Ephemeral events are best-effort**: cursors, laser, `stroke:preview` ghosts and follow-mode view updates may be dropped and are never replayed; the UI tolerates gaps (ghosts vanish after 3 s without updates, cursors fade).
 - **Cursors**: shown only for users on the same board; name pill; hidden while user is idle > 5 s (fade) or follow mode active.
 - **Presence**: online dot; idle (2 min no input) shows half-opacity avatar; board dots on tabs.
-- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following"). "Manual" = drag, wheel, double-click, pan/zoom keys, Space / middle-mouse pan, the HUD zoom / fit buttons, or opening a ping chip; programmatic moves never count. A "Following {name} · Stop" pill sits at the top of the map; the follower's own cursor isn't broadcast meanwhile. The leader learns its follower count (`followers:update`) and sends `view:update` (≤ 10 Hz) only while it is > 0, plus at once when a follower joins or its new board is subscribed, and every 1.5 s as a resend (view updates are best-effort). Started from a presence avatar's menu (Follow / Go to their board). If the leader leaves the room or goes offline, followers stop with a toast "{name} left — stopped following".
+- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following"). "Manual" = drag, wheel, double-click, pan/zoom keys, Space / middle-mouse pan, the HUD zoom / fit buttons, the minimap, or opening a ping chip; programmatic moves never count. A "Following {name} · Stop" pill sits at the top of the map; the follower's own cursor isn't broadcast meanwhile. The leader learns its follower count (`followers:update`) and sends `view:update` (≤ 10 Hz) only while it is > 0, plus at once when a follower joins or its new board is subscribed, and every 1.5 s as a resend (view updates are best-effort). Started from a presence avatar's menu (Follow / Go to their board). If the leader leaves the room or goes offline, followers stop with a toast "{name} left — stopped following".
 - **Summon**: leader triggers (Editor+, own avatar → "Summon everyone"); each member starts following at once and gets a non-blocking toast "{name} is presenting — following" with a "Don't follow" button (5 s).
 - **Sync indicator** states defined in UI_UX_SPEC §3.5.
 - **Reconnect**: exponential backoff 0.5 s → 10 s with jitter; on reconnect rejoin room + resubscribe board with `sinceSeq`.

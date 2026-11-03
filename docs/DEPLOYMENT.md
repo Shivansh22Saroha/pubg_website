@@ -60,6 +60,8 @@ Each map folder holds `preview.jpg` (1024 px, auth backdrop), `card.webp` (512 p
 ]
 ```
 
+**Board thumbnails (Phase 11).** A second R2 bucket `rotationlab-assets` with a public custom domain (`assets.example.com`) and an API token scoped to Object Read & Write on it. Set the five `S3_*` / `PUBLIC_ASSETS_BASE_URL` values on the server and `PUBLIC_ASSETS_BASE_URL` on the web container (CSP). Objects are written as `thumbnails/<boardId>/<random>.jpg` with `Cache-Control: public, max-age=31536000, immutable` (a new key per upload) and deleted when replaced, when the board is deleted and when its room is purged. No CORS rule is needed (plain `<img>`, never read back into a canvas). Without S3 the server falls back to `ASSETS_DIR` on local disk, which the read-only production container can't write — it logs a warning at boot.
+
 Add the staging origin to `AllowedOrigins` too. Keep the CDN cache keyed on `Origin` (R2's public bucket does this) so a non-CORS response is never served to the app. In development and E2E the tiles are same-origin (`/tiles`), so no rule is needed.
 
 ## 5. CI/CD (GitHub Actions)

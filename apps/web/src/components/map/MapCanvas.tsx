@@ -11,7 +11,9 @@ import { prefersReducedMotion } from '@/lib/motion';
 import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { GRID_PANE, GridLayer } from './GridLayer';
 import { GridLabels } from './GridLabels';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { MapHud } from './MapHud';
+import { Minimap } from './Minimap';
 
 export type BaseVariant = 'labels' | 'clean';
 
@@ -28,6 +30,7 @@ export default function MapCanvas({
   children,
   overlay,
   onCursor,
+  minimap = false,
 }: {
   mapId: MapId;
   /** board layers (elements, cursors…) rendered inside the Leaflet map */
@@ -36,7 +39,10 @@ export default function MapCanvas({
   overlay?: ReactNode;
   /** world-unit pointer position over the map (null when it leaves) */
   onCursor?: (pt: Pt | null) => void;
+  /** Phase 11: the collapsible minimap (never on phones) */
+  minimap?: boolean;
 }) {
+  const phone = useBreakpoint() === 'phone';
   const config = MAPS[mapId];
   const { worldSize, gridCells, maxNativeZoom } = config;
   const crs = useMemo(() => createCrs(config), [config]);
@@ -183,6 +189,7 @@ export default function MapCanvas({
       </div>
       {map && grid && <GridLabels map={map} worldSize={worldSize} cells={gridCells} />}
       {overlay}
+      {map && minimap && !phone && <Minimap map={map} mapId={mapId} />}
       {map && (
         <MapHud
           map={map}

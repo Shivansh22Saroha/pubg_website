@@ -30,4 +30,6 @@ export const prefKeys = {
   toolStyles: 'toolStyles',
   /** last marker kind picked in the flyout (FEATURES F6) */
   markerKind: 'markerKind',
+  /** minimap collapsed (Phase 11) */
+  minimapCollapsed: 'minimapCollapsed',
 } as const;

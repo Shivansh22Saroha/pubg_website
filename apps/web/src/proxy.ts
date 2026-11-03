@@ -31,6 +31,8 @@ export function proxy(request: NextRequest) {
     tilesBaseUrl: env.NEXT_PUBLIC_TILES_BASE_URL,
     socketUrl: env.NEXT_PUBLIC_SOCKET_URL,
     sentryDsn: env.NEXT_PUBLIC_SENTRY_DSN,
+    // server-only, read per request: where the API stores board thumbnails when on R2 / S3
+    assetsBaseUrl: process.env.PUBLIC_ASSETS_BASE_URL,
   });
   const headers = new Headers(request.headers);
   headers.set('content-security-policy', csp);

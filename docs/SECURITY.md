@@ -64,6 +64,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | V5 **MUST** | Colors validated by `^#[0-9A-Fa-f]{6}$` before use in SVG/CSS (prevents CSS/SVG injection via style strings). |
 | V6 | URLs in chat are shown as plain text (no auto-linking in v1). |
 | V7 **MUST** | Prisma parameterised queries only; any raw SQL uses `$queryRaw` tagged templates, never string concatenation. |
+| V8 | Uploaded images (board thumbnails, Phase 11): ≤ 100 KB raw `image/jpeg` only, JPEG magic bytes checked, decoded by sharp with `limitInputPixels` = 256², exactly 256×256, then **re-encoded** (no EXIF / ICC / trailing data survives) and stored under a server-generated random key — never a client-chosen name or path. |
 
 ## 5. Transport & browser security
 | # | Control |

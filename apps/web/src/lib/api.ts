@@ -28,21 +28,30 @@ interface RequestOptions<S extends z.ZodType | undefined> {
   body?: unknown;
   /** response schema; omit for 204 responses */
   schema?: S;
+  /** a binary body sent as-is (e.g. a thumbnail JPEG) instead of JSON `body` */
+  raw?: { data: Blob; type: string };
   signal?: AbortSignal;
 }
 
 type Result<S> = S extends z.ZodType ? z.infer<S> : undefined;
 
-function send(path: string, method: Method, body: unknown, signal?: AbortSignal) {
+function send(
+  path: string,
+  method: Method,
+  body: unknown,
+  signal?: AbortSignal,
+  raw?: { data: Blob; type: string },
+) {
+  const json = body !== undefined && !raw;
   return fetch(`${API_BASE}${path}`, {
     method,
     credentials: 'include', // httpOnly cookies only — no tokens in JS, storage or URLs
     cache: 'no-store',
     headers: {
       [CSRF_HEADER]: CSRF_HEADER_VALUE,
-      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      ...(raw ? { 'content-type': raw.type } : json ? { 'content-type': 'application/json' } : {}),
     },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(raw ? { body: raw.data } : json ? { body: JSON.stringify(body) } : {}),
     ...(signal ? { signal } : {}),
   });
 }
@@ -80,7 +89,7 @@ export async function api<S extends z.ZodType | undefined = undefined>(
   opts: RequestOptions<S> = {},
 ): Promise<Result<S>> {
   const method = opts.method ?? 'GET';
-  let res = await send(path, method, opts.body, opts.signal).catch((err: unknown) => {
+  let res = await send(path, method, opts.body, opts.signal, opts.raw).catch((err: unknown) => {
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
     throw new ApiError(0, 'NETWORK', 'Network error — check your connection');
   });
@@ -88,7 +97,7 @@ export async function api<S extends z.ZodType | undefined = undefined>(
   if (res.status === 401 && !path.startsWith('/auth/')) {
     const { code } = await toError(res.clone());
     if ((code === 'TOKEN_EXPIRED' || code === 'UNAUTHENTICATED') && (await refreshSession())) {
-      res = await send(path, method, opts.body, opts.signal);
+      res = await send(path, method, opts.body, opts.signal, opts.raw);
     }
   }
 

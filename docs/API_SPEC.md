@@ -44,7 +44,7 @@ Cursor-based: `?limit=50&before=<id>` → response `{ items: [...], nextCursor: 
 PublicUser = { id, username, displayName, ign: string|null, avatarColor }
 Me         = PublicUser & { email, emailVerified: boolean, createdAt }
 RoomSummary= { id, name, description, role: 'OWNER'|'EDITOR'|'VIEWER', memberCount, onlineCount,
-               boardCount, lastActivityAt, thumbnailUrl: string|null, hasPassword: boolean,
+               boardCount, lastActivityAt, thumbnailUrl: string|null /* Phase 11: the primaryMapId board's thumbnail */, hasPassword: boolean,
                primaryMapId: 'erangel'|'miramar'|'rondo' /* map of the most recently updated board */ }
 Member     = { user: PublicUser, role, joinedAt, online: boolean }
 Board      = { id, roomId, name, mapId: 'erangel'|'miramar'|'rondo', position, elementCount, updatedAt }
@@ -249,7 +249,8 @@ Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violati
 | `GET /api/health` | `{ status: 'ok', db: 'ok', redis: 'ok', version }` |
 | `GET /api/v1/maps` | static map registry `{ items: [{ id, name, worldSize, tileBaseUrl: { labels, clean }, maxNativeZoom, thumbnailUrl }] }` |
 | `GET /api/v1/public/demo-boards` | read-only demo boards for `/explore`: `{ items: [{ board, layers, elements }] }`, no auth, rate-limited 30 / min / IP, `Cache-Control: public, max-age=300`. Only boards whose id is in `DEMO_BOARD_IDS` (≤ 3, env order; ids that don't exist or whose room is deleted are skipped; unset → `{ items: [] }`). The id list never comes from the request. Nothing points back at a room or a person: `board` has no `roomId`, elements have `createdBy` / `updatedBy: null` |
-| `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+, `image/jpeg` body ≤ 100 KB, 256×256 (server re-encodes with sharp and stores in object storage) — P1 |
+| `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+ (`board.edit`), raw `image/jpeg` body ≤ 100 KB, exactly 256×256 → `200 { thumbnailUrl }`. The server checks the JPEG magic bytes, decodes with sharp (pixel cap), re-encodes (q80, metadata stripped) and stores it under a fresh random key `thumbnails/<boardId>/<128-bit>.jpg`, then deletes the previous one; `boards.updated_at` is not touched. Other content types → `415 BAD_REQUEST`; > 100 KB → `413 PAYLOAD_TOO_LARGE`; not a 256×256 JPEG → `400 VALIDATION_ERROR`; viewers `403`, non-members `404` (Phase 11) |
+| `GET /api/v1/assets/thumbnails/:boardId/:file` | public; the **local** storage backend only (dev / tests): serves a stored thumbnail (`image/jpeg`, immutable cache). Keys are unguessable like the R2 URLs; anything not shaped like a key we write → `400` / `404` (Phase 11) |
 | `GET /metrics` | Prometheus, **internal network only** (Caddy never routes it). Process defaults, `http_request_duration_seconds{method,route,status}`, `socketio_connected_clients`. With `METRICS_TOKEN` set it also needs `Authorization: Bearer <token>`; a missing or wrong token gets `404` (Phase 10) |
 
 ## 9. Example: create a room

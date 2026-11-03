@@ -31,11 +31,38 @@ test('landing and dashboard meet the Lighthouse targets', async ({ baseURL }) =>
     await page.getByRole('button', { name: 'Create account' }).click();
     await page.waitForURL(/\/dashboard$/);
     // a dashboard with something on it
-    for (const n of ['Scrims', 'Team Soul'])
-      await pageApi(page, 'POST', '/rooms', {
+    for (const n of ['Scrims', 'Team Soul']) {
+      const { board } = await pageApi<{ board: { id: string } }>(page, 'POST', '/rooms', {
         name: n,
         firstBoard: { name: 'Erangel – Plan 1', mapId: 'erangel' },
       });
+      // LH_THUMBNAILS=1 (Phase 11): the cards show uploaded board thumbnails instead of the
+      // map card image — the dashboard of a team that has drawn something
+      if (process.env.LH_THUMBNAILS === '1') {
+        await page.evaluate(async (boardId) => {
+          const c = document.createElement('canvas');
+          c.width = c.height = 256;
+          const g = c.getContext('2d');
+          if (!g) throw new Error('no 2d context');
+          const grad = g.createLinearGradient(0, 0, 256, 256);
+          grad.addColorStop(0, '#2f4a3a');
+          grad.addColorStop(1, '#8a7a55');
+          g.fillStyle = grad;
+          g.fillRect(0, 0, 256, 256);
+          const blob = await new Promise<Blob | null>((r) => {
+            c.toBlob(r, 'image/jpeg', 0.8);
+          });
+          if (!blob) throw new Error('no jpeg');
+          const res = await fetch(`/api/v1/boards/${boardId}/thumbnail`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'x-requested-with': 'rotationlab', 'content-type': 'image/jpeg' },
+            body: blob,
+          });
+          if (!res.ok) throw new Error(`thumbnail ${res.status}`);
+        }, board.id);
+      }
+    }
 
     const results: Record<string, { performance: number[]; accessibility: number }> = {};
     for (const url of ['/', '/dashboard']) {

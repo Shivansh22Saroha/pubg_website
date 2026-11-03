@@ -12,6 +12,12 @@ const prisma = createPrisma(config.DATABASE_URL);
 const redis = createRedis(config.REDIS_URL);
 
 const app = await buildApp({ config, prisma, redis });
+if (config.NODE_ENV === 'production' && app.assets.kind === 'local') {
+  // the production container's root FS is read-only: thumbnails need R2 / S3 (DEPLOYMENT §4)
+  app.log.warn(
+    'S3_* not set: board thumbnails use local disk (ASSETS_DIR) and need a writable volume',
+  );
+}
 
 redis.on('error', (err) => {
   app.log.warn({ err: err.message }, 'redis connection error');
@@ -20,7 +26,7 @@ redis.connect().catch(() => {
   // reported via health + the error listener; the retry strategy keeps reconnecting
 });
 
-const stopJobs = startJobs({ prisma, redis, log: app.log });
+const stopJobs = startJobs({ prisma, redis, log: app.log, assets: app.assets });
 
 let closing = false;
 async function shutdown(signal: string) {

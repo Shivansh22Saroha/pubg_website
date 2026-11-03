@@ -59,3 +59,33 @@ describe('loadConfig', () => {
     }
   });
 });
+
+describe('thumbnail storage config (Phase 11)', () => {
+  const s3 = {
+    S3_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+    S3_BUCKET: 'rotationlab-assets',
+    S3_ACCESS_KEY_ID: 'id',
+    S3_SECRET_ACCESS_KEY: 'secret',
+    PUBLIC_ASSETS_BASE_URL: 'https://assets.example.com',
+  };
+
+  it('defaults to local disk; empty S3 values count as unset', () => {
+    const cfg = loadConfig({ ...base, S3_ENDPOINT: '', S3_BUCKET: '' });
+    expect(cfg.ASSETS_DIR).toBe('data/assets');
+    expect(cfg.S3_ENDPOINT).toBeUndefined();
+    expect(cfg.S3_REGION).toBe('auto');
+  });
+
+  it('accepts all five S3 values together', () => {
+    expect(loadConfig({ ...base, ...s3 }).S3_BUCKET).toBe('rotationlab-assets');
+  });
+
+  it('refuses a partial S3 setup and names what is missing (never the values)', () => {
+    const { S3_SECRET_ACCESS_KEY: _s, PUBLIC_ASSETS_BASE_URL: _p, ...partial } = s3;
+    expect(() => loadConfig({ ...base, ...partial })).toThrow(
+      /S3_SECRET_ACCESS_KEY[\s\S]*PUBLIC_ASSETS_BASE_URL|PUBLIC_ASSETS_BASE_URL[\s\S]*S3_SECRET_ACCESS_KEY/,
+    );
+    expect(() => loadConfig({ ...base, ...partial })).not.toThrow(/secret|\bid\b/);
+    expect(() => loadConfig({ ...base, ...s3, S3_ENDPOINT: 'not a url' })).toThrow(/S3_ENDPOINT/);
+  });
+});

@@ -124,7 +124,7 @@ PK `(room_id, user_id)`. Written by `DELETE /rooms/:roomId/members/:userId { ban
 | position | int | NOT NULL (tab order) |
 | last_seq | bigint | NOT NULL default 0 |
 | element_count | int | NOT NULL default 0, CHECK ≤ 5000 |
-| thumbnail_key | text | NULL (object storage key) |
+| thumbnail_key | text | NULL (object storage key `thumbnails/<boardId>/<random>.jpg`, Phase 11; replaced per upload without touching `updated_at`) |
 | created_by | uuid | FK → users SET NULL |
 | created_at / updated_at | timestamptz | NOT NULL |
 Index `(room_id, position)`. App-level limit 20 boards per room.

@@ -17,6 +17,7 @@ import type {
 import type { QueryClient } from '@tanstack/react-query';
 import { v7 as uuid } from 'uuid';
 import { fetchMessages } from '@/lib/chat';
+import { emitLocalEdit } from '@/lib/localEdits';
 import { keys } from '@/lib/rooms';
 import { hasGap, type LocalOp, type PendingOp } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
@@ -276,6 +277,7 @@ export class RoomSession {
     const boardId = this.boardId;
     const list = ops.map((op): PendingOp => ({ opId: uuid(), boardId, op }));
     if (!useBoardStore.getState().localMany(list, this.online)) return null;
+    emitLocalEdit(boardId);
     if (this.online) this.emitAll(list);
     return list.map((p) => p.opId);
   }
@@ -287,6 +289,7 @@ export class RoomSession {
     if (!this.boardId) return null;
     const pending: PendingOp = { opId: uuid(), boardId: this.boardId, op };
     if (!useBoardStore.getState().local(pending)) return null;
+    emitLocalEdit(pending.boardId);
     if (this.online) this.emitOp(pending);
     return pending.opId;
   }

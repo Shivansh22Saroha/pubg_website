@@ -54,6 +54,9 @@ Drawing approach: **custom tool layer on Leaflet**, not Leaflet.draw / Geoman. E
 | nodemailer | 10.x (Phase 10: 6.x had 5 high advisories, fixed in ≥ 10.0.6; ships its own types) | email (P1, behind flag) |
 | @sentry/node | 11.x | optional error tracking (Sentry 11: privacy via `dataCollection`, not `sendDefaultPii`) |
 | prom-client | 15.x | metrics |
+| sharp | 0.35.x (same version as `map-tiles`) | Phase 11: validate + re-encode uploaded board thumbnails |
+
+Object storage for thumbnails (Phase 11) talks to R2 / S3 with a small hand-written SigV4 signer (`src/lib/storage.ts`, verified against AWS's published test vectors) over `fetch` — no AWS SDK dependency for two calls (PUT, DELETE).
 
 ## 4. Shared (`packages/shared`)
 zod, TypeScript only. Exports: schemas, types (`z.infer`), `MAPS` registry, `PERMISSIONS`, limits, socket event maps:

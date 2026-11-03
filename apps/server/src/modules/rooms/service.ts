@@ -26,22 +26,32 @@ export interface RoomServiceDeps {
   events: RoomEvents;
   passwords: PasswordHasher;
   limits: { maxOwnedRooms: number; maxRoomMembers: number };
+  /** public URL of a stored asset (board thumbnails, Phase 11); default: none are shown */
+  assetUrl?: AssetUrl;
 }
+
+type AssetUrl = (key: string) => string;
 
 type RoomWithCounts = Room & {
   _count: { members: number; boards: number };
-  boards: { mapId: MapIdRow }[];
+  boards: { mapId: MapIdRow; thumbnailKey: string | null }[];
 };
 const withCounts = {
   _count: { select: { members: true, boards: true } },
   // most recently updated board → dashboard card preview (primaryMapId)
-  boards: { select: { mapId: true }, orderBy: { updatedAt: 'desc' }, take: 1 },
+  // (and its thumbnail, Phase 11 — the card falls back to the map image without one)
+  boards: { select: { mapId: true, thumbnailKey: true }, orderBy: { updatedAt: 'desc' }, take: 1 },
 } as const;
 
 const assignable = (role: Room['defaultRole']): AssignableRole =>
   role === 'VIEWER' ? 'VIEWER' : 'EDITOR';
 
-function summary(room: RoomWithCounts, role: RoomSummary['role']): RoomSummary {
+function summary(
+  room: RoomWithCounts,
+  role: RoomSummary['role'],
+  assetUrl: AssetUrl | undefined,
+): RoomSummary {
+  const key = room.boards[0]?.thumbnailKey;
   return {
     id: room.id,
     name: room.name,
@@ -51,15 +61,19 @@ function summary(room: RoomWithCounts, role: RoomSummary['role']): RoomSummary {
     onlineCount: 0, // presence arrives with the realtime core (Phase 5)
     boardCount: room._count.boards,
     lastActivityAt: room.lastActivityAt.toISOString(),
-    thumbnailUrl: null, // board thumbnails are P1
+    thumbnailUrl: key && assetUrl ? assetUrl(key) : null,
     hasPassword: room.passwordHash !== null,
     primaryMapId: toMapId(room.boards[0]?.mapId ?? 'ERANGEL'),
   };
 }
 
-function detail(room: RoomWithCounts, role: RoomSummary['role']): RoomDetail {
+function detail(
+  room: RoomWithCounts,
+  role: RoomSummary['role'],
+  assetUrl: AssetUrl | undefined,
+): RoomDetail {
   return {
-    ...summary(room, role),
+    ...summary(room, role, assetUrl),
     ownerId: room.ownerId,
     isLocked: room.isLocked,
     defaultRole: assignable(room.defaultRole),
@@ -124,7 +138,7 @@ export function createRoomService(d: RoomServiceDeps) {
         include: { room: { include: withCounts } },
         orderBy: { room: { lastActivityAt: 'desc' } },
       });
-      return rows.map((m) => summary(m.room, m.role));
+      return rows.map((m) => summary(m.room, m.role, d.assetUrl));
     },
 
     /** ROOM-1/2: room + OWNER membership + first board + 3 default layers in one transaction. */
@@ -170,7 +184,7 @@ export function createRoomService(d: RoomServiceDeps) {
         return { room, board };
       });
       await policy.bust(roomId, [user.id]);
-      return { room: summary(room, 'OWNER'), board: toBoard(board) };
+      return { room: summary(room, 'OWNER', d.assetUrl), board: toBoard(board) };
     },
 
     async detail(user: AuthUser, roomId: string): Promise<RoomDetailResponse> {
@@ -181,7 +195,7 @@ export function createRoomService(d: RoomServiceDeps) {
         orderBy: { position: 'asc' },
       });
       return {
-        room: detail(room, role),
+        room: detail(room, role, d.assetUrl),
         members: await members(roomId),
         boards: boards.map(toBoard),
       };
@@ -203,7 +217,7 @@ export function createRoomService(d: RoomServiceDeps) {
           ...(body.isLocked !== undefined ? { isLocked: body.isLocked } : {}),
         },
       });
-      const room = detail(await loadRoom(roomId), role);
+      const room = detail(await loadRoom(roomId), role, d.assetUrl);
       events.emit('room:updated', { roomId, room });
       return room;
     },

@@ -64,6 +64,7 @@ export default function BoardMap({
   const nameOf = useMemo(() => makeNameOf(meId, names), [meId, names]);
   return (
     <MapCanvas
+      minimap
       mapId={mapId}
       onCursor={onCursor}
       overlay={

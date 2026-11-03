@@ -46,3 +46,6 @@ apps/web/.next-e2e/
 # load-test fixtures hold live access tokens
 loadtest/users.json
 loadtest/results/
+
+# uploaded board thumbnails (local storage backend, Phase 11)
+apps/server/data/assets/
