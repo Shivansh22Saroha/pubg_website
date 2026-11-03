@@ -22,6 +22,8 @@ export const ERROR_CODES = [
   'ACCOUNT_LOCKED',
   'RATE_LIMITED',
   'INTERNAL',
+  /** 503 while MAINTENANCE=true (DEPLOYMENT §7) */
+  'MAINTENANCE',
 ] as const;
 
 export const ErrorCodeSchema = z.enum(ERROR_CODES);

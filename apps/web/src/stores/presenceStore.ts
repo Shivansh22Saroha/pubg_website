@@ -39,6 +39,8 @@ interface PresenceState {
   pruneGhosts: (now?: number) => void;
   setUsers: (roomId: string, users: Presence[]) => void;
   moveCursor: (c: Omit<Cursor, 'at'>) => void;
+  /** one store update for a whole `cursor:batch` */
+  moveCursors: (boardId: string, list: { userId: string; x: number; y: number }[]) => void;
   dropCursor: (userId: string) => void;
   clear: () => void;
 }
@@ -84,6 +86,14 @@ export const usePresenceStore = create<PresenceState>((set) => ({
   },
   moveCursor: (c) => {
     set((s) => ({ cursors: { ...s.cursors, [c.userId]: { ...c, at: Date.now() } } }));
+  },
+  moveCursors: (boardId, list) => {
+    const at = Date.now();
+    set((s) => {
+      const cursors = { ...s.cursors };
+      for (const c of list) cursors[c.userId] = { ...c, boardId, at };
+      return { cursors };
+    });
   },
   dropCursor: (userId) => {
     set((s) => {

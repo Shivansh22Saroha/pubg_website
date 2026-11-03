@@ -118,12 +118,25 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 > 2026-11-03 follow-up: 512 px card image + server-rendered room list → dashboard Performance **91** / Accessibility 100, landing 95 / 100 (median of 5, AC power). **Exit criteria met.**
 
 ## Phase 10 — Hardening & launch
-- [ ] Security headers + CSP nonces verified; ZAP baseline clean; gitleaks/audit clean.
-- [ ] k6 load test meets targets on staging VM.
-- [ ] Backups + restore test, uptime monitoring, Sentry.
-- [ ] Deploy pipeline (staging auto, prod on tag with approval), rollback tested.
-- [ ] `security.txt`, privacy page, terms page.
-- [ ] Tag `v1.0.0`, update CHANGELOG.
+Split (2026-11-03, no staging/production servers yet): **10A** is everything that can be built and verified in the repo and against the production stack on local Docker; **10B** needs the real VMs.
+
+### 10A — in the repo, rehearsed locally ✅
+- [x] Security headers + CSP nonces verified (web proxy nonce CSP, helmet on the API, Caddy edge headers, E2E zero-violation walk); ZAP baseline clean (0 failures, accepted warnings in `.zap/rules.tsv`); gitleaks clean; audit clean (nodemailer 6 → 10; one accepted advisory, SECURITY §9).
+- [x] k6 realtime load test written (`loadtest/realtime.js` + `scripts/loadtest-seed.ts`) and run against the production images — fixes it forced: glibc server image, batched cursors, fewer queries per op. Local results in CHANGELOG; the 500-user target can only be judged off-box (10B).
+- [x] Backups (`deploy/backup.sh`, age-encrypted) + restore test (`deploy/restore.sh` into a scratch DB) — rehearsed; Sentry wired for server and web (off until a DSN is set); `/metrics`; maintenance mode.
+- [x] Deploy pipeline written (`deploy.yml`: staging on green `main`, prod on `v*` behind the `production` environment) with `deploy.sh` smoke test + automatic rollback — rollback rehearsed with a broken release.
+- [x] `security.txt` (Phase 9), privacy page, terms page (placeholders, `TODO(phase0)` until reviewed).
+
+**Exit (10A):** lint / typecheck / unit / integration / E2E green; production stack rehearsal (§9 DEPLOYMENT) passes.
+
+### 10B — needs the VMs (blocked on hosting + Phase 0)
+- [ ] Provision staging + prod VMs (DEPLOYMENT §6), R2 buckets (tiles, backups), DNS; repo variables / secrets / `production` reviewers.
+- [ ] First staging deploy through the pipeline; prod-like rollback test on staging.
+- [ ] k6 from a separate machine against the staging VM spec: p95 op broadcast < 400 ms, errors < 0.1 %, server CPU < 70 % (try `--scale server=2` if one process is the limit).
+- [ ] ZAP nightly green against staging; securityheaders.com A; SSL Labs A.
+- [ ] Backups to R2 running nightly; first monthly restore test on staging.
+- [ ] Uptime monitoring (`/api/health` every minute → Discord); Sentry DSNs set.
+- [ ] Phase 0 closed (legal text, name/domain) → tag `v1.0.0`, update CHANGELOG.
 
 ---
 

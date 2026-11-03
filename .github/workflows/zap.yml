@@ -1,0 +1,46 @@
+name: ZAP baseline
+
+# TESTING §5.7 / SECURITY §11: nightly passive scan of staging; fails on any High alert. Warnings
+# reviewed and accepted in Phase 10 are listed, with reasons, in .zap/rules.tsv.
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    if: vars.STAGING_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan ${{ vars.STAGING_URL }}
+        run: |
+          mkdir -p zap && chmod 777 zap
+          cp .zap/rules.tsv zap/
+          # exit code 1/2 = warnings/failures by ZAP's own levels; we judge by risk below
+          docker run --rm -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t "${{ vars.STAGING_URL }}" -c rules.tsv \
+            -r report.html -J report.json -I || true
+          test -s zap/report.json
+
+      - name: Fail on High
+        run: |
+          node -e '
+            const r = require("./zap/report.json");
+            const alerts = r.site.flatMap((s) => s.alerts);
+            for (const a of alerts) console.log(`${a.riskdesc.padEnd(24)} ${a.pluginid} ${a.name}`);
+            const high = alerts.filter((a) => Number(a.riskcode) >= 3);
+            if (high.length) { console.error(`${high.length} High alert(s)`); process.exit(1); }
+          '
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: zap/report.html
+          retention-days: 30

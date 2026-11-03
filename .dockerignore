@@ -1,0 +1,23 @@
+# build context for docker/*.Dockerfile — keep it small and secret-free
+**/node_modules
+**/.next
+**/.next-e2e
+**/dist
+**/.turbo
+**/coverage
+**/test-results
+**/playwright-report
+.git
+.github
+.husky
+**/.env
+**/.env.*
+!**/.env.example
+docs
+deploy
+rotationlab-docs.zip
+# tiles are served from R2/CDN in production, never from the web image
+apps/web/public/tiles
+packages/map-tiles/.cache
+packages/map-tiles/out
+packages/map-tiles/raw

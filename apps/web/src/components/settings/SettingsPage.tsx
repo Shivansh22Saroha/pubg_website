@@ -99,6 +99,7 @@ function Profile({ me }: { me: Me }) {
   return (
     <Section title="Profile">
       <form
+        method="post"
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
@@ -180,6 +181,7 @@ function Account({ me }: { me: Me }) {
         <Input value={me.email} readOnly aria-readonly />
       </Field>
       <form
+        method="post"
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();

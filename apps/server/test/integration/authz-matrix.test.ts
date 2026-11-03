@@ -82,6 +82,13 @@ const MATRIX: Row[] = [
     request: () => ({ url: '/api/health' }),
     expect: everyone(200),
   },
+  // Phase 10: Prometheus; never routed by Caddy, token-guarded only when METRICS_TOKEN is set
+  {
+    method: 'GET',
+    url: '/metrics',
+    request: () => ({ url: '/metrics' }),
+    expect: everyone(200),
+  },
   {
     method: 'POST',
     url: '/api/v1/auth/register',

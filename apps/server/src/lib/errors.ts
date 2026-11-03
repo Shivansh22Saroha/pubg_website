@@ -21,6 +21,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   ACCOUNT_LOCKED: 423,
   RATE_LIMITED: 429,
   INTERNAL: 500,
+  MAINTENANCE: 503,
 };
 
 export function statusForCode(code: ErrorCode): number {

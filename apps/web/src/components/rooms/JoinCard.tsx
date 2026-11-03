@@ -140,6 +140,7 @@ export function JoinCard({ code }: { code: string }) {
         </div>
       ) : (
         <form
+          method="post"
           className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();

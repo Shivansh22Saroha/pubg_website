@@ -1,4 +1,4 @@
-import { Prisma, type Element as ElementRow, type PrismaClient } from '@prisma/client';
+import { Prisma, type Board, type Element as ElementRow, type PrismaClient } from '@prisma/client';
 import {
   can,
   ELEMENT_LIMITS,
@@ -43,6 +43,8 @@ export interface ApplyResult {
 }
 
 const OP_TTL_SEC = 600; // ARCHITECTURE §7.4: 10-minute opId dedupe window
+/** touchRoom only changes a row once a minute; skip the query in between (hot path) */
+const TOUCH_EVERY_MS = 60_000;
 const opKey = (userId: string, opId: string) => `rl:op:${userId}:${opId}`;
 const PENDING = 'pending';
 
@@ -78,6 +80,15 @@ export function createBoardOpsService(d: {
   events?: RoomEvents;
 }) {
   const { prisma, redis, policy } = d;
+  const touchedAt = new Map<string, number>(); // roomId → last touchRoom by this instance
+
+  async function touch(roomId: string) {
+    const now = Date.now();
+    if (now - (touchedAt.get(roomId) ?? 0) < TOUCH_EVERY_MS) return;
+    if (touchedAt.size > 10_000) touchedAt.clear();
+    touchedAt.set(roomId, now);
+    await touchRoom(prisma, roomId);
+  }
 
   function validate(boardId: string, worldSize: number, ops: OpRequest[]) {
     for (const op of ops) {
@@ -122,13 +133,14 @@ export function createBoardOpsService(d: {
         const el = op.element;
         const layer = await lockedLayer(tx, boardId, el.layerId);
         if (layer.locked) throw new AppError('FORBIDDEN', 'Layer is locked');
-        const existing = await tx.element.findUnique({
-          where: { id: el.id },
-          include: { layer: true },
-        });
+        const existing = await tx.element.findUnique({ where: { id: el.id } });
         if (existing && existing.boardId !== boardId)
           throw new AppError('FORBIDDEN', 'Element id belongs to another board');
-        if (existing?.layer.locked) throw new AppError('FORBIDDEN', 'Layer is locked');
+        // moving it off a locked layer is refused too; same layer → already checked above
+        if (existing && existing.layerId !== el.layerId) {
+          const from = await tx.layer.findUnique({ where: { id: existing.layerId } });
+          if (from?.locked) throw new AppError('FORBIDDEN', 'Layer is locked');
+        }
         if (!existing && elementCount + 1 > ELEMENT_LIMITS.maxElementsPerBoard) {
           throw new AppError(
             'LIMIT_REACHED',
@@ -275,7 +287,25 @@ export function createBoardOpsService(d: {
 
   return {
     async apply(user: AuthUser, boardId: string, ops: OpRequest[]): Promise<ApplyResult> {
-      const { board, role } = await policy.requireBoard(user, boardId, 'board.edit');
+      const resolved = await policy.requireBoard(user, boardId, 'board.edit');
+      return this.applyResolved(user, resolved, ops);
+    },
+
+    /**
+     * `apply` for a caller that already resolved the board and checked `board.edit` (the socket
+     * handler does, to check `room:join` first) — saves a second board + role lookup per op.
+     */
+    async applyResolved(
+      user: AuthUser,
+      {
+        board,
+        role,
+      }: { board: { id: string; roomId: string; mapId: Board['mapId'] }; role: RoomRole },
+      ops: OpRequest[],
+    ): Promise<ApplyResult> {
+      if (!can(role, 'board.edit'))
+        throw new AppError('FORBIDDEN', 'Your role does not allow that');
+      const boardId = board.id;
       if (ops.length === 0) throw new AppError('BAD_REQUEST', 'No ops');
 
       // Idempotency per op (ARCHITECTURE §7.4): every opId remembers its seq for 10 min. A
@@ -350,7 +380,7 @@ export function createBoardOpsService(d: {
           pipe.set(todoPairs[n]?.key ?? '', String(o.seq), 'EX', OP_TTL_SEC),
         );
         await pipe.exec();
-        await touchRoom(prisma, board.roomId);
+        await touch(board.roomId);
         for (const c of clearedLayers)
           d.events?.emit('layer:cleared', { roomId: board.roomId, userId: user.id, ...c });
         let next = 0;

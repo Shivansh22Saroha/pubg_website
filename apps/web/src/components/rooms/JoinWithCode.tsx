@@ -14,6 +14,7 @@ export function JoinWithCode() {
 
   return (
     <form
+      method="post"
       className="flex flex-col gap-1.5"
       onSubmit={(e) => {
         e.preventDefault();

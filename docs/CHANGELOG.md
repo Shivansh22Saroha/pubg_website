@@ -46,9 +46,34 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - UI_UX_SPEC §7 / §9 / §10: what each layout offers, long-press, touch targets, the touch empty hint, the element list, the board-actions menu, the contrast fix.
   - DEPLOYMENT: the demo seed in production, the web env, landing screenshots.
 
+- 2026-11-03 — Phase 10A docs: TODO Phase 10 split into 10A / 10B; SECURITY §5 (what T4 now is), §9 (bases, accepted advisory), §11 (ZAP); DEPLOYMENT §2–3 (real images and `deploy/`), §5 (CI jobs, deploy workflow, rollback), §6–7 (backups, restore test, maintenance, metrics), §9 (local rehearsal); API_SPEC §1.4 `MAINTENANCE`, §7.3 `cursor:batch`, §8 `/metrics`; ARCHITECTURE §7.3 cursor batching; ENVIRONMENT (Sentry, maintenance, deploy env files); TECH_STACK (Sentry 11, nodemailer 10, k6 / ZAP / gitleaks); TESTING §5.6–5.7, §7 (k6).
 - 2026-11-03 — Phase 9 exit follow-up (decision asked in Decisions (Phase 9)): ARCHITECTURE §4 "Server prefetch" (what is forwarded, the fallback, why `/me` is seeded in the layout) and §6 the 512 px `card.webp`; DEPLOYMENT §4 the per-map image files and adding `card.webp` to an existing bucket.
 
 ### Added
+- 2026-11-03 — **Phase 10A: hardening, deploy pipeline, load test** (TODO Phase 10A; SECURITY §5 / §8–9 / §11, DEPLOYMENT §2–9, TESTING §5–7). No staging or production server exists yet, so everything below was verified against the production images on local Docker; 10B repeats the server-dependent parts on the real VMs.
+  - **CSP with nonces** (SECURITY T4):
+    - `src/proxy.ts` now runs on every page: a fresh nonce per request, the CSP on the request (Next stamps the nonce on its scripts) and on the response; the `(app)` login guard is unchanged.
+    - `src/lib/csp.ts` builds the policy: `script-src 'self' 'nonce-…' 'strict-dynamic'`, no `'unsafe-eval'` outside dev, only absolute http(s) tile / socket / Sentry origins added (Next's proxy runtime turns `new URL('/tiles').origin` into the string `"null"` — filtered).
+    - Every page renders per request (root layout `connection()`); all routes are now dynamic.
+    - Zod runs jitless in browsers (`packages/shared/src/zodSetup.ts`, imported first by the shared index and by `env.ts`): its `new Function` probe was the one CSP violation left.
+  - **API headers:** `@fastify/helmet` — deny-all CSP (`default-src 'none'`, `frame-ancestors`, `base-uri`, `form-action`), nosniff, Referrer-Policy, COOP / CORP; HSTS only with `COOKIE_SECURE=true`.
+  - **Forms post:** every `<form>` has `method="post"` (20 forms; a unit test keeps it so). ZAP's spider submitted the server-rendered register form before hydration and got `?password=…` in the URL — a real user pressing Enter on a slow connection would have too.
+  - **Maintenance mode** (DEPLOYMENT §7): `MAINTENANCE=true` → `503 MAINTENANCE` + `Retry-After` on every route but health and metrics, socket handshakes refused; the web app shows a banner on every page from its own `MAINTENANCE`. New error code `MAINTENANCE`.
+  - **Metrics:** `GET /metrics` (prom-client): process defaults, `http_request_duration_seconds{method,route,status}`, `socketio_connected_clients`; `METRICS_TOKEN` → bearer required, otherwise `404`. Per-app registry.
+  - **Sentry** (off until a DSN is set): server `@sentry/node` reports unexpected 5xx from the error handler; web `@sentry/nextjs` in `instrumentation-client.ts` (SDK chunk fetched only with a DSN) and `instrumentation.ts` (`onRequestError`). Sentry 11 collects cookies / headers / bodies by default — all turned off via `dataCollection`, plus a `beforeSend` scrub on the server. Releases `rotationlab-{server,web}@<version>`.
+  - **Images** (`docker/`, `.dockerignore`): web on Alpine (standalone, per-environment build args, `check:no-debug` in the build); server on Debian slim with the Prisma CLI and `tsx` (migrations and seeds from the same image). Both non-root, healthchecked, run `read_only`.
+  - **`deploy/`:** `docker-compose.prod.yml` (no fixed project name — a local run uses `-p rl-prodtest` so the dev volumes are never touched), `Caddyfile` (edge headers, deny-all CSP fallback via `?Content-Security-Policy`, 1 MB request cap, per-connection resolution of `server` so `--scale` works), `env/*.env.example`, `deploy.sh` (migrate → up → smoke → rollback to `.last_tag`), `backup.sh` / `restore.sh` (bash, `pipefail`; the dump goes straight into `age`, never to disk unencrypted), `ci-ssh-deploy.sh`. `.gitignore`: `deploy/env/*.env`, `deploy/backups/`, `deploy/.last_tag`, `loadtest/users.json`.
+  - **CI:** `security` job (`pnpm audit --prod --audit-level=high`, gitleaks over the full history) and `images` job (both Dockerfiles build). `zap.yml` nightly against staging (fails on High). `deploy.yml`: staging after a green CI run on `main`, production on `v*` behind the `production` environment; server image re-tagged, web image rebuilt with production build args. actionlint clean apart from one note on an existing job.
+  - **Realtime — batched cursors:** the server buffers each board's latest cursor per user and flushes one `cursor:batch { boardId, cursors[] }` every 50 ms (replaces the per-move `cursor:move` broadcast; the client applies a batch in one store update and skips its own cursor). The cursor stream's membership check is reused for 5 s (kicks disconnect at once).
+  - **Fewer queries per op:** the socket path resolves board + role once (`boardOps.applyResolved`); `touchRoom` skips its query within a minute of the last touch on this instance; the element lookup no longer joins its layer when the element stays on the layer just checked.
+  - **Load test:** `loadtest/realtime.js` (k6 over raw websockets) + `apps/server/scripts/loadtest-seed.ts`. See Decisions (Phase 10) for the runs.
+  - **Dependencies:** nodemailer 6 → 10.1.7 (5 high advisories; a mail sent through Mailpit with v10 to check), `pnpm.auditConfig.ignoreGhsas` for deepmerge-ts (SECURITY §9).
+  - **Rehearsed on the local production stack** (DEPLOYMENT §9): headers per response type; `__Host-rl_at` / `__Secure-rl_rt` cookie flags; `wss://localhost/realtime` through Caddy; zero CSP violations and console errors across register → room; deploy and **rollback from a broken release** (detected in ~50 s, previous tag restored, exit 1); demo seed from the image; **encrypted backup restored into a scratch database** (1 user / 1 room / 3 boards / 24 elements / 8 migrations); ZAP baseline 0 failures; gitleaks clean (13 commits).
+  - Tests:
+    - Unit 366 (+16): web `csp.test.ts` (nonce / strict-dynamic, dev eval, CDN + socket + Sentry origins, never `"null"`), `forms.test.ts` (every form posts), `phase10.test.ts` (`MAINTENANCE` parsing, Sentry data collection off); server `phase10.test.ts` (API headers, HSTS only over HTTPS, maintenance 503 with health / metrics up, `/metrics` with and without a token); shared: 21 error codes.
+    - Integration 499 (+5): batched cursors (one message per tick, latest position per user), the cursor tests on `cursor:batch`, the volatile cap measured on `laser:point`, the `/metrics` authz row; the harness retries a deadlocked `TRUNCATE`.
+    - E2E 47 (+2, `security.spec.ts`): pages carry a fresh nonce CSP that every script uses; register → explore → privacy / terms → room → settings with zero CSP violations. The API-restart test now runs in its own Playwright project after all others — stopping the shared API broke whatever ran beside it.
+    - Lighthouse (all pages now dynamic, median of 5, AC power): landing 93, dashboard 89, accessibility 100.
 - 2026-11-03 — **Phase 9 exit: dashboard Lighthouse 83 → 91** (TODO Phase 9; the user picked both fixes offered in Decisions (Phase 9), one after the other).
   - **Card image:** the tile build writes `<map>/card.webp` (512 px, WebP q72: Erangel 34 KB, Miramar 52 KB, Rondo 59 KB, vs the 151–228 KB `preview.jpg`). `MapConfig.card` in shared; dashboard room cards use it (`MapThumb variant="card"`); `preview.jpg` stays for the auth backdrop. Fixture tiles regenerated with a `card.webp` per map. Lower WebP quality barely helps (q50 still 39–44 KB for Miramar / Rondo), so q72 stays.
   - **Server-rendered room list:** `app/(app)/dashboard/page.tsx` is now a server component that fetches `GET /rooms` and seeds React Query through a `HydrationBoundary`; the client UI moved to `components/rooms/DashboardView.tsx`. The `(app)` layout seeds `GET /me` the same way, above `AppShell`. `lib/serverApi.ts`: `prefetchApi` (forwards only the access cookie plus `X-Forwarded-For`, 1.5 s timeout, validates with the shared schema, null on anything else → the client fetches as before), `requestContext`, `dehydrated`. Query keys moved to `lib/queryKeys.ts` (no `'use client'`, so server code gets the values; re-exported from the old modules). React hoists the first card's image into a `<head>` preload, so it loads before any JS.
@@ -433,6 +458,30 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
   - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
 
+### Decisions (Phase 10)
+- **Phase 10 split** (asked): 10A in the repo + local rehearsal, 10B on the real VMs. `v1.0.0` is held until Phase 0 is closed (asked); the release section will be written then.
+- **Web Sentry** (asked): `@sentry/nextjs` added (TECH_STACK). Its host is added to `connect-src` only when a DSN is configured.
+- **nodemailer 10** (asked) instead of allowlisting 6.x; **deepmerge-ts allowlisted** (asked) — only Prisma 6's config loader reaches it.
+- **Server image on Debian slim, not Alpine.** k6 against the production images, 200 users without cursors: Alpine handled ≈ 217 ops/s of the 400 sent (p95 39.8 s, server 583 % CPU, almost all in Prisma's tokio threads); glibc handled all of it at p95 73 ms and 261 % CPU. Prisma's engine on musl is the known culprit. The web image has no Prisma and stays on Alpine.
+- **Cursor batching** (asked — protocol change). With cursors on, the per-move fan-out (one socket write per cursor per teammate, ~40 k/s at 500 users) saturated the event loop: 150 users p95 14.7 s → **209 ms** after batching, 0 errors.
+- **Load-test results (local, k6 on the same machine):**
+
+  | Run (cursors 20 Hz unless noted) | p95 broadcast | op errors |
+  |---|---|---|
+  | 50 users, 60 s, Alpine | 80 ms | 0 / 5 950 |
+  | 200 users, no cursors, 90 s — Alpine → glibc | 39.8 s → 73 ms | 0 |
+  | 150 users, 60 s — per-move → batched cursors | 14.7 s → 209 ms | 0 |
+  | **150 users, 10 min, batched** | **418 ms** (median 32, p90 166) | **0 / 179 850** |
+  | 300 users, 60 s, batched (1 or 2 server replicas) | 28.6 s / 22 s | 0 |
+
+  Above ≈ 150–200 users the host is the limit: CPU at 84 %, k6 itself 2–2.5 cores, two servers ~3.5, Caddy ~1.2, Postgres ~0.9 — a second replica barely helped. The 500-user gate (TESTING §7) therefore moves to 10B with k6 on a separate machine; `--scale server=2` is ready (Caddy resolves `server` per connection, Socket.IO is websocket-only, the Redis adapter fans out).
+- Two measurement traps worth keeping: (1) a server keeps applying ops it already received after the clients leave — after the first 500-user run it sat at 660 % CPU with nobody connected, so every run now restarts it first; (2) k6 thresholds pass on zero samples, so the script requires `ops_received > 0` and all checks green.
+- **Caddy upstream:** `dynamic a` was tried for replicas and reverted — it cached the server's old IP for a minute after a restart and every connection failed meanwhile. The plain upstream resolves per connection and Docker's DNS rotates replicas.
+- **ZAP accepted warnings** (`.zap/rules.tsv`): `style-src 'unsafe-inline'` (Leaflet / Radix, already in T4), anti-CSRF tokens (false positive: header + Origin + SameSite), public cache on `security.txt`, COEP (would need CORP on R2 tiles), non-storable pages, "modern web app", the empty-body 307 to `/login`. Scanners on a dotless `localhost` send no SNI, which Caddy's internal-CA policy rejects — the rehearsal scans `rl.localhost`.
+- **Maintenance banner** reads the web container's own `MAINTENANCE` (server-only env, per request) rather than reacting to the first 503: it shows on every page, the landing included, without an API call.
+- **Load-test fixtures** are minted server-side (users, rooms, tokens) rather than registered through the API: production allows 5 registrations / hour / IP, and lowering the limit for a test would test something else.
+- The integration harness retries `TRUNCATE` on a Postgres deadlock (40P01): socket ops a test sent are still being applied when the next test starts. Faster op handling exposed it.
+
 ### Decisions (Phase 9)
 - **Lighthouse target missed on the dashboard** (83 vs 85; landing 95). The LCP element is the first room card's 1024 px, 151 KB `preview.jpg` shown at 378 px. Under simulated slow 4G it can only start after the JS (268 KB), `/me` + `/rooms` and the image itself, because the list is client-rendered. Fixed what was legitimately wrong:
   - the AppShell waterfall;
@@ -591,9 +640,10 @@ Total 8 190 tiles, 93.6 MB (≈ 113 MB of `out/` including previews). Fetch took
 ### Dependencies (resolved)
 - Tooling: turbo 2.11.10, typescript 5.9.3, eslint 9.39.5, @eslint/js 9.39.5, typescript-eslint 8.72.0, eslint-config-prettier 10.1.8, @next/eslint-plugin-next 16.4.3, eslint-plugin-react-hooks 7.1.1, globals 17.13.0, prettier 3.9.10, husky 9.1.7, lint-staged 17.6.0, vitest 5.0.5, tsx 4.23.15, @types/node 22.20.5, pnpm 10.34.8
 - Shared: zod 4.6.7
-- Server: fastify 5.12.7, fastify-type-provider-zod 7.0.0, ioredis 5.11.1, prisma / @prisma/client 6.19.3, pino-pretty 13.2.0 (pino comes in through fastify), nodemailer 6.10.1, @types/nodemailer 6.4.24 (Phase 8)
+- Server: fastify 5.12.7, fastify-type-provider-zod 7.0.0, ioredis 5.11.1, prisma / @prisma/client 6.19.3, pino-pretty 13.2.0 (pino comes in through fastify), nodemailer 6.10.1, @types/nodemailer 6.4.24 (Phase 8); Phase 10: @fastify/helmet 13.2.0, @sentry/node 11.8.0, prom-client 15.1.3, nodemailer **10.1.7** (own types; @types/nodemailer removed)
 - Web: next 16.4.3, react / react-dom 19.3.1, tailwindcss / @tailwindcss/postcss 4.3.3, lucide-react 1.61.0, clsx 2.1.1, tailwind-merge 3.7.0, class-variance-authority 0.7.1, @types/react / @types/react-dom 19.3.0, @testing-library/react 16.3.3, @testing-library/dom 10.4.2, jsdom 30.1.3; dev (Phase 9): @axe-core/playwright 4.13.0, lighthouse 13.5.0
-- Images: postgres:17-alpine, redis:7-alpine, axllent/mailpit
+- Web, Phase 10: @sentry/nextjs 11.8.0
+- Images: postgres:17-alpine, redis:7-alpine, axllent/mailpit; Phase 10: node:22-bookworm-slim (server), node:22-alpine (web), caddy:2.10-alpine; tools (not dependencies): grafana/k6:1.3.0, ghcr.io/zaproxy/zaproxy:stable, ghcr.io/gitleaks/gitleaks:v8.30.1
 
 ---
 

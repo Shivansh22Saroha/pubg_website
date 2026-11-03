@@ -35,8 +35,8 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
  * App for unit tests that never touch Postgres/Redis: clients are created lazily and never
  * connect, rate limiting (which needs Redis) is off.
  */
-export async function unitApp(checks: HealthChecks) {
-  const config = testConfig({ RATE_LIMITS_ENABLED: 'false' });
+export async function unitApp(checks: HealthChecks, overrides: Record<string, string> = {}) {
+  const config = testConfig({ RATE_LIMITS_ENABLED: 'false', ...overrides });
   const prisma = new PrismaClient({ datasourceUrl: config.DATABASE_URL });
   const redis = new Redis(config.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 0 });
   const app = await buildApp({ config, prisma, redis, checks, realtime: false });

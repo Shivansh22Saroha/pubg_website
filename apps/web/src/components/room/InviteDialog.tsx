@@ -118,6 +118,7 @@ export function InviteDialog({
         )}
 
         <form
+          method="post"
           className="grid grid-cols-3 gap-2 border-t pt-4"
           onSubmit={(e) => {
             e.preventDefault();

@@ -21,6 +21,6 @@ describe('ApiErrorBodySchema', () => {
 
   it('lists every code from API_SPEC §1.4 exactly once', () => {
     expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length);
-    expect(ERROR_CODES).toHaveLength(20);
+    expect(ERROR_CODES).toHaveLength(21); // Phase 10: + MAINTENANCE
   });
 });

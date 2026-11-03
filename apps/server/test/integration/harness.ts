@@ -40,9 +40,19 @@ export function useCleanState() {
   beforeEach(async () => {
     // fire-and-forget system messages of the previous test would deadlock with TRUNCATE
     await Promise.all(apps.map((a) => a.chatIdle()));
-    await prisma.$executeRawUnsafe(
-      'TRUNCATE TABLE audit_logs, snapshots, chat_messages, board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
-    );
+    // ops a previous test's socket sent are still applied after it ends (the server works
+    // through what it already received): their transactions can deadlock with TRUNCATE → retry
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await prisma.$executeRawUnsafe(
+          'TRUNCATE TABLE audit_logs, snapshots, chat_messages, board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
+        );
+        break;
+      } catch (err) {
+        if (attempt >= 5 || !String(err).includes('40P01')) throw err;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
     await redis.flushdb();
   });
   afterAll(async () => {

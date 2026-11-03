@@ -1,3 +1,4 @@
+import { CURSOR_FLUSH_MS } from '@rotationlab/shared';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../../src/app.js';
 import { withLeaderLock } from '../../src/jobs/index.js';
@@ -715,9 +716,12 @@ describe('presence (ARCHITECTURE §7.6)', () => {
 describe('ephemeral events (volatile)', () => {
   it('cursor and laser go to the board channel only, tagged with the sender', async () => {
     const l = await live();
-    const cursor = nextEvent(l.owner, 'cursor:move');
+    const cursor = nextEvent(l.owner, 'cursor:batch');
     l.viewer.emit('cursor:move', { boardId: l.f.boardId, x: 1000, y: 2000 });
-    expect(await cursor).toEqual({ userId: l.f.viewer.id, boardId: l.f.boardId, x: 1000, y: 2000 });
+    expect(await cursor).toEqual({
+      boardId: l.f.boardId,
+      cursors: [{ userId: l.f.viewer.id, x: 1000, y: 2000 }],
+    });
     const laser = nextEvent(l.editor, 'laser:point');
     l.owner.emit('laser:point', { boardId: l.f.boardId, x: 5, y: 6 });
     expect(await laser).toMatchObject({ userId: l.f.owner.id, x: 5 });
@@ -757,15 +761,29 @@ describe('ephemeral events (volatile)', () => {
     expect(await summoned).toEqual({ userId: l.f.editor.id, boardId: l.f.boardId });
   });
 
+  it('cursors are batched: one message per board per tick, the latest position per user', async () => {
+    const l = await live();
+    await sleep(CURSOR_FLUSH_MS * 2); // start on a fresh tick
+    const seen = collect<{ cursors: { userId: string; x: number }[] }>(l.owner, 'cursor:batch');
+    for (let x = 1; x <= 5; x++) l.editor.emit('cursor:move', { boardId: l.f.boardId, x, y: 1 });
+    l.viewer.emit('cursor:move', { boardId: l.f.boardId, x: 99, y: 1 });
+    await sleep(CURSOR_FLUSH_MS * 3);
+    const all = seen.flatMap((b) => b.cursors);
+    // far fewer messages than moves, and nothing older than the last move survives a flush
+    expect(seen.length).toBeLessThanOrEqual(3);
+    expect(all.filter((c) => c.userId === l.f.editor.id).at(-1)?.x).toBe(5);
+    expect(all.find((c) => c.userId === l.f.viewer.id)?.x).toBe(99);
+  });
+
   it('volatile spam is capped (≈40/s, rest dropped) and the server stays responsive', async () => {
     const l = await live();
-    const seen = collect(l.owner, 'cursor:move');
+    const seen = collect(l.owner, 'laser:point');
     // send far faster than the cap with no sleeps in between bursts of 20
     const started = Date.now();
     let sent = 0;
     while (Date.now() - started < 1000) {
       for (let i = 0; i < 20; i++, sent++)
-        l.editor.emit('cursor:move', { boardId: l.f.boardId, x: sent, y: sent });
+        l.editor.emit('laser:point', { boardId: l.f.boardId, x: sent, y: sent });
       await sleep(10);
     }
     const elapsed = (Date.now() - started) / 1000;
@@ -939,9 +957,9 @@ describe('scale-out: two instances sharing Redis', () => {
     expect(r.ok).toBe(true);
     expect((await op).seq).toBe(1);
 
-    const cursor = nextEvent(editor, 'cursor:move');
+    const cursor = nextEvent<{ cursors: { userId: string }[] }>(editor, 'cursor:batch');
     owner.emit('cursor:move', { boardId: f.boardId, x: 1, y: 2 });
-    expect(await cursor).toMatchObject({ userId: f.owner.id });
+    expect((await cursor).cursors).toMatchObject([{ userId: f.owner.id }]);
 
     // REST on instance 1 kicks a socket living on instance 2
     const kicked = nextEvent(editor, 'disconnect');

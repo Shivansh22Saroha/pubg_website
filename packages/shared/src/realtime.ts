@@ -17,6 +17,8 @@ import { BoardSchema, LayerSchema, MemberSchema, RoomDetailSchema } from './sche
  * client→server event except the volatile ones takes an ack callback.
  */
 export const REALTIME_PATH = '/realtime';
+/** `cursor:batch` cadence: 20 Hz, the most a client sends (RT-2) */
+export const CURSOR_FLUSH_MS = 50;
 
 // ---- acks ------------------------------------------------------------------------------
 
@@ -222,7 +224,15 @@ export interface ServerToClientEvents {
   'board:updated': (p: { board: z.infer<typeof BoardSchema> }) => void;
   'board:deleted': (p: { boardId: string }) => void;
   'presence:update': (p: { roomId: string; users: Presence[] }) => void;
-  'cursor:move': (p: { userId: string; boardId: string; x: number; y: number }) => void;
+  /**
+   * Live cursors (Phase 10): every CURSOR_FLUSH_MS the server sends each board the latest
+   * position of every cursor that moved since the last flush — one message per recipient per
+   * tick instead of one per teammate per move. Includes the recipient's own cursor (ignore it).
+   */
+  'cursor:batch': (p: {
+    boardId: string;
+    cursors: { userId: string; x: number; y: number }[];
+  }) => void;
   'stroke:preview': (p: { userId: string } & z.infer<typeof StrokePreviewSchema>) => void;
   'laser:point': (p: { userId: string; boardId: string; x: number; y: number }) => void;
   'view:update': (p: { userId: string } & z.infer<typeof ViewUpdateSchema>) => void;

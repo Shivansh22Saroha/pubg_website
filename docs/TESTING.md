@@ -73,8 +73,8 @@
 3. **XSS** — E2E: chat message and marker label `<img src=x onerror=alert(1)>` render as literal text; no dialog fires; CSP report count 0. Until Phase 10 configures a CSP, "no CSP violation" holds trivially — the check only becomes meaningful once the policy ships; the literal-text, no-element and no-dialog checks are the real guards before then.
 4. **IDOR** — swap IDs between two users' rooms/boards/snapshots/messages in every endpoint.
 5. **Session** — refresh-token reuse detection; access token still valid after logout? (≤ 15 min accepted; sockets must be dropped immediately).
-6. **Headers** — integration test asserts CSP, HSTS (prod), nosniff, frame-ancestors.
-7. **ZAP baseline** — against staging nightly; fail on High.
+6. **Headers** — server unit tests assert the API's CSP, HSTS (only with `COOKIE_SECURE`), nosniff, COOP/CORP; `e2e/security.spec.ts` asserts the pages' nonce CSP (fresh per request, every script carries it) and walks the app with zero CSP violations (Phase 10).
+7. **ZAP baseline** — against staging nightly; fail on High (`.github/workflows/zap.yml`; accepted warnings with reasons in `.zap/rules.tsv`).
 8. **Dependencies & secrets** — `pnpm audit --prod --audit-level=high`, gitleaks on every push.
 
 ## 6. E2E scenarios (Playwright)
@@ -100,6 +100,9 @@
   - Separate from `pnpm test:e2e` (slow, wants a quiet machine) and not yet a CI gate.
 - Map render benchmark (Playwright + `performance.now`): load board with 1 000 mixed elements, pan for 5 s. **In CI this is a regression check only**, against the recorded baseline (Phase 5B: avg 18.6 ms / p95 33.3 ms in headless Chromium with software rendering): report the trend, hard fail only on > 2× the baseline average. The absolute 60 fps target (avg < 16.7 ms) is verified **manually on a GPU-accelerated browser** before release. Software-rendered frame times drift a lot between days on the same machine (the Phase 5B code measured 18.6 ms on 2026-10-25 and 29.5 ms on 2026-10-26), so a "no regression" claim at the end of a phase is made by an **A/B run**: the previous phase's commit and the new code, back to back, on the same machine.
 - k6 socket load: 100 rooms × 5 users, each user 2 ops/s + 20 Hz cursor for 10 min on staging VM spec → p95 op broadcast latency < 400 ms, error rate < 0.1 %, server CPU < 70 %.
+  - Implemented (Phase 10): `loadtest/realtime.js` speaks Engine.IO / Socket.IO over a raw k6 websocket (join → subscribe → `element:upsert` of the VU's own marker 2×/s with the send time in its label, `cursor:move` at `CURSOR_HZ`). Receivers turn the label into `broadcast_latency`; `ack_latency`, `op_errors` (non-ok acks), `connect_errors`. A run that received nothing fails (`ops_received > 0`, `checks == 1`). Fixtures: `apps/server/scripts/loadtest-seed.ts` (users, rooms, boards and minted access tokens — the production rate limits make API registration impossible at this scale; `--cleanup` removes them). Knobs: `BASE`, `DURATION`, `RAMP_S`, `CURSOR_HZ`, `VUS`, `INSECURE=1`, `DEBUG=1` (per-VU error codes).
+  - **Run k6 on a different machine from the stack.** Locally the generator alone takes 2–2.5 cores and the host saturates above ≈ 150–200 users, so higher numbers measure the box, not the server. Restart the server between runs: ops it already received keep it busy after the clients leave.
+  - Phase 10 local results and the fixes they forced: CHANGELOG, Decisions (Phase 10).
 
 ## 8. Test data & environment
 - Local `pnpm test:e2e` runs with at most 3 Playwright workers (CI: Playwright's default): the ≤ 1 s sync assertions need a machine that isn't saturated. Use `127.0.0.1` (not `localhost`) in `DATABASE_URL` / `REDIS_URL` on Windows (ENVIRONMENT.md).

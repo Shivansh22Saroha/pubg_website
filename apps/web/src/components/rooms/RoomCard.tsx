@@ -129,6 +129,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
         {dialog === 'rename' && (
           <DialogContent title="Rename room">
             <form
+              method="post"
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -163,6 +164,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
             description={`Everyone loses access. Type "${room.name}" to confirm.`}
           >
             <form
+              method="post"
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault();

@@ -1,0 +1,42 @@
+# DEPLOYMENT §3. APP_DOMAIN: app.example.com / staging.example.com (Let's Encrypt), or
+# `localhost` for a local rehearsal (Caddy's internal CA).
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# edge headers for every response; pages add their nonce CSP (web), the API its own (helmet)
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		# responses that bring no CSP of their own (static files, a 404 for /robots.txt) get a
+		# deny-all one; `?` never overrides the pages' nonce CSP or the API's
+		?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+		-Server
+		-X-Powered-By
+	}
+
+	# REST bodies are capped at 100 KB by the API; this stops anything far larger at the edge
+	request_body {
+		max_size 1MB
+	}
+
+	@api path /api/* /realtime/*
+	handle @api {
+		# resolved per new connection (no cached IP after a restart); with `--scale server=N`
+		# Docker's DNS rotates the replicas. Websocket-only Socket.IO needs no sticky sessions
+		# and the Redis adapter fans events out across instances. (`dynamic a` cached the old IP
+		# for a minute after each server restart — every connection failed meanwhile.)
+		reverse_proxy server:4000
+	}
+
+	# /metrics is never routed (the API serves it only on the internal network)
+	handle {
+		reverse_proxy web:3000
+	}
+}

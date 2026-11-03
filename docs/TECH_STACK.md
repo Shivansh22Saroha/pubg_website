@@ -33,6 +33,7 @@
 | uuid | 10.x+ (`v7`) | client element/op ids |
 | html-to-image or leaflet-image alternative | latest | PNG export (render tiles + vector canvas to one canvas) |
 | next-themes | – | not needed (dark only in v1) |
+| @sentry/nextjs | 11.x (Phase 10) | browser + Next-server error reports; loaded only when `NEXT_PUBLIC_SENTRY_DSN` is set |
 
 Drawing approach: **custom tool layer on Leaflet**, not Leaflet.draw / Geoman. Elements are rendered as Leaflet vector layers using a shared `L.canvas()` renderer (fast for thousands of shapes) and markers as `L.marker` with `divIcon` SVG. Tools are plain TS classes handling pointer events → produce `ElementInput`. Reason: full control over the data model, realtime previews and undo; plugin editors fight with our sync model.
 
@@ -50,8 +51,8 @@ Drawing approach: **custom tool layer on Leaflet**, not Leaflet.draw / Geoman. E
 | jose | 5.x+ | JWT sign/verify |
 | pino + pino-pretty (dev) | 9.x | structured logging |
 | node-cron | 3.x | background jobs |
-| nodemailer | 6.x | email (P1, behind flag) |
-| @sentry/node | latest | optional error tracking |
+| nodemailer | 10.x (Phase 10: 6.x had 5 high advisories, fixed in ≥ 10.0.6; ships its own types) | email (P1, behind flag) |
+| @sentry/node | 11.x | optional error tracking (Sentry 11: privacy via `dataCollection`, not `sendDefaultPii`) |
 | prom-client | 15.x | metrics |
 
 ## 4. Shared (`packages/shared`)
@@ -75,7 +76,7 @@ Both `io<ServerToClientEvents, ClientToServerEvents>()` and `new Server<ClientTo
 |---|---|---|
 | PostgreSQL | 16 or 17 | `citext` extension |
 | Redis | 7.x (or Valkey 8) | adapter pub/sub, presence, rate limits, caches |
-| Caddy | 2.x | reverse proxy, automatic HTTPS, headers |
+| Caddy | 2.x (2.10 image) | reverse proxy, automatic HTTPS, headers |
 | Docker / Compose | 27.x / v2 | dev & prod |
 | Object storage + CDN | Cloudflare R2 + Cloudflare CDN (or AWS S3 + CloudFront) | map tiles, board thumbnails |
 | Hosting (v1) | Single VM (e.g. Hetzner CX22 / DigitalOcean 2 vCPU 4 GB / AWS Lightsail) | all containers; scale out later |
@@ -93,8 +94,9 @@ Both `io<ServerToClientEvents, ClientToServerEvents>()` and `new Server<ClientTo
 | Playwright | E2E, multi-browser-context collaboration tests |
 | @axe-core/playwright (4.13) | E2E-13 accessibility scans (Phase 9) |
 | lighthouse (13.x, Node API) | `pnpm --filter web test:lighthouse` on landing + dashboard through Playwright's Chromium (Phase 9) |
-| k6 or Artillery | load test sockets |
-| OWASP ZAP baseline | DAST in CI |
+| k6 (1.3, `grafana/k6` Docker image — not a repo dependency) | realtime load test (`loadtest/realtime.js`, Phase 10) |
+| OWASP ZAP baseline (`ghcr.io/zaproxy/zaproxy:stable`) | DAST, nightly against staging; accepted warnings in `.zap/rules.tsv` |
+| gitleaks (8.30, Docker image) | secret scan of the full history in CI |
 
 ## 8. Explicitly rejected (and why)
 | Option | Reason |

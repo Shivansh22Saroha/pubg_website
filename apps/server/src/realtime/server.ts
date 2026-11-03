@@ -14,6 +14,7 @@ import {
   LayerReorderSchema,
   LayerUpsertSchema,
   PresenceHeartbeatSchema,
+  CURSOR_FLUSH_MS,
   REALTIME_PATH,
   RoomJoinSchema,
   RoomLeaveSchema,
@@ -110,6 +111,9 @@ export interface RealtimeDeps {
   tokenGraceSec: number;
 }
 
+/** how long a socket's cursor stream trusts its last membership check */
+const CURSOR_MEMBER_TTL_MS = 5000;
+
 const ch = {
   room: (id: string) => `room:${id}`,
   board: (id: string) => `board:${id}`,
@@ -149,6 +153,19 @@ export function createRealtime(d: RealtimeDeps): {
   });
   const presence = createPresence(d.redis);
   const log = d.app.log.child({ module: 'realtime' });
+
+  // ---- live cursors (Phase 10): buffered per board, flushed as one `cursor:batch` per tick ----
+  // boardId → userId → latest position since the last flush (only cursors from this instance;
+  // the adapter fans each batch out to every instance's subscribers)
+  const cursorBuffers = new Map<string, Map<string, { x: number; y: number }>>();
+  const cursorTimer = setInterval(() => {
+    for (const [boardId, byUser] of cursorBuffers) {
+      const cursors = [...byUser].map(([userId, p]) => ({ userId, x: p.x, y: p.y }));
+      io.to(ch.board(boardId)).volatile.emit('cursor:batch', { boardId, cursors });
+    }
+    cursorBuffers.clear();
+  }, CURSOR_FLUSH_MS);
+  cursorTimer.unref();
 
   // ---- handshake (API_SPEC §7.1, SECURITY T2) ------------------------------------------
   io.use((socket, next) => {
@@ -315,10 +332,25 @@ export function createRealtime(d: RealtimeDeps): {
       return (await d.policy.roleOf(socket.data.boardRoomId, user.id)) ? boardId : null;
     }
 
+    /**
+     * `subscribedBoard` for the 20 Hz cursor stream: the membership answer is reused for
+     * CURSOR_MEMBER_TTL_MS instead of one role lookup per move. Safe because a kick or a removed
+     * room disconnects the socket at once (SECURITY Z5) — the board check itself is per call.
+     */
+    let cursorMember: { roomId: string; until: number } | null = null;
+    async function cursorAllowed(boardId: string): Promise<boolean> {
+      const roomId = socket.data.boardRoomId;
+      if (socket.data.boardId !== boardId || !roomId) return false;
+      if (cursorMember?.roomId === roomId && cursorMember.until > Date.now()) return true;
+      if (!(await d.policy.roleOf(roomId, user.id))) return false;
+      cursorMember = { roomId, until: Date.now() + CURSOR_MEMBER_TTL_MS };
+      return true;
+    }
+
     async function applyOps(boardId: string, ops: OpRequest[]) {
-      const { board } = await d.policy.requireBoard(user, boardId, 'board.edit');
-      requireJoined(board.roomId);
-      const result = await d.boardOps.apply(user, boardId, ops);
+      const resolved = await d.policy.requireBoard(user, boardId, 'board.edit');
+      requireJoined(resolved.board.roomId);
+      const result = await d.boardOps.applyResolved(user, resolved, ops);
       if (!result.replay) broadcastOps(socket, boardId, result.ops);
       return result.seqs;
     }
@@ -465,8 +497,13 @@ export function createRealtime(d: RealtimeDeps): {
 
     // ---- ephemeral (volatile, never persisted) ---------------------------------------------
     onVolatile('cursor:move', CursorMoveSchema, async (p) => {
-      if (await subscribedBoard(p.boardId))
-        socket.volatile.to(ch.board(p.boardId)).emit('cursor:move', { userId: user.id, ...p });
+      if (!(await cursorAllowed(p.boardId))) return;
+      let byUser = cursorBuffers.get(p.boardId);
+      if (!byUser) {
+        byUser = new Map<string, { x: number; y: number }>();
+        cursorBuffers.set(p.boardId, byUser);
+      }
+      byUser.set(user.id, { x: p.x, y: p.y });
     });
     onVolatile('laser:point', LaserPointSchema, async (p) => {
       if (await subscribedBoard(p.boardId))
@@ -576,6 +613,7 @@ export function createRealtime(d: RealtimeDeps): {
     /** logout / logout-all / password change / theft: drop those sessions' sockets everywhere */
     async close() {
       closing = true;
+      clearInterval(cursorTimer);
       io.disconnectSockets(true);
       await new Promise<void>((resolve) => {
         io.engine.close();

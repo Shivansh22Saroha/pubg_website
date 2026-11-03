@@ -498,8 +498,10 @@ export class RoomSession {
     this.on('presence:update', ({ roomId, users }) => {
       if (roomId === this.roomId) usePresenceStore.getState().setUsers(roomId, users);
     });
-    this.on('cursor:move', (c) => {
-      if (c.boardId === this.boardId) usePresenceStore.getState().moveCursor(c);
+    this.on('cursor:batch', ({ boardId, cursors }) => {
+      if (boardId !== this.boardId) return;
+      const others = cursors.filter((c) => c.userId !== this.meId);
+      if (others.length > 0) usePresenceStore.getState().moveCursors(boardId, others);
     });
     this.on('stroke:preview', ({ userId, boardId, tempId, points, style }) => {
       if (boardId !== this.boardId || userId === this.meId) return;

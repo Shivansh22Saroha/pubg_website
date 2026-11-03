@@ -1,4 +1,11 @@
+import { readFileSync } from 'node:fs';
 import type { NextConfig } from 'next';
+
+const { version } = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+) as {
+  version: string;
+};
 
 const isDev = process.env.NODE_ENV !== 'production';
 /** E2E runs a production build that has to stand in for Caddy (see playwright.config.ts). */
@@ -10,7 +17,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   // always defined, so `=== 'true'` folds at build time and dead debug code is dropped
-  env: { NEXT_PUBLIC_E2E_DEBUG: process.env.NEXT_PUBLIC_E2E_DEBUG ?? 'false' },
+  env: {
+    NEXT_PUBLIC_E2E_DEBUG: process.env.NEXT_PUBLIC_E2E_DEBUG ?? 'false',
+    // Sentry release tag (DEPLOYMENT §7)
+    NEXT_PUBLIC_RELEASE: version,
+  },
   // separate output for the E2E build so it never mixes with `pnpm build`
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   // Dev (and E2E builds): proxy API + realtime through Next so the browser sees one origin and

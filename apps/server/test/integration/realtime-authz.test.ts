@@ -44,6 +44,8 @@ interface AckedRow {
 }
 interface VolatileRow {
   event: (typeof VOLATILE_EVENTS)[number];
+  /** server→client event name when it differs (cursors arrive batched) */
+  receivedAs?: string;
   payload: (ctx: Ctx) => unknown;
   delivered: Record<Exclude<Caller, 'anonymous'>, boolean>;
 }
@@ -156,6 +158,7 @@ const everyMember = { outsider: false, viewer: true, editor: true, owner: true }
 const VOLATILE: VolatileRow[] = [
   {
     event: 'cursor:move',
+    receivedAs: 'cursor:batch',
     payload: ({ f }) => ({ boardId: f.boardId, x: 1, y: 2 }),
     delivered: everyMember,
   },
@@ -239,7 +242,7 @@ describe('socket authz matrix', () => {
           const callerId = caller === 'outsider' ? ctx.f.outsider.id : ctx.f[caller].id;
           await ack(observer, 'follow:start', { targetUserId: callerId });
         }
-        const seen = collect(observer, row.event);
+        const seen = collect(observer, row.receivedAs ?? row.event);
         // volatile packets may be dropped while the receiver is busy — probe a few times
         for (let i = 0; i < 3; i++) {
           socket.emit(row.event, row.payload(ctx) as never);

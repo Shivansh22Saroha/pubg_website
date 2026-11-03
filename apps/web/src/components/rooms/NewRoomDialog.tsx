@@ -96,7 +96,12 @@ export function NewRoomDialog({ trigger }: { trigger?: React.ReactNode }) {
         )}
       </DialogTrigger>
       <DialogContent title="New room" description="A private space for your squad's plans.">
-        <form onSubmit={(e) => void onSubmit(e)} noValidate className="flex flex-col gap-4">
+        <form
+          method="post"
+          onSubmit={(e) => void onSubmit(e)}
+          noValidate
+          className="flex flex-col gap-4"
+        >
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="room-name">Name</Label>
             <Input

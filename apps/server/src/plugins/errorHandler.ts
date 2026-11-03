@@ -2,6 +2,7 @@ import type { ApiErrorBody, ApiErrorDetail, ErrorCode } from '@rotationlab/share
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 import { AppError } from '../lib/errors.js';
+import { reportError } from '../lib/sentry.js';
 
 function send(
   reply: FastifyReply,
@@ -44,6 +45,7 @@ export function registerErrorHandler(app: FastifyInstance) {
 
     // Unexpected: log the full error, return nothing internal to the client.
     request.log.error({ err }, 'unhandled error');
+    reportError(err, request.id);
     return send(reply, request, 500, 'INTERNAL', 'Something went wrong');
   });
 

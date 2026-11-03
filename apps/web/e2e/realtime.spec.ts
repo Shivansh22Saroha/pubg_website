@@ -5,7 +5,7 @@ import { controlApi, debugCount, debugPending, pageApi, twoUsersInRoom } from '.
  * Realtime client (Phase 5B; RT-1/2/3/6, FEATURES F8) with two browser contexts. Elements are
  * created through the dev/E2E debug hook (`window.__rlDebug`) until Phase 6 adds tools.
  */
-test.describe.configure({ mode: 'serial' }); // the API-restart test affects every open socket
+test.describe.configure({ mode: 'serial' });
 
 test('A adds 20 elements, B sees all within 1 s; B moves one, A sees the move; presence & cursors', async ({
   browser,
@@ -77,7 +77,8 @@ test('offline: 3 edits queue up, then reach B exactly once when back online', as
   await ctxB.close();
 });
 
-test('API killed and restarted mid-session: both clients recover without a reload, nothing lost or duplicated', async ({
+// @api-restart: its own Playwright project, run after all other tests (playwright.config.ts)
+test('API killed and restarted mid-session: both clients recover without a reload, nothing lost or duplicated @api-restart', async ({
   browser,
 }) => {
   const { ctxA, ctxB, a, b, boardId } = await twoUsersInRoom(browser);

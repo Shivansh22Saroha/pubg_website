@@ -217,6 +217,7 @@ export function BoardTabs({
         {dialog?.kind === 'new' && (
           <DialogContent title="New board">
             <form
+              method="post"
               className="flex flex-col gap-4"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -261,6 +262,7 @@ export function BoardTabs({
         {dialog?.kind === 'rename' && (
           <DialogContent title="Rename board">
             <form
+              method="post"
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault();

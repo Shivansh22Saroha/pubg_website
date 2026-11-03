@@ -1,0 +1,8 @@
+# ZAP baseline rules (TESTING §5.7): warnings reviewed in Phase 10 and accepted. Format: id<TAB>action<TAB>reason
+10015	IGNORE	security.txt is public and cacheable on purpose (RFC 9116); pages and API send no-store / private
+10049	IGNORE	informational: pages are per-request (nonce CSP), so not storable by design
+10055	IGNORE	style-src 'unsafe-inline' is required by Leaflet/Radix inline styles (SECURITY §5 T4); script-src is nonce + strict-dynamic
+10109	IGNORE	informational: it is a modern web app
+10202	IGNORE	false positive: forms never submit natively to the API; CSRF = X-Requested-With + Origin check + SameSite cookies (SECURITY T3)
+90004	IGNORE	COEP not adopted: would require CORP on R2 tiles; no cross-origin isolation is needed (no SharedArrayBuffer)
+10019	IGNORE	the only hit is the empty-body 307 redirect from a guarded page to /login

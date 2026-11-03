@@ -37,6 +37,7 @@ Cursor-based: `?limit=50&before=<id>` → response `{ items: [...], nextCursor: 
 | 423 | `ACCOUNT_LOCKED` |
 | 429 | `RATE_LIMITED` (+ `Retry-After` header) |
 | 500 | `INTERNAL` |
+| 503 | `MAINTENANCE` (+ `Retry-After: 300`) — every route but `/api/health` and `/metrics` while `MAINTENANCE=true`; socket handshakes fail with the same code (Phase 10, DEPLOYMENT §7) |
 
 ### 1.5 Common objects
 ```ts
@@ -171,7 +172,7 @@ Implementation notes (Phase 5A/5B):
 - Locked layer → `FORBIDDEN`; element outside the map → `VALIDATION_ERROR`; > 5 000 elements or > 10 layers → `LIMIT_REACHED`; last layer → `CONFLICT`.
 - A resent `opId` (same user, within 10 min) returns the original seq(s) and is not re-applied or re-broadcast.
 - **Batch semantics:** each *attempt* of `element:batch` is all-or-nothing (one transaction — any invalid op rejects the whole attempt). Resends are deduped **per op** (`opId`), so a retry of a batch whose ops were partly applied by an earlier attempt replays the known seqs and applies only the rest. Partial application across retries is therefore safe and converges.
-- **Ephemeral events are best-effort:** `cursor:move`, `laser:point`, `stroke:preview` and `view:update` are volatile — they can be dropped (rate cap, invalid payload, a receiver still flushing, reconnects) and are never replayed. Clients must not depend on receiving every one (ghosts expire after 3 s without updates, cursors fade after 5 s).
+- **Ephemeral events are best-effort:** `cursor:move` (delivered as `cursor:batch`), `laser:point`, `stroke:preview` and `view:update` are volatile — they can be dropped (rate cap, invalid payload, a receiver still flushing, reconnects) and are never replayed. Clients must not depend on receiving every one (ghosts expire after 3 s without updates, cursors fade after 5 s).
 - Volatile events are dropped silently when invalid, over the cap, or not on the board the socket subscribed to; `stroke:preview` only flows from roles that can draw; `view:update` goes only to sockets that sent `follow:start` for that user.
 
 ### 7.2 Client → server
@@ -210,7 +211,7 @@ Implementation notes (Phase 5A/5B):
 | `chat:deleted` | `{ messageId }` |
 | `chat:typing` | `{ userId }` |
 | `presence:update` | `{ roomId, users: Presence[] }` where `Presence = { userId, boardId, idle, color }` |
-| `cursor:move` | `{ userId, boardId, x, y }` |
+| `cursor:batch` | `{ boardId, cursors: [{ userId, x, y }] }` — every 50 ms (`CURSOR_FLUSH_MS`), the latest position of each cursor on that board that moved since the last flush; one message per recipient per tick (Phase 10, replaces a per-move `cursor:move` broadcast). Includes the recipient's own cursor: ignore it. Volatile |
 | `stroke:preview` | `{ userId, boardId, tempId, points, style }` |
 | `laser:point` | `{ userId, boardId, x, y }` |
 | `view:update` | `{ userId, boardId, center, zoom }` (only to followers) |
@@ -239,7 +240,7 @@ Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violati
 | `GET /api/v1/maps` | static map registry `{ items: [{ id, name, worldSize, tileBaseUrl: { labels, clean }, maxNativeZoom, thumbnailUrl }] }` |
 | `GET /api/v1/public/demo-boards` | read-only demo boards for `/explore`: `{ items: [{ board, layers, elements }] }`, no auth, rate-limited 30 / min / IP, `Cache-Control: public, max-age=300`. Only boards whose id is in `DEMO_BOARD_IDS` (≤ 3, env order; ids that don't exist or whose room is deleted are skipped; unset → `{ items: [] }`). The id list never comes from the request. Nothing points back at a room or a person: `board` has no `roomId`, elements have `createdBy` / `updatedBy: null` |
 | `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+, `image/jpeg` body ≤ 100 KB, 256×256 (server re-encodes with sharp and stores in object storage) — P1 |
-| `GET /metrics` | Prometheus, **internal network only** |
+| `GET /metrics` | Prometheus, **internal network only** (Caddy never routes it). Process defaults, `http_request_duration_seconds{method,route,status}`, `socketio_connected_clients`. With `METRICS_TOKEN` set it also needs `Authorization: Bearer <token>`; a missing or wrong token gets `404` (Phase 10) |
 
 ## 9. Example: create a room
 ```http

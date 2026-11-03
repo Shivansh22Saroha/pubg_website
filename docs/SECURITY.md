@@ -87,6 +87,13 @@ Cross-Origin-Opener-Policy: same-origin
 ```
 (Tighten `style-src` later by removing `'unsafe-inline'` if feasible — Leaflet sets inline styles, so it is currently required.)
 
+Implemented (Phase 10):
+- **Pages:** `apps/web/src/proxy.ts` builds the CSP per request (`src/lib/csp.ts`): `script-src 'self' 'nonce-…' 'strict-dynamic'` (no `'unsafe-eval'` outside dev), `style-src 'self' 'unsafe-inline'`, `font-src 'self'` (next/font self-hosts — no Google hosts), `img-src`/`connect-src` add only the tile CDN origin, a direct socket URL (dev / E2E) and the Sentry ingest host when configured; `frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`. Every page renders per request (root layout `connection()`), so every script carries the nonce. Zod runs **jitless in browsers** (`packages/shared/src/zodSetup.ts`): its `new Function` probe would otherwise be reported as a violation.
+- **API:** `@fastify/helmet` — `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, nosniff, Referrer-Policy, COOP / CORP `same-origin`; HSTS when `COOKIE_SECURE=true`.
+- **Edge (Caddy):** HSTS, nosniff, Referrer-Policy, Permissions-Policy, COOP, no `Server`; a deny-all CSP for responses that carry none (static files, odd 404s) — never overriding the two above.
+- **Forms** always declare `method="post"` (unit-tested): a server-rendered form submitted before hydration would otherwise GET its fields — passwords — into the URL (found by ZAP).
+- Not adopted: COEP (needs CORP on the R2 tiles; nothing needs cross-origin isolation).
+
 | T5 | No CORS in production (same origin). In dev, allow only `http://localhost:3000` with credentials. |
 
 ## 6. Rate limiting & abuse (DoS)
@@ -120,7 +127,9 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 ## 9. Dependency & supply chain
 - `pnpm audit --prod` and GitHub Dependabot (weekly); fail CI on high/critical in prod dependencies.
 - Lockfile committed; `pnpm install --frozen-lockfile` in CI and Docker.
-- Docker images: `node:22-alpine` (or distroless) base, run as non-root user, read-only root FS where possible, `HEALTHCHECK` set.
+- Docker images: run as non-root user, read-only root FS (compose `read_only: true` + tmpfs), `HEALTHCHECK` set. Bases (Phase 10): web `node:22-alpine`; server `node:22-bookworm-slim` — Prisma's engine on musl was CPU-bound at a fraction of glibc's throughput (CHANGELOG, Phase 10 load test).
+- Accepted advisories (`package.json` → `pnpm.auditConfig.ignoreGhsas`), reviewed each release:
+  - `GHSA-ggr8-5vv4-36mx` deepmerge-ts < 8 (stack exhaustion on recursive objects): only reached by Prisma 6's own config loader at CLI / startup, never with request data. Revisit with Prisma 7.
 - Map tile script verifies SHA-256 of downloaded LFS objects against the pointer `oid`, and checks image magic bytes before processing (treat downloaded files as untrusted; run `sharp` with `limitInputPixels` set to the expected size, not `false`, once the real size is known).
 
 ## 10. Threat model (STRIDE summary)
@@ -142,9 +151,9 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 
 ## 11. Security testing (see TESTING.md §5)
 - Automated authz matrix tests for every endpoint and socket event × role.
-- OWASP ZAP baseline scan in CI against staging.
+- OWASP ZAP baseline scan nightly against staging (`.github/workflows/zap.yml`), failing on High. Phase 10 local run against the production stack: 0 failures; the reviewed, accepted warnings are in `.zap/rules.tsv` with a reason each.
 - Manual checklist before each release: cookie flags, headers (securityheaders.com A), CSP violations in console = 0, rate limits verified.
-- Note: the automated "no CSP violation" assertion (TESTING §5.3) is only meaningful once Phase 10 ships the CSP (T4); before that it passes trivially.
+- The automated "no CSP violation" assertions (TESTING §5.3, `e2e/security.spec.ts`) are meaningful since Phase 10 shipped the CSP.
 
 ## 12. Incident response (lightweight)
 1. Detect (Sentry alerts, error-rate spikes, user report to `security@` address in footer).

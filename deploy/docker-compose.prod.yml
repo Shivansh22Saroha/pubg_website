@@ -1,0 +1,79 @@
+# Production / staging stack (DEPLOYMENT §3), one VM: /opt/rotationlab/{docker-compose.prod.yml,
+# Caddyfile,env/*.env}. Only Caddy publishes ports. Images come from GHCR:
+#   REGISTRY=ghcr.io/<owner>/  TAG=sha-abc1234 | v1.0.0   (deploy.sh sets both)
+# Local rehearsal: REGISTRY= TAG=local APP_DOMAIN=localhost, `-p rl-prodtest` (DEPLOYMENT §9).
+# No fixed `name:` — on the VM the project is the directory (/opt/rotationlab → rotationlab);
+# a local rehearsal passes `-p rl-prodtest` so it never touches the dev stack's volumes.
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: 10m, max-file: '5' }
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    ports: ['80:80', '443:443', '443:443/udp']
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com} # Let's Encrypt account / expiry mail
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web, server]
+    restart: unless-stopped
+    logging: *logging
+
+  web:
+    image: ${REGISTRY:-}rotationlab-web:${TAG:?set TAG}
+    env_file: env/web.env
+    read_only: true
+    tmpfs: [/tmp, /app/apps/web/.next/cache]
+    depends_on: [server]
+    restart: unless-stopped
+    logging: *logging
+
+  server:
+    image: ${REGISTRY:-}rotationlab-server:${TAG:?set TAG}
+    env_file: env/server.env
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
+
+  # one-shot, before switching traffic: `docker compose --profile migrate run --rm migrate`
+  migrate:
+    image: ${REGISTRY:-}rotationlab-server:${TAG:?set TAG}
+    env_file: env/server.env
+    command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
+    depends_on:
+      postgres: { condition: service_healthy }
+    profiles: ['migrate']
+
+  postgres:
+    image: postgres:17-alpine
+    env_file: env/postgres.env
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    command: ['sh', '-c', 'exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes']
+    env_file: env/redis.env
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep -q PONG']
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+volumes: { pgdata: {}, redisdata: {}, caddy_data: {}, caddy_config: {} }

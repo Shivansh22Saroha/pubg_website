@@ -46,7 +46,17 @@ export function makeConfig(mode: 'prod' | 'dev') {
       baseURL: origin,
       trace: 'retain-on-failure',
     },
-    projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+    projects: [
+      { name: 'chromium', use: { ...devices['Desktop Chrome'] }, grepInvert: /@api-restart/ },
+      // stopping the shared API breaks whatever else is running in parallel, so the restart test
+      // runs alone, after everything else (`serial` only orders tests within one file)
+      {
+        name: 'api-restart',
+        use: { ...devices['Desktop Chrome'] },
+        grep: /@api-restart/,
+        dependencies: ['chromium'],
+      },
+    ],
     webServer:
       mode === 'dev'
         ? [

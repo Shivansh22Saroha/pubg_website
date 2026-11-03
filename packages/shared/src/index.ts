@@ -1,3 +1,6 @@
+// first: browser Zod config, before any module below builds a schema
+import './zodSetup.js';
+
 export * from './brand.js';
 export * from './coords.js';
 export * from './drawing.js';

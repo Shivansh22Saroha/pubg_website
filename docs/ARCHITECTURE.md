@@ -193,7 +193,7 @@ client                         server                                  other cli
 ### 7.3 Ephemeral events (never persisted, `socket.volatile`)
 | Event | Rate | Purpose |
 |---|---|---|
-| `cursor:move` | ≤ 20 Hz | live cursors |
+| `cursor:move` | ≤ 20 Hz in, `cursor:batch` out at 20 Hz | live cursors. Phase 10: the server keeps each board's latest position per user and flushes one `cursor:batch` per board every 50 ms — with N people moving, each recipient gets 20 messages/s instead of 20 × (N−1), and the Redis adapter publishes once per board per tick. A socket's membership check for its cursor stream is reused for 5 s (a kick disconnects at once, SECURITY Z5) |
 | `stroke:preview` | ≤ 20 Hz | others see a pen stroke while it is being drawn; final stroke sent as `element:upsert` on pointer-up |
 | `laser:point` | ≤ 30 Hz | laser trail |
 | `view:update` | ≤ 10 Hz | viewport broadcast, only while someone follows you — the server tells a leader its follower count with `followers:update { count }` (on follow start/stop, a follower disconnecting, and the leader's `room:join`); the leader also re-sends every 1.5 s while followed |

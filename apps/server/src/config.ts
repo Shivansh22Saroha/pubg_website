@@ -74,7 +74,11 @@ export const EnvSchema = z
       )
       .pipe(z.array(z.uuid()).max(DEMO_BOARDS_MAX)),
     SENTRY_DSN: optionalString,
+    /** Sentry environment tag (production / staging); release = package version */
+    SENTRY_ENVIRONMENT: optionalString,
     METRICS_TOKEN: optionalString,
+    /** DEPLOYMENT §7: every request but /api/health and /metrics gets 503 MAINTENANCE */
+    MAINTENANCE: bool.default(false),
   })
   .superRefine((e, ctx) => {
     if (e.NODE_ENV === 'production' && !e.COOKIE_SECURE) {

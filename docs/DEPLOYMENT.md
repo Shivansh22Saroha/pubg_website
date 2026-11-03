@@ -11,140 +11,29 @@ v1 target: **one Linux VM** running Docker Compose (Caddy, web, server, Postgres
 
 ## 2. Build artifacts
 Two images pushed to GitHub Container Registry:
-- `ghcr.io/<owner>/rotationlab-web:<sha|tag>`
-- `ghcr.io/<owner>/rotationlab-server:<sha|tag>`
+- `ghcr.io/<owner>/rotationlab-web:<sha-xxxxxxx|vX.Y.Z>`
+- `ghcr.io/<owner>/rotationlab-server:<sha-xxxxxxx|vX.Y.Z>`
 
-### `docker/web.Dockerfile` (Next.js standalone)
-```dockerfile
-FROM node:22-alpine AS base
-RUN corepack enable
-WORKDIR /repo
+The real files (Phase 10) are `docker/web.Dockerfile`, `docker/server.Dockerfile` and `.dockerignore` (tiles, caches, env files and docs never enter the build context).
 
-FROM base AS deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
-COPY apps/web/package.json apps/web/
-COPY packages/shared/package.json packages/shared/
-RUN pnpm install --frozen-lockfile
+- **web** — `node:22-alpine`, Next.js standalone output, non-root, `HEALTHCHECK` on `/`. `NEXT_PUBLIC_*` (origin, tiles URL, Sentry DSN / environment) are build args inlined at build time, so the web image is **built per environment**; the build also runs `check:no-debug`.
+- **server** — `node:22-bookworm-slim` (not Alpine: Prisma's engine on musl was CPU-bound at ≈ 217 ops/s where glibc handled 400 ops/s at under half the CPU — CHANGELOG Phase 10). `pnpm deploy` of the server package **with** its dev tooling, so the same image runs the API, `prisma migrate deploy` and the demo / load-test seeds (`tsx`). The Prisma engine is generated in the build stage with `openssl` present. Environment-agnostic: production re-tags the image staging ran.
 
-FROM deps AS build
-COPY . .
-ARG NEXT_PUBLIC_APP_ORIGIN NEXT_PUBLIC_TILES_BASE_URL
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm turbo run build --filter=web...
+## 3. Production compose — `deploy/`
+Everything a VM needs lives in `deploy/` and is copied to `/opt/rotationlab/` by the deploy job:
 
-FROM node:22-alpine AS run
-WORKDIR /app
-ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
-RUN addgroup -S app && adduser -S app -G app
-COPY --from=build --chown=app:app /repo/apps/web/.next/standalone ./
-COPY --from=build --chown=app:app /repo/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build --chown=app:app /repo/apps/web/public ./apps/web/public
-USER app
-EXPOSE 3000
-HEALTHCHECK CMD wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1
-CMD ["node", "apps/web/server.js"]
-```
-(`output: 'standalone'` in `next.config.ts`. `NEXT_PUBLIC_*` values are baked at build time → build per environment, or use runtime config via an injected `window.__ENV`.)
+| File | What |
+|---|---|
+| `docker-compose.prod.yml` | caddy, web, server, `migrate` (profile), postgres 17, redis 7. Only Caddy publishes ports. `web` / `server` run `read_only` with tmpfs; json-file logs capped at 10 MB × 5. Images: `${REGISTRY}rotationlab-*:${TAG}` |
+| `Caddyfile` | `{$APP_DOMAIN}`: zstd/gzip; HSTS, nosniff, Referrer-Policy, Permissions-Policy, COOP, no `Server`; deny-all CSP only for responses without one; 1 MB request cap; `/api/*` + `/realtime/*` → server, everything else → web. `/metrics` is never routed |
+| `env/*.env.example` | templates for `env/{server,web,postgres,redis}.env` (git-ignored, mode 600 on the VM) |
+| `deploy.sh` | `./deploy.sh <tag>`: pull → `migrate` → `up -d` → smoke test (both containers healthy, `/api/health` ok through Caddy, `/login` renders) → on failure **roll back** to `.last_tag` and exit 1 |
+| `backup.sh` / `restore.sh` | §7 |
+| `ci-ssh-deploy.sh` | used by the deploy workflow: scp the files above, `docker login ghcr.io` with the job token (piped), run `deploy.sh` |
 
-### `docker/server.Dockerfile`
-```dockerfile
-FROM node:22-alpine AS base
-RUN corepack enable
-WORKDIR /repo
+`/opt/rotationlab/.env` (not in git) sets `REGISTRY=ghcr.io/<owner>/`, `APP_DOMAIN`, `ACME_EMAIL`, `AGE_RECIPIENT`, `RCLONE_REMOTE`.
 
-FROM base AS build
-COPY . .
-RUN pnpm install --frozen-lockfile \
- && pnpm --filter server prisma generate \
- && pnpm turbo run build --filter=server... \
- && pnpm --filter server deploy --prod /out
-
-FROM node:22-alpine AS run
-WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup -S app && adduser -S app -G app
-COPY --from=build --chown=app:app /out ./
-USER app
-EXPOSE 4000
-HEALTHCHECK CMD wget -qO- http://127.0.0.1:4000/api/health >/dev/null || exit 1
-CMD ["node", "dist/index.js"]
-```
-
-## 3. Production compose (`/opt/rotationlab/docker-compose.prod.yml`)
-```yaml
-services:
-  caddy:
-    image: caddy:2-alpine
-    ports: ["80:80", "443:443", "443:443/udp"]
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on: [web, server]
-    restart: unless-stopped
-
-  web:
-    image: ghcr.io/<owner>/rotationlab-web:${TAG}
-    env_file: .env.web
-    restart: unless-stopped
-
-  server:
-    image: ghcr.io/<owner>/rotationlab-server:${TAG}
-    env_file: .env.server
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_started }
-    restart: unless-stopped
-    read_only: true
-    tmpfs: [/tmp]
-
-  migrate:                       # one-shot, run before switching traffic
-    image: ghcr.io/<owner>/rotationlab-server:${TAG}
-    env_file: .env.server
-    command: ["npx", "prisma", "migrate", "deploy"]
-    profiles: ["migrate"]
-
-  postgres:
-    image: postgres:17-alpine
-    env_file: .env.postgres
-    volumes: [pgdata:/var/lib/postgresql/data]
-    healthcheck: { test: ["CMD-SHELL", "pg_isready"], interval: 5s, retries: 10 }
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: ["sh", "-c", "redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
-    env_file: .env.redis
-    volumes: [redisdata:/data]
-    restart: unless-stopped
-
-volumes: { pgdata: {}, redisdata: {}, caddy_data: {}, caddy_config: {} }
-```
-No `ports:` on postgres/redis/web/server — only Caddy is exposed.
-
-### `Caddyfile`
-```
-app.example.com {
-  encode zstd gzip
-  header {
-    Strict-Transport-Security "max-age=63072000; includeSubDomains"
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "strict-origin-when-cross-origin"
-    Permissions-Policy "camera=(), microphone=(), geolocation=()"
-    -Server
-  }
-  @api path /api/* /realtime/*
-  handle @api {
-    reverse_proxy server:4000
-  }
-  @metrics path /metrics
-  respond @metrics 404
-  handle {
-    reverse_proxy web:3000
-  }
-}
-```
-(CSP with per-request nonce is set by Next.js middleware, not Caddy.)
+(CSP with per-request nonce is set by the Next.js proxy, not Caddy — SECURITY §5.)
 
 ## 4. Map tiles deployment (one-time per tile version)
 ```bash
@@ -185,10 +74,13 @@ Add the staging origin to `AllowedOrigins` too. Keep the CDN cache keyed on `Ori
 7. Playwright E2E (Chromium) against `docker compose -f docker-compose.ci.yml up` with fixture tiles; upload traces on failure.
 8. Security: `pnpm audit --prod --audit-level=high`, gitleaks, (nightly) ZAP baseline vs staging.
 
+Implemented (Phase 10): the existing `check` and `fresh-clone-boot` jobs, plus `security` (audit — accepted advisories in `pnpm.auditConfig`, SECURITY §9 — and gitleaks 8.30 over the full history) and `images` (both Dockerfiles must build; GHA layer cache). E2E runs a production build against its own API, not a compose stack. `.github/workflows/zap.yml`: nightly ZAP baseline against `vars.STAGING_URL` (skipped while unset), fails on any High, uploads the HTML report.
+
 ### `.github/workflows/deploy.yml`
-- **On push to `main`** → build & push images tagged `sha-<short>` → SSH to staging VM → `TAG=sha-xxx docker compose --profile migrate run --rm migrate && docker compose up -d` → smoke test `curl https://staging.example.com/api/health`.
-- **On tag `v*`** → same images re-tagged `vX.Y.Z` → **environment `production` with required reviewer** → deploy to prod VM → smoke test → on failure, automatic rollback to previous `TAG` (kept in `/opt/rotationlab/.last_tag`).
-- Secrets used: `GHCR_TOKEN` (or `GITHUB_TOKEN`), `STAGING_SSH_KEY`, `PROD_SSH_KEY`, host/user vars. App secrets live on the VMs, not in Actions.
+- **After a green CI run on `main`** (`workflow_run`) → build & push `sha-<short>` images (web with the staging build args) → `deploy/ci-ssh-deploy.sh` → `deploy.sh sha-<short>` on the staging VM (migrate, up, smoke test, rollback) → public `curl $STAGING_URL/api/health`.
+- **On tag `v*`** → **environment `production` with required reviewer** → the server image of that commit re-tagged `vX.Y.Z` (`imagetools create`; built if it never was) and the web image built with the production build args → `deploy.sh vX.Y.Z` on the prod VM → smoke test → on failure, automatic rollback to the previous tag (`/opt/rotationlab/.last_tag`).
+- Repo variables: `STAGING_HOST/USER/URL/TILES_BASE_URL`, `PROD_HOST/USER/URL/TILES_BASE_URL`, optional `WEB_SENTRY_DSN`. Secrets: `STAGING_SSH_KEY`, `STAGING_KNOWN_HOSTS`, `PROD_SSH_KEY`, `PROD_KNOWN_HOSTS`. GHCR uses the job's `GITHUB_TOKEN`. App secrets live on the VMs, not in Actions. Each job is skipped while its `*_HOST` variable is unset.
+- Rollback is rehearsed (Phase 10, §9): a release whose server never turns healthy is detected and the previous tag restored. **Migrations are not rolled back** — they must stay additive (§7).
 
 ## 6. Server setup checklist (fresh VM, Ubuntu 24.04 LTS)
 - [ ] Create non-root deploy user, SSH key auth only, disable password login & root SSH.
@@ -196,20 +88,24 @@ Add the staging origin to `AllowedOrigins` too. Keep the CDN cache keyed on `Ori
 - [ ] Install Docker Engine + compose plugin; add deploy user to `docker` group.
 - [ ] `unattended-upgrades` enabled; `fail2ban` for SSH.
 - [ ] DNS A/AAAA records for `app` and `staging`.
-- [ ] `/opt/rotationlab/` with compose file, Caddyfile, `.env.*` files (chmod 600).
-- [ ] First deploy: `docker compose --profile migrate run --rm migrate`, then `up -d`.
+- [ ] `apt install age rclone`; `rclone config` an R2 remote with **backup-only** credentials.
+- [ ] `/opt/rotationlab/` with `env/*.env` from `deploy/env/*.env.example` (chmod 600) and `.env` (`REGISTRY`, `APP_DOMAIN`, `ACME_EMAIL`, `AGE_RECIPIENT`, `RCLONE_REMOTE`). The deploy job copies the compose file, Caddyfile and scripts.
+- [ ] Backup key: `age-keygen -o rl-backup.key` **on your own machine**; put only the public key (`age1…`) in `.env`; keep the private key offline (password manager). Cron: `15 3 * * * cd /opt/rotationlab && ./backup.sh >> backups/backup.log 2>&1`.
+- [ ] First deploy: run the deploy workflow (or `./deploy.sh <tag>`), then the demo seed (§ Phase 9) with `docker compose -f docker-compose.prod.yml run --rm --no-deps server ./node_modules/.bin/tsx scripts/seed.ts --demo-only`.
 - [ ] Verify headers (securityheaders.com), TLS (SSL Labs A), websocket connect.
 
 ## 7. Operations
 | Task | How |
 |---|---|
-| Backups | nightly cron: `docker exec postgres pg_dump -Fc` → encrypt with `age` → upload to R2 `backups/` bucket (separate credentials); retain 14 daily + 8 weekly; monthly restore test into staging |
+| Backups | `deploy/backup.sh` nightly (cron, §6): `pg_dump -Fc` inside the postgres container piped straight into `age -r $AGE_RECIPIENT` (never unencrypted on disk) → `backups/` (3 days) → `rclone` to `$RCLONE_REMOTE/daily` (14 days) and, on Sundays, `/weekly` (8 weeks) |
+| Restore test (monthly) | `AGE_IDENTITY=~/rl-backup.key ./restore.sh <file>`: restores into a scratch database, prints row counts, drops it. `--into rotationlab` restores over the live database (stop `server` first) |
 | Logs | `docker compose logs`; ship to Better Stack/Grafana Loki optional; rotate with Docker `json-file` `max-size: 10m, max-file: 5` |
 | Uptime | Uptime Kuma / Better Stack checking `/api/health` every 1 min, alerts to Discord webhook |
 | Errors | Sentry projects for web & server, release = git tag |
 | Migrations | always additive/expand-contract; never drop a column in the same release that stops using it |
 | Zero-downtime-ish | `docker compose up -d --no-deps server` restarts server (~2 s); clients auto-reconnect and resync — acceptable for v1 |
-| Maintenance mode | env `MAINTENANCE=true` → server returns 503 + web shows banner |
+| Maintenance mode | `MAINTENANCE=true` in `env/server.env` **and** `env/web.env`, then `docker compose up -d server web`: the API answers `503 MAINTENANCE` (health and metrics stay up, new sockets refused), every page shows a banner |
+| Metrics | `docker compose exec server wget -qO- http://127.0.0.1:4000/metrics` (add `--header "Authorization: Bearer …"` when `METRICS_TOKEN` is set) |
 
 ## 8. Scaling path (when needed)
 1. Move Postgres to managed (Neon / RDS / Supabase Postgres) and Redis to managed (Upstash / ElastiCache).
@@ -221,3 +117,13 @@ Add the staging origin to `AllowedOrigins` too. Keep the CDN cache keyed on `Ori
 - **Demo boards**: after the first deploy run `pnpm --filter server seed --demo-only` once against production (idempotent; it refuses to seed dev users there) and put the printed `DEMO_BOARD_IDS=` line into the server env. `/explore` shows bare maps until then.
 - **Web env**: set `SECURITY_CONTACT` (otherwise `/.well-known/security.txt` is a 404) and leave `ENABLE_DEV_PAGES` unset (the `/maps/*` viewer stays a 404).
 - **Landing screenshots** are committed WebP files in `apps/web/public/landing/`; regenerate them with `pnpm --filter web shots` against `pnpm dev` + the dev seed when the UI changes.
+
+## 9. Local rehearsal of the production stack (Phase 10)
+Everything above was exercised on Docker Desktop with throwaway secrets, `APP_DOMAIN=localhost` (Caddy's internal CA) and a separate compose project so the dev stack's volumes are never touched:
+```bash
+docker build -f docker/server.Dockerfile -t rotationlab-server:local .
+docker build -f docker/web.Dockerfile -t rotationlab-web:local   --build-arg NEXT_PUBLIC_APP_ORIGIN=https://localhost --build-arg NEXT_PUBLIC_TILES_BASE_URL=/tiles .
+cd deploy   # env/*.env filled from the templates; .env: REGISTRY= APP_DOMAIN=localhost
+COMPOSE_PROJECT=rl-prodtest SKIP_PULL=1 CURL_INSECURE=1 ./deploy.sh local
+```
+Checked: headers and CSP per response type, `__Host-` / `__Secure-` cookies, `wss://…/realtime` through Caddy, zero CSP violations, rollback from a broken release, an encrypted backup restored into a scratch database, the demo seed from the image, ZAP baseline and the k6 load test (TESTING §7). Scanners on a dotless host send no SNI, which Caddy's internal-CA `localhost` policy rejects; serve a second name (`APP_DOMAIN="localhost, rl.localhost"`) and scan that.

@@ -6,7 +6,7 @@ Files:
 - `apps/server/.env.example` → copy to `.env`
 - `apps/web/.env.example` → copy to `.env.local`
 - `packages/map-tiles/.env.example` → copy to `.env` (only for tile upload)
-- Production: values injected by Docker Compose `env_file` from a file **outside the repo** (e.g. `/opt/rotationlab/.env.prod`, mode 600) or by the platform's secret manager.
+- Production / staging: Docker Compose `env_file`s on the VM, **outside git**: `/opt/rotationlab/env/{server,web,postgres,redis}.env` (mode 600), from the templates in `deploy/env/*.env.example` (Phase 10, DEPLOYMENT §3). `/opt/rotationlab/.env` holds compose's own `REGISTRY` / `APP_DOMAIN` / `ACME_EMAIL` and, for backups, `AGE_RECIPIENT` / `RCLONE_REMOTE`.
 
 Generate secrets with: `openssl rand -base64 48`
 
@@ -45,7 +45,9 @@ Generate secrets with: `openssl rand -base64 48`
 | `S3_BUCKET` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_REGION` | P1 | `rotationlab-assets` / … / `auto` | |
 | `PUBLIC_ASSETS_BASE_URL` | P1 | `https://assets.example.com` | public URL for thumbnails |
 | `DEMO_BOARD_IDS` | – | `uuid1,uuid2,uuid3` | boards exposed read-only at `/explore` (≤ 3 uuids, comma-separated; unset → none). `pnpm --filter server seed` prints the line; the E2E API supervisor seeds them itself |
-| `SENTRY_DSN` | – | | error tracking |
+| `SENTRY_DSN` | – | | error tracking (Phase 10): unexpected 5xx only, no tracing, no cookies / headers / bodies / query strings / user info. Unset → off |
+| `SENTRY_ENVIRONMENT` | – | `production` | Sentry environment tag; default `NODE_ENV`. Release = `rotationlab-server@<package version>` |
+| `MAINTENANCE` | – | `false` | `true` → every request but `/api/health` and `/metrics` gets `503 MAINTENANCE` (+ `Retry-After: 300`), new sockets are refused (DEPLOYMENT §7). Set it on web too for the banner |
 | `METRICS_TOKEN` | – | | if set, `/metrics` requires `Authorization: Bearer` (in addition to internal-only routing) |
 | `RATE_LIMITS_ENABLED` | – | `true` | `false` only for local E2E convenience (repeated registrations); refused when `NODE_ENV=production`. Integration tests always run with limits on |
 | `SOCKET_TOKEN_GRACE_SEC` | – | `60` | a socket is disconnected with `TOKEN_EXPIRED` this many seconds after its access token's `exp` (0–600); the client refreshes and reconnects silently before that |
@@ -64,7 +66,8 @@ Only `NEXT_PUBLIC_*` variables reach the browser — **never** put secrets there
 | `NEXT_PUBLIC_SOCKET_PATH` | ✓ | `/realtime` | |
 | `NEXT_PUBLIC_TILES_BASE_URL` | ✓ | `/tiles` (dev) / `https://tiles.example.com/v1` (prod) | tile root; map paths appended |
 | `NEXT_PUBLIC_CAPTCHA_SITE_KEY` | if captcha | | |
-| `NEXT_PUBLIC_SENTRY_DSN` | – | | |
+| `NEXT_PUBLIC_SENTRY_DSN` | – | | build-time. Browser + Next-server errors to Sentry (Phase 10); the SDK chunk is only fetched when set, and its host is added to the CSP `connect-src` |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | – | `production` | build-time Sentry environment tag |
 | `INTERNAL_API_URL` | ✓ | `http://localhost:4000` (dev) / `http://server:4000` (docker) | server-side calls from Next middleware/RSC |
 
 ### Dev proxying
@@ -80,6 +83,8 @@ Server-only web settings (Phase 9; `src/lib/serverEnv.ts`) — read per request 
 | Variable | Required | Example | Description |
 |---|---|---|---|
 | `ENABLE_DEV_PAGES` | – | *(unset)* | `true` \| `false`. The `/maps/[mapId]` dev map viewer. Unset: on in development, **off (404) in production**. The E2E build sets `true` for the Phase 2 map test |
+| `MAINTENANCE` | – | `false` | `true` → maintenance banner on every page (pair with the server's `MAINTENANCE`) |
+| `INTERNAL_API_URL` | ✓ | `http://server:4000` | also read per request by the server-side prefetch (dashboard) |
 | `SECURITY_CONTACT` | prod | `mailto:security@example.com` | `Contact:` of `/.well-known/security.txt` (SECURITY §13); `mailto:` or `https:` URL. Unset → the file is a 404 |
 
 ## 3. Map tiles (`packages/map-tiles/.env`)

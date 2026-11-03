@@ -77,6 +77,7 @@ export function SnapshotsDrawer({
       >
         {canSave && (
           <form
+            method="post"
             className="flex gap-2"
             onSubmit={(e) => {
               e.preventDefault();

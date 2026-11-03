@@ -11,6 +11,7 @@ import {
 import type { Redis } from 'ioredis';
 import type { Config } from './config.js';
 import { AppError } from './lib/errors.js';
+import { registerMetrics } from './lib/metrics.js';
 import { registerPolicy } from './lib/policy.js';
 import { createAuthCookies } from './modules/auth/cookies.js';
 import { createLockout } from './modules/auth/lockout.js';
@@ -45,7 +46,9 @@ import { createRoomService } from './modules/rooms/service.js';
 import { userRoutes } from './modules/users/routes.js';
 import { registerCsrf } from './plugins/csrf.js';
 import { registerErrorHandler } from './plugins/errorHandler.js';
+import { registerMaintenance } from './plugins/maintenance.js';
 import { registerRateLimit } from './plugins/rateLimit.js';
+import { registerSecurityHeaders } from './plugins/securityHeaders.js';
 import { healthRoutes, type HealthChecks } from './routes/health.js';
 
 /** minimal pino destination (pino itself comes in through fastify) */
@@ -112,6 +115,9 @@ export async function buildApp({
   app.setSerializerCompiler(serializerCompiler);
   registerErrorHandler(app);
   registerPolicy(app);
+  await registerSecurityHeaders(app, config.COOKIE_SECURE);
+  registerMaintenance(app, config.MAINTENANCE);
+  const metrics = registerMetrics(app, config.METRICS_TOKEN);
   registerCsrf(app, config.APP_ORIGIN);
   await app.register(cookie);
   await registerRateLimit(app, redis, config.RATE_LIMITS_ENABLED);
@@ -272,6 +278,12 @@ export async function buildApp({
     dropSessions = (sids) => {
       disconnectSessions(realtime.io, sids);
     };
+    metrics.trackSockets(() => realtime.io.engine.clientsCount);
+    if (config.MAINTENANCE) {
+      realtime.io.use((_socket, next) => {
+        next(Object.assign(new Error('MAINTENANCE'), { data: { code: 'MAINTENANCE' } }));
+      });
+    }
     app.addHook('preClose', async () => {
       await realtime.close();
     });

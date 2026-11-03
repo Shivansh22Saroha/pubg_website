@@ -69,6 +69,7 @@ export function RoomSettingsDialog({
 
           <TabsContent value="general">
             <form
+              method="post"
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -130,6 +131,7 @@ export function RoomSettingsDialog({
 
           <TabsContent value="security" className="flex flex-col gap-5">
             <form
+              method="post"
               className="flex flex-col gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -215,6 +217,7 @@ export function RoomSettingsDialog({
 
           <TabsContent value="danger" className="flex flex-col gap-5">
             <form
+              method="post"
               className="flex flex-col gap-2 rounded-control border p-3"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -265,6 +268,7 @@ export function RoomSettingsDialog({
               </Button>
             </form>
             <form
+              method="post"
               className="flex flex-col gap-2 rounded-control border border-danger/40 p-3"
               onSubmit={(e) => {
                 e.preventDefault();

@@ -422,6 +422,7 @@ function Composer({ boards, session }: { boards: Board[]; session: RoomSession |
 
   return (
     <form
+      method="post"
       className="flex flex-col gap-1 border-t p-2"
       onSubmit={(e) => {
         e.preventDefault();

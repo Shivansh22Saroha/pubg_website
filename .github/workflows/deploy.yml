@@ -1,0 +1,152 @@
+name: Deploy
+
+# DEPLOYMENT §5. Staging: every green CI run on main. Production: a `v*` tag, gated by the
+# `production` environment (required reviewer, set in repo Settings → Environments).
+# The VM runs deploy/deploy.sh: migrate → up → smoke test → automatic rollback to .last_tag.
+#
+# Repo variables: STAGING_HOST STAGING_USER STAGING_URL STAGING_TILES_BASE_URL
+#                 PROD_HOST PROD_USER PROD_URL PROD_TILES_BASE_URL  WEB_SENTRY_DSN (optional)
+# Secrets:        STAGING_SSH_KEY STAGING_KNOWN_HOSTS PROD_SSH_KEY PROD_KNOWN_HOSTS
+# App secrets never pass through Actions: they live in /opt/rotationlab/env/*.env on each VM.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  staging:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      vars.STAGING_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    concurrency: { group: deploy-staging, cancel-in-progress: false }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Image names
+        id: img
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          sha="${{ github.event.workflow_run.head_sha }}"
+          echo "registry=ghcr.io/$owner/" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${sha::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/server.Dockerfile
+          push: true
+          tags: ${{ steps.img.outputs.registry }}rotationlab-server:${{ steps.img.outputs.tag }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: Web image (staging build args)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: true
+          tags: ${{ steps.img.outputs.registry }}rotationlab-web:${{ steps.img.outputs.tag }}
+          build-args: |
+            NEXT_PUBLIC_APP_ORIGIN=${{ vars.STAGING_URL }}
+            NEXT_PUBLIC_TILES_BASE_URL=${{ vars.STAGING_TILES_BASE_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.WEB_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=staging
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Deploy to staging
+        env:
+          HOST: ${{ vars.STAGING_HOST }}
+          USER: ${{ vars.STAGING_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+          TAG: ${{ steps.img.outputs.tag }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./deploy/ci-ssh-deploy.sh
+
+      - name: Public smoke test
+        run: curl -fsS "${{ vars.STAGING_URL }}/api/health" | grep -q '"status":"ok"'
+
+  production:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && vars.PROD_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production # required reviewer
+    concurrency: { group: deploy-production, cancel-in-progress: false }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image names
+        id: img
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "registry=ghcr.io/$owner/" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # the exact server image staging ran for this commit, re-tagged (built if it never was)
+      - name: Server image (re-tag)
+        run: |
+          r="${{ steps.img.outputs.registry }}rotationlab-server"
+          if docker buildx imagetools inspect "$r:${{ steps.img.outputs.sha }}" >/dev/null 2>&1; then
+            docker buildx imagetools create -t "$r:${{ steps.img.outputs.tag }}" "$r:${{ steps.img.outputs.sha }}"
+          else
+            docker buildx build -f docker/server.Dockerfile -t "$r:${{ steps.img.outputs.tag }}" \
+              --cache-from type=gha,scope=server --push .
+          fi
+
+      # NEXT_PUBLIC_* are build-time, so the web image is built with production values
+      - name: Web image (production build args)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: true
+          tags: ${{ steps.img.outputs.registry }}rotationlab-web:${{ steps.img.outputs.tag }}
+          build-args: |
+            NEXT_PUBLIC_APP_ORIGIN=${{ vars.PROD_URL }}
+            NEXT_PUBLIC_TILES_BASE_URL=${{ vars.PROD_TILES_BASE_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.WEB_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=production
+          cache-from: type=gha,scope=web
+
+      - name: Deploy to production
+        env:
+          HOST: ${{ vars.PROD_HOST }}
+          USER: ${{ vars.PROD_USER }}
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+          TAG: ${{ steps.img.outputs.tag }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./deploy/ci-ssh-deploy.sh
+
+      - name: Public smoke test
+        run: curl -fsS "${{ vars.PROD_URL }}/api/health" | grep -q '"status":"ok"'

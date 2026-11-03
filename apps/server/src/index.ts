@@ -3,9 +3,11 @@ import { loadConfig } from './config.js';
 import { createPrisma } from './db/prisma.js';
 import { startJobs } from './jobs/index.js';
 import { createRedis } from './lib/redis.js';
+import { initSentry } from './lib/sentry.js';
 
 // boot: config → db → redis → fastify + Socket.IO (ARCHITECTURE §3) → jobs
 const config = loadConfig();
+initSentry(config);
 const prisma = createPrisma(config.DATABASE_URL);
 const redis = createRedis(config.REDIS_URL);
 
