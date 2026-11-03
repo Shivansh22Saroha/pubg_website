@@ -135,6 +135,8 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 | danger | `#F97316` | – | optional |
 | hold | `#22C55E` | – | optional |
 | pin | layer color | – | optional |
+| loot (Phase 12) | `#A855F7` | – | optional; plus an **item**: one of 80 PUBG item / care-package icons (style bar "Loot item", grouped Care packages / Weapons / Handguns / Throwables / Equipment / Melee; remembered for the next placement; changeable on a selected marker as one undoable edit) |
+- Loot markers (Phase 12): a dark rounded badge in the marker colour with the item icon (24 px) on it; until the icon loads — or if it never does — a crate glyph shows instead. `props.item` is an id from `LOOT_ITEMS` (`packages/shared/src/loot.ts`), never a path or URL; the icon is `{tiles base}/icons/items/<id>.webp`. Export PNG draws the icon too. Names are the in-game ones (PUBG's file `HK416` → "M416").
 - Hover tooltip: label + "placed by {user} · {time ago}".
 - Own player markers can be linked to a member (P2, Phase 12): select one own-player marker → "Linked player" in the style bar (members by IGN, else display name; "Not linked"). The link is stored as `props.memberId` (one undoable edit; it replaces a typed label). The marker's label is resolved when drawn — that member's IGN, else display name — so it follows renames as soon as the room's member list refreshes; nothing name-like is stored. The server accepts only a current member of the room. A link to someone who left shows no label (the glyph still reads "P{n}") and the picker shows "Former member". Share links and `/explore` never receive the member id, so those viewers see "P{n}" only.
 

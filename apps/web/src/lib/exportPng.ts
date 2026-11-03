@@ -27,8 +27,12 @@ export interface ExportSources {
   gridLabels: (Rect & { text: string })[];
   /** the element vectors (one shared Leaflet canvas) */
   vectors: (Rect & { canvas: CanvasImageSource })[];
-  /** marker glyphs (SVG → image) and their label pills */
-  markers: (Rect & { img: CanvasImageSource; label: (Rect & { text: string }) | null })[];
+  /** marker glyphs (SVG → image), a loot marker's item icon over it, and label pills */
+  markers: (Rect & {
+    img: CanvasImageSource;
+    icon?: (Rect & { img: CanvasImageSource }) | null;
+    label: (Rect & { text: string }) | null;
+  })[];
   /** text labels: pill + text */
   texts: (Rect & { text: string; color: string; fontPx: number })[];
   footer: string;
@@ -88,6 +92,7 @@ export function composeExport(ctx: Ctx, s: ExportSources): void {
   for (const v of s.vectors) ctx.drawImage(v.canvas, v.x, v.y, v.w, v.h);
   for (const m of s.markers) {
     ctx.drawImage(m.img, m.x, m.y, m.w, m.h);
+    if (m.icon) ctx.drawImage(m.icon.img, m.icon.x, m.icon.y, m.icon.w, m.icon.h);
     if (m.label) {
       pill(ctx, m.label);
       ctx.fillStyle = '#F8FAFC';
@@ -190,10 +195,14 @@ export async function collectExportSources(
     nodes.markers.map(async (icon) => {
       const svg = icon.querySelector('svg');
       const labelEl = icon.querySelector<HTMLElement>('.rl-marker-label');
+      const loot = icon.querySelector<HTMLImageElement>('img.rl-loot-icon');
       if (!svg) return null;
       return {
         ...rectIn(svg, origin),
         img: await svgImage(svg),
+        // only a loaded icon (CORS-clean: crossOrigin=anonymous) — else the crate stays alone
+        icon:
+          loot?.complete && loot.naturalWidth > 0 ? { ...rectIn(loot, origin), img: loot } : null,
         label: labelEl?.textContent
           ? { ...rectIn(labelEl, origin), text: labelEl.textContent }
           : null,

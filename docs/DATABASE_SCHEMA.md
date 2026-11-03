@@ -228,9 +228,10 @@ ARROW   geometry: { points: Pt[] }          // 2..50 points (bends)
 CIRCLE  geometry: { center: Pt, r: number } // r 100..600000
 POLYGON geometry: { points: Pt[] }          // 3..200
 TEXT    geometry: { at: Pt }   props: { text: string(1..120), size: 'sm'|'md'|'lg' }
-MARKER  geometry: { at: Pt }   props: { kind: 'own_squad'|'own_player'|'enemy_squad'|'vehicle'|'drop'|'danger'|'hold'|'pin',
+MARKER  geometry: { at: Pt }   props: { kind: 'own_squad'|'own_player'|'enemy_squad'|'vehicle'|'drop'|'danger'|'hold'|'pin'|'loot',
                                          number?: 1..25, label?: string(0..24),
-                                         memberId?: uuid /* Phase 12, own_player only: linked member */ }
+                                         memberId?: uuid /* Phase 12, own_player only: linked member */,
+                                         item?: LootItemId /* Phase 12, loot only: id from LOOT_ITEMS */ }
 style: { color: '#RRGGBB', width: 2|4|7, dashed: boolean, fillOpacity: 0..0.6 }
 ```
 

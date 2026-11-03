@@ -2,12 +2,15 @@
 
 import { MAPS, tileWorldSize, type Layer, type MapId } from '@rotationlab/shared';
 import L from 'leaflet';
+import { env } from '@/env';
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import { ELEMENTS_PANE, textScale } from '@/components/map/ElementLayer';
 import { ElementRenderer } from '@/components/map/elementRenderer';
 import type { ViewElement } from '@/stores/boardModel';
 
+/** loot item icons are deployed next to the tiles (Phase 12) */
+const ICON_BASE = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 /**
  * The same ElementRenderer the live board uses, fed from fixed data instead of the board store
  * (snapshot previews, the /explore demo boards). Hidden layers stay hidden.
@@ -26,7 +29,7 @@ export function StaticElements({
     const config = MAPS[mapId];
     if (!map.getPane(ELEMENTS_PANE)) map.createPane(ELEMENTS_PANE).style.zIndex = '400';
     const canvas = L.canvas({ pane: ELEMENTS_PANE, padding: 0.5 });
-    const renderer = new ElementRenderer(L, map, canvas, tileWorldSize(config));
+    const renderer = new ElementRenderer(L, map, canvas, tileWorldSize(config), ICON_BASE);
     const container = map.getContainer();
     const draw = () => {
       container.style.setProperty(

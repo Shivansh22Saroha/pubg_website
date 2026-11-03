@@ -2,6 +2,9 @@
 
 import {
   DRAWING_PALETTE,
+  LOOT_CATEGORIES,
+  LOOT_CATEGORY_NAMES,
+  LOOT_ITEMS,
   ELEMENT_LIMITS,
   ElementInputSchema,
   MAX_FILL_OPACITY,
@@ -51,6 +54,35 @@ function withFlag(props: Record<string, unknown>, key: 'doubleHeaded' | 'curved'
   if (on) next[key] = true;
   else Reflect.deleteProperty(next, key);
   return next;
+}
+
+const isLoot = (e: ViewElement) =>
+  e.type === 'MARKER' && (e.props as { kind?: unknown }).kind === 'loot';
+
+/** Loot marker item (Phase 12): PUBG's item icons, grouped like the in-game inventory. */
+function LootSelect({ value, onPick }: { value: string; onPick: (id: string) => void }) {
+  return (
+    <select
+      aria-label="Loot item"
+      data-testid="loot-item"
+      value={value}
+      onChange={(e) => {
+        onPick(e.target.value);
+      }}
+      className="h-7 max-w-44 rounded-control border bg-bg px-1 text-xs outline-none focus:ring-2 focus:ring-accent"
+    >
+      {!value && <option value="">Item…</option>}
+      {LOOT_CATEGORIES.map((cat) => (
+        <optgroup key={cat} label={LOOT_CATEGORY_NAMES[cat]}>
+          {LOOT_ITEMS.filter((i) => i.category === cat).map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
 }
 
 const isOwnPlayer = (e: ViewElement) =>
@@ -112,6 +144,8 @@ export function StyleBar({
   const arrowDoubleHeaded = useToolStore((s) => s.arrowDoubleHeaded);
   const players = usePlayersStore((s) => s.players);
   const arrowCurved = useToolStore((s) => s.arrowCurved);
+  const markerKind = useToolStore((s) => s.markerKind);
+  const lootItemId = useToolStore((s) => s.lootItem);
   const selectedIds = useSelectionStore((s) => (tool === 'select' ? s.ids : EMPTY));
   const elements = useBoardStore((s) => s.view.elements);
   const layers = useBoardStore((s) => s.view.layers);
@@ -224,6 +258,17 @@ export function StyleBar({
               value={(selected.find((e) => CLOSED.has(e.type)) ?? first).style.fillOpacity}
               onCommit={(fillOpacity) => {
                 editStyle({ fillOpacity }, (e) => CLOSED.has(e.type));
+              }}
+            />
+          </>
+        )}
+        {single && isLoot(single) && (
+          <>
+            <Divider />
+            <LootSelect
+              value={typeof single.props.item === 'string' ? single.props.item : ''}
+              onPick={(id) => {
+                edit((i) => ({ ...i, props: { ...i.props, item: id } }));
               }}
             />
           </>
@@ -423,6 +468,17 @@ export function StyleBar({
               {size.toUpperCase()}
             </Seg>
           ))}
+        </>
+      )}
+      {tool === 'marker' && markerKind === 'loot' && (
+        <>
+          <Divider />
+          <LootSelect
+            value={lootItemId}
+            onPick={(id) => {
+              useToolStore.getState().setLootItem(id);
+            }}
+          />
         </>
       )}
       {tool === 'marker' && (

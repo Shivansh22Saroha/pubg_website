@@ -6,6 +6,7 @@ export * from './coords.js';
 export * from './drawing.js';
 export * from './errors.js';
 export * from './geometry.js';
+export * from './loot.js';
 export * from './maps.js';
 export * from './measure.js';
 export * from './permissions.js';

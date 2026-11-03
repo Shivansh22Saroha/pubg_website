@@ -1,7 +1,7 @@
 import type { Layer as BoardLayer } from '@rotationlab/shared';
 import type * as Leaflet from 'leaflet';
 import type { ViewElement } from '@/stores/boardModel';
-import { drawnPoints } from '@rotationlab/shared';
+import { drawnPoints, lootIconPath, lootItem } from '@rotationlab/shared';
 import { markerElement, safeColor, textElement } from './markerDom';
 
 type Pt = [number, number];
@@ -67,7 +67,14 @@ export class ElementRenderer {
     private readonly renderer: Leaflet.Renderer,
     /** world units spanned by the whole tile pyramid (CRS scale) */
     private readonly tileWorldSize: number,
+    /** where loot item icons live (the tiles base URL; Phase 12); '' = no icons, crate only */
+    private readonly iconBase = '',
   ) {}
+
+  private lootIconUrl = (itemId: string): string | null => {
+    const item = lootItem(itemId); // allow-listed id → fixed path, never user text in a URL
+    return item && this.iconBase ? `${this.iconBase}/${lootIconPath(item.id)}` : null;
+  };
 
   private worldPerPx(): number {
     return this.tileWorldSize / (256 * 2 ** this.map.getZoom());
@@ -169,7 +176,7 @@ export class ElementRenderer {
       }
       case 'MARKER': {
         const icon = L.divIcon({
-          html: markerElement(el.props, color),
+          html: markerElement(el.props, color, this.lootIconUrl),
           className: 'rl-marker-icon',
           iconSize: [28, 28],
           iconAnchor: [14, 14],

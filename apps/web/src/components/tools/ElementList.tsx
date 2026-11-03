@@ -5,6 +5,7 @@ import {
   can,
   elementAnchor,
   gridRef,
+  lootItem,
   type Board,
   type Member,
   type MarkerKind,
@@ -46,7 +47,8 @@ export function elementLabel(
   if (el.type === 'MARKER') {
     const kind = p.kind ? MARKER_LABELS[p.kind] : 'Marker';
     const label = linkedLabel(el, names) ?? p.label;
-    return [kind, p.number, label].filter((x) => x !== undefined && x !== '').join(' ');
+    const item = lootItem((el.props as { item?: unknown }).item)?.name; // Phase 12 loot
+    return [kind, item, p.number, label].filter((x) => x !== undefined && x !== '').join(' ');
   }
   return '';
 }

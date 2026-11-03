@@ -91,6 +91,19 @@ describe('export composition (FEATURES F12)', () => {
     expect(calls.at(-1)).toBe('restore');
   });
 
+  it("draws a loot marker's item icon over its glyph (Phase 12)", () => {
+    const { calls, ctx } = recorder();
+    composeExport(ctx, {
+      ...sources,
+      markers: [{ ...r, img: img('crate'), icon: { ...r, img: img('awm') }, label: null }],
+    });
+    const order = calls.filter((c) => c.startsWith('image'));
+    expect(order.slice(order.indexOf('image crate'), order.indexOf('image crate') + 2)).toEqual([
+      'image crate',
+      'image awm',
+    ]);
+  });
+
   it('no grid when it is hidden', () => {
     const { calls, ctx } = recorder();
     composeExport(ctx, { ...sources, grid: null, gridLabels: [] });

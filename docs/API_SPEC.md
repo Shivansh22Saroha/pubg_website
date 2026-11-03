@@ -208,7 +208,7 @@ Implementation notes (Phase 5A/5B):
 | `summon` | `{ boardId }` | – | asks all to follow you; permission `board.edit` (OWNER/EDITOR). Receivers start following **immediately** and may opt out ("Don't follow", 5 s) |
 | `presence:heartbeat` | `{ roomId, boardId, idle: boolean }` | – | every 20 s |
 
-`ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly. Phase 11: an ARROW's `props` may carry `doubleHeaded: true` (strict; anything else → `VALIDATION_ERROR`). Phase 12: an `own_player` MARKER's `props` may carry `memberId` (uuid) — it must be a current member of the board's room, and other kinds may not carry it (`VALIDATION_ERROR`). Public responses (`/public/share/:token`, `/public/demo-boards`) drop `memberId`.
+`ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly. Phase 11: an ARROW's `props` may carry `doubleHeaded: true` (strict; anything else → `VALIDATION_ERROR`). Phase 12: an `own_player` MARKER's `props` may carry `memberId` (uuid) — it must be a current member of the board's room, and other kinds may not carry it (`VALIDATION_ERROR`). Public responses (`/public/share/:token`, `/public/demo-boards`) drop `memberId`. A `loot` MARKER may carry `item` — an id from `LOOT_ITEMS` (unknown ids, paths and URLs → `VALIDATION_ERROR`; other kinds may not carry it).
 
 ### 7.3 Server → client
 | Event | Payload |

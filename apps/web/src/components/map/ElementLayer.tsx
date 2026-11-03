@@ -2,6 +2,7 @@
 
 import { tileWorldSize, type MapConfig } from '@rotationlab/shared';
 import L from 'leaflet';
+import { env } from '@/env';
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import { withTransform } from '@/components/tools/scene';
@@ -14,6 +15,8 @@ import { ElementRenderer } from './elementRenderer';
 
 export const ELEMENTS_PANE = 'elements';
 
+/** loot item icons are deployed next to the tiles (Phase 12) */
+const ICON_BASE = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 /** Text labels scale with zoom between 0.75× and 1.5×, then clamp (UI_UX_SPEC §6). */
 export function textScale(zoom: number, maxNativeZoom: number) {
   return Math.min(1.5, Math.max(0.75, 2 ** (zoom - (maxNativeZoom - 2))));
@@ -31,7 +34,7 @@ export function ElementLayer({ config }: { config: MapConfig }) {
   useEffect(() => {
     if (!map.getPane(ELEMENTS_PANE)) map.createPane(ELEMENTS_PANE).style.zIndex = '400';
     const canvas = L.canvas({ pane: ELEMENTS_PANE, padding: 0.5 });
-    const renderer = new ElementRenderer(L, map, canvas, tileWorldSize(config));
+    const renderer = new ElementRenderer(L, map, canvas, tileWorldSize(config), ICON_BASE);
     const container = map.getContainer();
     const applyScale = () => {
       container.style.setProperty(

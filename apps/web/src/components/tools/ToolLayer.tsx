@@ -244,13 +244,14 @@ export function ToolLayer({
       },
       textSize: () => useToolStore.getState().textSize,
       markerProps: () => {
-        const { markerKind: kind, markerLabel } = useToolStore.getState();
+        const { markerKind: kind, markerLabel, lootItem } = useToolStore.getState();
         const label =
           markerLabel.trim() || (kind === 'own_squad' ? initials(live.current.roomName) : '');
         return {
           kind,
           number: nextMarkerNumber(useBoardStore.getState().view.elements, kind),
           ...(label && { label }),
+          ...(kind === 'loot' && { item: lootItem }),
         };
       },
       presetRadius: () => useToolStore.getState().presetRadius,

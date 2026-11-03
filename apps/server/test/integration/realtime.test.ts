@@ -231,6 +231,33 @@ describe('element ops (ARCHITECTURE §7.2)', () => {
     });
   });
 
+  it('loot markers (Phase 12): a registry item is stored; anything else is refused', async () => {
+    const l = await live();
+    const base = {
+      boardId: l.f.boardId,
+      layerId: l.layerIds[0]!,
+      type: 'MARKER',
+      geometry: { at: [100_000, 100_000] },
+      style: STYLE,
+      z: 0,
+    };
+    const send = (props: object) =>
+      ack(l.editor, 'element:upsert', {
+        opId: opId(),
+        boardId: l.f.boardId,
+        element: { ...base, id: opId(), props },
+      });
+    expect(await send({ kind: 'loot', item: 'm416' })).toMatchObject({ ok: true });
+    expect(await send({ kind: 'loot', item: '../../package.json' })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION_ERROR',
+    });
+    expect(await send({ kind: 'pin', item: 'm416' })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION_ERROR',
+    });
+  });
+
   it('linked own-player markers (Phase 12): a member is accepted, anyone else refused', async () => {
     const l = await live();
     const base = {

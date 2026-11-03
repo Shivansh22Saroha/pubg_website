@@ -153,6 +153,51 @@ describe('curved arrows (Phase 12)', () => {
   });
 });
 
+describe('loot markers (Phase 12)', () => {
+  const url = (id: string) => `/tiles/icons/items/${id}.webp`;
+
+  it('put the item icon (from the allow-listed id) over the crate; it drops out if it fails', () => {
+    const m = markerElement({ kind: 'loot', item: 'awm' }, '#A855F7', url);
+    const icon = m.querySelector<HTMLImageElement>('img.rl-loot-icon');
+    expect(icon?.getAttribute('src')).toBe('/tiles/icons/items/awm.webp');
+    expect(icon?.crossOrigin).toBe('anonymous');
+    expect(m.querySelector('svg rect')).not.toBeNull(); // the crate badge stays underneath
+    icon?.dispatchEvent(new Event('error'));
+    expect(m.querySelector('img')).toBeNull();
+    expect(m.querySelector('[data-loot-crate]')).not.toBeNull(); // failed: the crate shows
+  });
+
+  it('a loaded icon replaces the crate lines (the badge stays)', () => {
+    const m = markerElement({ kind: 'loot', item: 'awm' }, '#A855F7', url);
+    m.querySelector('img')?.dispatchEvent(new Event('load'));
+    expect(m.querySelector('[data-loot-crate]')).toBeNull();
+    expect(m.querySelector('svg rect')).not.toBeNull();
+  });
+
+  it('no icon without an item or a URL for it', () => {
+    expect(markerElement({ kind: 'loot' }, '#A855F7', url).querySelector('img')).toBeNull();
+    expect(markerElement({ kind: 'loot', item: 'awm' }, '#A855F7').querySelector('img')).toBeNull();
+    expect(
+      markerElement({ kind: 'loot', item: 'awm' }, '#A855F7', () => null).querySelector('img'),
+    ).toBeNull();
+  });
+
+  it('the renderer only builds URLs for registry ids, under its icon base', () => {
+    const withBase = new ElementRenderer(fakeL, map, {} as never, 816_000, '/tiles');
+    withBase.sync(
+      {
+        ok: el('ok', 'MARKER', L1, { props: { kind: 'loot', item: 'awm' } }),
+        bad: el('bad', 'MARKER', L1, { props: { kind: 'loot', item: 'x/../../y' } }),
+      },
+      layers(),
+    );
+    const srcs = ([...map.onMap] as FakeLayer[])
+      .map((m) => (m.args[1] as { icon: { divIcon: { html: HTMLElement } } }).icon.divIcon.html)
+      .map((h) => h.querySelector('img')?.getAttribute('src') ?? null);
+    expect(srcs.sort()).toEqual(['/tiles/icons/items/awm.webp', null].sort());
+  });
+});
+
 describe('ElementRenderer diffing', () => {
   it('creates one Leaflet layer per element and renders every type', () => {
     const els = Object.fromEntries(

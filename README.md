@@ -130,7 +130,7 @@ Facts verified in the repo (Oct 2026):
 - All `*_High_Res.png` files are stored in **Git LFS** — a normal clone gives 133-byte pointer files. Use `git lfs pull --include="Assets/Maps/{Erangel,Miramar,Rondo}_Main*_High_Res.png"` or the `media.githubusercontent.com` raw URLs.
 - The `*_Low_Res.png` files are 819×819 and are fine for thumbnails/placeholders.
 - ⚠️ `Rondo_Main_Low_Res.png` is actually a **JPEG with a .png extension**. Detect by file signature, not extension.
-- The repo also contains vehicle and item icons (`Assets/Vehicle`, `Assets/Item`, `Assets/Icons`) that can be used for markers later.
+- The repo also contains vehicle renders (`Assets/Vehicle`: 5760×3240 photo-style images, too detailed for 28 px markers) and item icons (`Assets/Icons/Item`, `Assets/Icons/CarePackage`). Phase 12 uses 80 of the item / care-package icons for loot markers (fetched and built by `packages/map-tiles` with the tiles).
 
 ### Licensing ⚠️
 The PUBG repo states assets must be used under the **PUBG Developer Terms of Use** (developer.pubg.com/tos) and the **PUBG Player-created Content** policy. Before any public launch:

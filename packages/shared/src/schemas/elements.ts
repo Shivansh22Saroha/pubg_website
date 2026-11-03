@@ -1,3 +1,4 @@
+import { lootItem } from '../loot.js';
 import { z } from 'zod';
 import { HexColorSchema, textField } from '../text.js';
 
@@ -56,6 +57,8 @@ export const MARKER_KINDS = [
   'danger',
   'hold',
   'pin',
+  /** Phase 12: an item / care-package spot, shown with a PUBG item icon (`props.item`) */
+  'loot',
 ] as const;
 
 const empty = z.strictObject({}).default({});
@@ -126,10 +129,20 @@ export const ElementInputSchema = z.discriminatedUnion('type', [
         label: textField(0, ELEMENT_LIMITS.markerLabelMax).optional(),
         /** Phase 12: an own-player marker linked to a room member (label = their IGN, live) */
         memberId: z.uuid().optional(),
+        /** Phase 12: a loot marker's item — an id from LOOT_ITEMS, never a path or URL */
+        item: z
+          .string()
+          .max(40)
+          .refine((id) => lootItem(id) !== undefined, { message: 'Unknown item' })
+          .optional(),
       })
       .refine((p) => p.memberId === undefined || p.kind === 'own_player', {
         message: 'Only own-player markers can be linked to a member',
         path: ['memberId'],
+      })
+      .refine((p) => p.item === undefined || p.kind === 'loot', {
+        message: 'Only loot markers carry an item',
+        path: ['item'],
       }),
   }),
 ]);

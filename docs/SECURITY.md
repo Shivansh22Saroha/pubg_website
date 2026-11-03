@@ -66,6 +66,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | V6 | URLs in chat are shown as plain text (no auto-linking in v1). |
 | V7 **MUST** | Prisma parameterised queries only; any raw SQL uses `$queryRaw` tagged templates, never string concatenation. |
 | V8 | Uploaded images (board thumbnails, Phase 11): ≤ 100 KB raw `image/jpeg` only, JPEG magic bytes checked, decoded by sharp with `limitInputPixels` = 256², exactly 256×256, then **re-encoded** (no EXIF / ICC / trailing data survives) and stored under a server-generated random key — never a client-chosen name or path. |
+| V9 | Loot marker items (Phase 12): `props.item` is checked against the shared `LOOT_ITEMS` allow-list (Zod, both ends); the client builds the icon URL from the matched entry's id under the tiles base — no element ever carries a path or URL. |
 
 ## 5. Transport & browser security
 | # | Control |

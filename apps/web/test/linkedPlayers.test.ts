@@ -40,6 +40,12 @@ describe('linked own-player markers (Phase 12)', () => {
     );
   });
 
+  it("the element list names a loot marker's item (Phase 12)", () => {
+    expect(elementLabel(el('l', { kind: 'loot', item: 'm416', label: 'roof' }))).toBe(
+      'Loot M416 roof',
+    );
+  });
+
   it('keeps identity for everything unlinked and re-labels only on a name change', () => {
     const cache = new WeakMap();
     const plain = el('p', { kind: 'enemy_squad', number: 1, label: 'Bridge' });

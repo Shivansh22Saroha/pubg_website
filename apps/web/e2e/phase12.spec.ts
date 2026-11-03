@@ -138,3 +138,45 @@ test('curved arrow: style-bar toggle, synced, and selecting it flips it back as 
   await ctxA.close();
   await ctxB.close();
 });
+
+test('loot marker: pick Loot + an item, the icon shows for everyone; a missing icon falls back to the crate', async ({
+  browser,
+}) => {
+  const { a, b, ctxA, ctxB } = await twoUsersInRoom(browser);
+  const box = await a.locator('.leaflet-container').boundingBox();
+  if (!box) throw new Error('no map');
+  const loaded = (p: Page) =>
+    p
+      .locator('img.rl-loot-icon')
+      .evaluateAll((imgs) =>
+        (imgs as HTMLImageElement[])
+          .filter((i) => i.complete && i.naturalWidth > 0)
+          .map((i) => new URL(i.src).pathname),
+      );
+
+  // marker flyout → Loot, then the item in the style bar
+  await a.getByTestId('tool-marker').click(); // opens the kind flyout
+  await a.getByTestId('marker-kind-loot').click();
+  await a.getByTestId('loot-item').selectOption('awm');
+  await a.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
+
+  await expect.poll(() => loaded(b)).toEqual(['/tiles/icons/items/awm.webp']);
+  await expect.poll(() => loaded(a)).toEqual(['/tiles/icons/items/awm.webp']);
+  const props = await b.evaluate(
+    () => window.__rlDebug?.elements().find((e) => e.type === 'MARKER')?.props,
+  );
+  expect(props).toEqual({ kind: 'loot', item: 'awm' });
+
+  // switch the item on the selected marker → smoke grenade has no fixture icon: the crate stays
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await a.keyboard.press('v');
+  await a.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await a.getByTestId('style-bar').getByTestId('loot-item').selectOption('smoke_grenade');
+  await expect
+    .poll(() => b.evaluate(() => window.__rlDebug?.elements()[0]?.props))
+    .toEqual({ kind: 'loot', item: 'smoke_grenade' });
+  await expect(b.locator('img.rl-loot-icon')).toHaveCount(0);
+  await expect(b.locator('.rl-marker svg rect')).toHaveCount(1);
+  await ctxA.close();
+  await ctxB.close();
+});

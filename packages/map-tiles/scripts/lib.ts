@@ -45,13 +45,29 @@ export interface SourceEntry {
   lfs: boolean;
 }
 
+/** Phase 12: a loot item icon (Assets/Icons/…, plain git blobs — not in LFS) */
+export interface IconEntry {
+  id: string;
+  repoPath: string;
+  sha256: string;
+  bytes: number;
+  format: string;
+}
+
 export interface SourcesFile {
   repo: string;
   ref: string;
   commit: string;
   fetchedAt: string;
   files: SourceEntry[];
+  /** absent in a .cache written before Phase 12 — re-run fetch */
+  icons?: IconEntry[];
 }
+
+/** where `build` writes the loot icons, relative to OUT_DIR (= the tiles base URL) */
+export const ICONS_DIR = 'icons/items';
+/** icon edge in px: 2× the 28 px marker */
+export const ICON_SIZE = 64;
 
 /** Runs a program without a shell, so it behaves the same under PowerShell, cmd and Git Bash. */
 export function run(

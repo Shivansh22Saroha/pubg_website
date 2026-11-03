@@ -6,6 +6,11 @@ import {
   drawnPoints,
   elementAnchor,
   hitTest,
+  LOOT_CATEGORIES,
+  LOOT_ITEMS,
+  lootIconPath,
+  lootItem,
+  MARKER_DEFAULT_COLORS,
 } from '../src/index.js';
 
 describe('elementAnchor (Phase 12)', () => {
@@ -99,5 +104,29 @@ describe('curved arrows (Phase 12)', () => {
       true,
     );
     expect(ElementInputSchema.safeParse(arrow({ curved: 1 })).success).toBe(false);
+  });
+});
+
+describe('loot markers (Phase 12)', () => {
+  it("the registry: 80 unique, path-safe ids from PUBG's Assets/Icons, every category used", () => {
+    expect(LOOT_ITEMS).toHaveLength(80);
+    expect(new Set(LOOT_ITEMS.map((i) => i.id)).size).toBe(80);
+    for (const i of LOOT_ITEMS) {
+      expect(i.id).toMatch(/^[a-z0-9_]+$/);
+      expect(i.source).toMatch(/^Assets\/Icons\/(Item|CarePackage)\/.+\.png$/);
+    }
+    for (const c of LOOT_CATEGORIES) expect(LOOT_ITEMS.some((i) => i.category === c)).toBe(true);
+    expect(lootItem('m416')?.source).toContain('HK416'); // in-game name, PUBG file name
+    expect(lootIconPath('awm')).toBe('icons/items/awm.webp');
+    expect(MARKER_DEFAULT_COLORS.loot).toMatch(/^#[0-9A-F]{6}$/);
+  });
+
+  it('a loot marker takes a known item id only; other kinds take none', () => {
+    const parse = (props: unknown) => ElementInputSchema.safeParse(marker(props)).success;
+    expect(parse({ kind: 'loot', item: 'awm' })).toBe(true);
+    expect(parse({ kind: 'loot' })).toBe(true); // shows the crate
+    expect(parse({ kind: 'loot', item: '../../evil' })).toBe(false);
+    expect(parse({ kind: 'loot', item: 'https://evil.example/x.png' })).toBe(false);
+    expect(parse({ kind: 'drop', item: 'awm' })).toBe(false);
   });
 });

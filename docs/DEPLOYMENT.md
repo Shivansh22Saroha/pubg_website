@@ -45,6 +45,8 @@ rclone sync packages/map-tiles/out r2:rotationlab-tiles/v1 \
 ```
 R2 bucket settings: public custom domain `tiles.example.com`; CORS rule allowing `GET` from `https://app.example.com` (required for PNG export canvas). Set `NEXT_PUBLIC_TILES_BASE_URL=https://tiles.example.com/v1`. New tile build → upload to `/v2`, switch env, redeploy web.
 
+Phase 12: `out/icons/items/*.webp` (the loot marker icons) syncs with the tiles — same bucket, same CORS rule (Export PNG draws them), immutable cache. A bucket synced before Phase 12 needs a re-run of `fetch` + `build` and `rclone copy out/icons r2:rotationlab-tiles/v1/icons`; without them loot markers show a crate glyph.
+
 Each map folder holds `preview.jpg` (1024 px, auth backdrop), `card.webp` (512 px, dashboard room cards — added after Phase 9) and `thumb.jpg` (256 px). A bucket synced before `card.webp` existed only needs the new files added (`rclone copy`); the web app shows the map name in place of a missing image.
 
 **Tile CORS (required for Export PNG, FEATURES F12).** The web app loads every tile and the low-res placeholder with `crossOrigin="anonymous"`, so the browser sends an `Origin` header and needs an `Access-Control-Allow-Origin` back — otherwise the export canvas is tainted and `toBlob` throws (the UI says "Export blocked: the map tiles are not CORS-enabled"). R2 → bucket → Settings → CORS policy:
