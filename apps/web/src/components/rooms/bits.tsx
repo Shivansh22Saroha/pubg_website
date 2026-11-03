@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 
 /**
- * Map image from the tile build — 256 px `thumb` or 1024 px `preview` — with a labelled
+ * Map image from the tile build — 256 px `thumb` or 512 px `card` — with a labelled
  * fallback when tiles aren't installed.
  */
 export function MapThumb({
@@ -19,7 +19,7 @@ export function MapThumb({
 }: {
   mapId: MapId;
   className?: string;
-  variant?: 'thumb' | 'preview';
+  variant?: 'thumb' | 'card';
   /** above the fold and likely the LCP (the first dashboard card): fetch first, never lazy */
   priority?: boolean;
 }) {
@@ -29,7 +29,7 @@ export function MapThumb({
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element -- static tile asset, no optimisation wanted
         <img
-          src={`${tilesBase}/${variant === 'preview' ? MAPS[mapId].preview : MAPS[mapId].thumbnail}`}
+          src={`${tilesBase}/${variant === 'card' ? MAPS[mapId].card : MAPS[mapId].thumbnail}`}
           alt=""
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"

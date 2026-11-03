@@ -3,8 +3,9 @@
 import { UserResponseSchema, type Me } from '@rotationlab/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { ME_QUERY_KEY } from '@/lib/queryKeys';
 
-export const ME_QUERY_KEY = ['me'] as const;
+export { ME_QUERY_KEY };
 
 export function useMe() {
   return useQuery<Me>({

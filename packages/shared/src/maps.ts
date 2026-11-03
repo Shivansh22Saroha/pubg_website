@@ -41,6 +41,8 @@ export interface MapConfig {
   variants: { labels: string; clean: string };
   lowres: string;
   preview: string;
+  /** 512 px WebP for dashboard room cards */
+  card: string;
   thumbnail: string;
 }
 
@@ -62,6 +64,7 @@ function entry(
     variants: { labels: `${id}/labels`, clean: `${id}/clean` },
     lowres: `${id}/lowres.jpg`,
     preview: `${id}/preview.jpg`,
+    card: `${id}/card.webp`,
     thumbnail: `${id}/thumb.jpg`,
   };
 }

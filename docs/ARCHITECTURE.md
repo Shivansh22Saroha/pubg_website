@@ -103,10 +103,16 @@ stores/
 lib/
 ├─ socket.ts          # singleton Socket.IO client, typed events from shared
 ├─ api.ts             # fetch wrapper (credentials: 'include', refresh-on-401)
+├─ serverApi.ts       # server-side prefetch → HydrationBoundary (see below)
 ├─ coords.ts          # world ↔ Leaflet LatLng ↔ grid ref
 └─ exportPng.ts
 middleware.ts         # redirects unauthenticated users away from (app) routes
 ```
+
+**Server prefetch (after Phase 9).** The `(app)` layout fetches `GET /me` and the dashboard page `GET /rooms` on the server (`INTERNAL_API_URL`) and seed the React Query cache through a `HydrationBoundary`, so the dashboard's first room card — its LCP element — is in the first HTML response. Rules:
+- forward **only** the access cookie, plus the request's `X-Forwarded-For` so the API's per-IP limits see the user (Caddy sets it; the API trusts it with `TRUST_PROXY=true`);
+- validate with the shared response schemas; on any non-200, timeout (1.5 s), network error or schema mismatch, render without the data and let the client fetch as before — the server never refreshes a session (the refresh cookie is scoped to `/api/v1/auth`);
+- `/me` is seeded in the layout, above `AppShell`, so `AppShell`'s query starts with data; page-specific data is seeded in the page.
 
 ## 5. Map rendering & coordinate system ⭐
 
@@ -154,7 +160,7 @@ Note the **`{z}/{y}/{x}`** order — this is what `sharp`'s `layout: 'google'` w
    - Read size with `sharp(file, { limitInputPixels: false }).metadata()`; require square.
    - If side isn't a power-of-two multiple of 256, pad (transparent/sea color) to next power of two **and record the scale** so world→pixel mapping stays exact.
    - `sharp(...).webp({ quality: 82 }).tile({ size: 256, layout: 'google', overlap: 0 }).toFile(out/<map>/<variant>)`.
-   - Generate 1024px preview JPEG + 256px thumbnail per map.
+   - Generate 1024px preview JPEG (auth backdrop), 512px card WebP q72 (dashboard room cards, 34–59 KB vs 151–228 KB for the 1024 px JPEG — the dashboard's LCP image) + 256px thumbnail per map.
    - Write `out/manifest.json`: `{ map, variant, sourceSize, paddedSize, maxNativeZoom, sha256 }`.
 3. **upload** — `rclone sync out/ r2:rotationlab-tiles/` (or copy into `apps/web/public/tiles` for local dev).
    Tiles are immutable → `Cache-Control: public, max-age=31536000, immutable`; version path (`/tiles/v1/...`) when regenerating.

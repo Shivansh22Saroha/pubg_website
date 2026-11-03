@@ -46,7 +46,23 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - UI_UX_SPEC §7 / §9 / §10: what each layout offers, long-press, touch targets, the touch empty hint, the element list, the board-actions menu, the contrast fix.
   - DEPLOYMENT: the demo seed in production, the web env, landing screenshots.
 
+- 2026-11-03 — Phase 9 exit follow-up (decision asked in Decisions (Phase 9)): ARCHITECTURE §4 "Server prefetch" (what is forwarded, the fallback, why `/me` is seeded in the layout) and §6 the 512 px `card.webp`; DEPLOYMENT §4 the per-map image files and adding `card.webp` to an existing bucket.
+
 ### Added
+- 2026-11-03 — **Phase 9 exit: dashboard Lighthouse 83 → 91** (TODO Phase 9; the user picked both fixes offered in Decisions (Phase 9), one after the other).
+  - **Card image:** the tile build writes `<map>/card.webp` (512 px, WebP q72: Erangel 34 KB, Miramar 52 KB, Rondo 59 KB, vs the 151–228 KB `preview.jpg`). `MapConfig.card` in shared; dashboard room cards use it (`MapThumb variant="card"`); `preview.jpg` stays for the auth backdrop. Fixture tiles regenerated with a `card.webp` per map. Lower WebP quality barely helps (q50 still 39–44 KB for Miramar / Rondo), so q72 stays.
+  - **Server-rendered room list:** `app/(app)/dashboard/page.tsx` is now a server component that fetches `GET /rooms` and seeds React Query through a `HydrationBoundary`; the client UI moved to `components/rooms/DashboardView.tsx`. The `(app)` layout seeds `GET /me` the same way, above `AppShell`. `lib/serverApi.ts`: `prefetchApi` (forwards only the access cookie plus `X-Forwarded-For`, 1.5 s timeout, validates with the shared schema, null on anything else → the client fetches as before), `requestContext`, `dehydrated`. Query keys moved to `lib/queryKeys.ts` (no `'use client'`, so server code gets the values; re-exported from the old modules). React hoists the first card's image into a `<head>` preload, so it loads before any JS.
+  - The card's "2h ago" has `suppressHydrationWarning` (the server's clock may be on the other side of a minute).
+  - `INTERNAL_API_URL` is now read by `serverEnv()` too (it was only used by the dev rewrites).
+  - Tests: unit 190 (+8, `serverApi.test.ts`: forwarded headers, no call without a cookie, null on 401 / 500 / bad shape / non-JSON / network error, `dehydrated`); E2E 45 (+2, `dashboard.spec.ts`: the room name and the image preload are in the HTML, hydration without console errors; an invalid access cookie prefetches nothing and still reaches the dashboard through the client refresh).
+  - **Lighthouse** (mobile, cold cache, AC power, median of 5, A/B on the same machine):
+
+    | | Phase 9 commit | + card image | + server-rendered list |
+    |---|---|---|---|
+    | Landing | 94 | 94 | 95 |
+    | Dashboard | 79 | 82 | **91** |
+
+    Accessibility 100 on both. Today's Phase 9 baseline (79) is below the recorded 83: run-to-run and day-to-day variance. On battery the same machine measured 67 / 63, so Lighthouse runs need AC power.
 - 2026-10-26 — Phase 8 follow-up: `layer:clear` always saves an auto snapshot "Before clearing '{layer}'" when the layer has ≥ 1 element (an empty layer saves nothing and posts no system message). `SNAPSHOT_LIMITS.clearAutoThreshold` is gone; the confirm says "An automatic snapshot will be saved first." for every clear. Integration tests now cover 3 elements and the empty layer; the layers E2E clears a layer and finds the auto snapshot in the drawer.
 - 2026-10-26 — **Phase 9: landing, explore, responsive layouts, onboarding, accessibility** (TODO Phase 9; UI_UX_SPEC §3.1 / §3.4 / §7 / §9 / §10, FEATURES F13, USER_FLOWS UF-3 / UF-9, TESTING E2E-12 / 13).
   - **Landing `/`** (server component):
@@ -426,6 +442,10 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   I did not lower the threshold or hide the image. The two real fixes are spec changes, so I'm asking first:
   - a ~512 px WebP "card" image from the tile build (~25 KB, needs a new tile output in ARCHITECTURE / DEPLOYMENT);
   - or server-rendering the room list.
+
+  **Resolved 2026-11-03:** both were built (see Added); the dashboard is now at 91.
+- Server prefetch (2026-11-03): a failed prefetch renders without the data instead of redirecting to `/login`. The server can't refresh the session (the refresh cookie is scoped to `/api/v1/auth`), and the client's refresh-on-401 already handles it. `X-Forwarded-For` is forwarded because the API's global limit (300 / min) is keyed by `req.ip`; without it every dashboard load would count against the web container's IP.
+- Local dev (2026-11-03): on Windows, `localhost` in `DATABASE_URL` / `REDIS_URL` makes every new connection wait ~2 s (Docker binds 127.0.0.1 only, `::1` is tried first). It made the first parallel prefetch time out. `.env.example` already uses `127.0.0.1`; keep it that way.
 - Prefs: a `users.prefs` jsonb column (one row, merged with `||`) rather than a `user_prefs` table — one tiny object per user, read with `/me`, no join. Only `roomTourDone` today; unknown stored keys are ignored.
 - The demo-boards response drops `roomId` and the author ids (`null`): the public endpoint shouldn't leak which room or which people made them. ≤ 3 ids enforced by the config.
 - `/explore` with no demo boards shows the three bare maps instead of an empty page (so it is still useful in dev).

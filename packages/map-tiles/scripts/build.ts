@@ -36,6 +36,8 @@ const TILE_SIZE = 256;
 const TILE_QUALITY = Number(process.env.TILE_QUALITY ?? 82);
 const PREVIEW_SIZE = 1024;
 const THUMB_SIZE = 256;
+/** dashboard room cards (shown ≤ ~380 px) — keeps their LCP image ~25 KB instead of the 150 KB preview */
+const CARD_SIZE = 512;
 
 export interface VariantManifest {
   sourceSize: number;
@@ -53,6 +55,7 @@ export interface MapManifest {
   maxNativeZoom: number;
   variants: Record<Variant, VariantManifest>;
   preview: string;
+  card: string;
   thumbnail: string;
   lowres: { file: string; sourceFormat: string; sourceSize: number; sha256: string };
 }
@@ -191,6 +194,10 @@ async function buildMap(map: MapKey, sources: SourcesFile): Promise<MapManifest>
     .jpeg({ quality: 80, mozjpeg: true })
     .toFile(path.join(mapDir, 'preview.jpg'));
   await sharp(labelsFile, { limitInputPixels: pixels })
+    .resize(CARD_SIZE, CARD_SIZE)
+    .webp({ quality: 72 })
+    .toFile(path.join(mapDir, 'card.webp'));
+  await sharp(labelsFile, { limitInputPixels: pixels })
     .resize(THUMB_SIZE, THUMB_SIZE)
     .jpeg({ quality: 80, mozjpeg: true })
     .toFile(path.join(mapDir, 'thumb.jpg'));
@@ -203,7 +210,7 @@ async function buildMap(map: MapKey, sources: SourcesFile): Promise<MapManifest>
     .jpeg({ quality: 82, mozjpeg: true })
     .toFile(path.join(mapDir, 'lowres.jpg'));
   console.log(
-    `  extras preview ${PREVIEW_SIZE}px, thumb ${THUMB_SIZE}px, lowres ${lowSize.width}×${lowSize.height} (source ${low.format})`,
+    `  extras preview ${PREVIEW_SIZE}px, card ${CARD_SIZE}px, thumb ${THUMB_SIZE}px, lowres ${lowSize.width}×${lowSize.height} (source ${low.format})`,
   );
 
   return {
@@ -213,6 +220,7 @@ async function buildMap(map: MapKey, sources: SourcesFile): Promise<MapManifest>
     maxNativeZoom: labels.maxNativeZoom,
     variants,
     preview: `${map}/preview.jpg`,
+    card: `${map}/card.webp`,
     thumbnail: `${map}/thumb.jpg`,
     lowres: {
       file: `${map}/lowres.jpg`,

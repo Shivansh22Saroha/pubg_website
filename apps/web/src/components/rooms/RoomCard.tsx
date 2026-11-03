@@ -39,7 +39,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
         <div className="relative aspect-[16/9]">
           <MapThumb
             mapId={room.primaryMapId}
-            variant="preview"
+            variant="card"
             priority={priority}
             className="size-full opacity-80"
           />
@@ -67,7 +67,8 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
               {room.onlineCount} online
             </span>
             · <Users className="size-3" aria-hidden /> {room.memberCount} ·{' '}
-            {timeAgo(room.lastActivityAt)}
+            {/* server-rendered: the server's clock may sit on the other side of a minute */}
+            <span suppressHydrationWarning>{timeAgo(room.lastActivityAt)}</span>
           </p>
           <p className="flex items-center gap-2 text-xs text-text-muted">
             <RoleBadge role={room.role} /> {room.boardCount} board{room.boardCount === 1 ? '' : 's'}

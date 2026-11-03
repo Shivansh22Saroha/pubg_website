@@ -21,14 +21,9 @@ import {
 } from '@rotationlab/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
+import { keys } from './queryKeys';
 
-export const keys = {
-  rooms: ['rooms'] as const,
-  room: (id: string) => ['room', id] as const,
-  invites: (id: string) => ['room', id, 'invites'] as const,
-  bans: (id: string) => ['room', id, 'bans'] as const,
-  boardState: (id: string) => ['board', id, 'state'] as const,
-};
+export { keys };
 
 export function useRooms() {
   return useQuery({

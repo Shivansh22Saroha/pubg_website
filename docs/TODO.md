@@ -115,6 +115,7 @@ _Status 2026-10-25: **5A (server) done** — 112 realtime tests (38 behaviour + 
 
 **Exit:** E2E-12, E2E-13 pass; Lighthouse targets met.
 > Phase 9 result: E2E-12 and E2E-13 pass. Lighthouse (mobile, cold cache, median of 3): landing Performance 95 / Accessibility 100 ✔; dashboard Performance 83 / Accessibility 100 — **2 points under the 85 target** (CHANGELOG, Decisions (Phase 9)).
+> 2026-11-03 follow-up: 512 px card image + server-rendered room list → dashboard Performance **91** / Accessibility 100, landing 95 / 100 (median of 5, AC power). **Exit criteria met.**
 
 ## Phase 10 — Hardening & launch
 - [ ] Security headers + CSP nonces verified; ZAP baseline clean; gitleaks/audit clean.

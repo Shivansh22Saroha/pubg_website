@@ -7,6 +7,8 @@ import { z } from 'zod';
  */
 const ServerEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /** the API as seen from this server (server-rendered dashboard prefetch) */
+  INTERNAL_API_URL: z.url().default('http://localhost:4000'),
   /** `/maps/[mapId]` dev viewer; default: on outside production */
   ENABLE_DEV_PAGES: z.enum(['true', 'false']).optional(),
   /** `/.well-known/security.txt` Contact (SECURITY §13): `mailto:` or `https:` URL */
@@ -21,6 +23,7 @@ export type ServerEnv = z.infer<typeof ServerEnvSchema>;
 export function serverEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv {
   return ServerEnvSchema.parse({
     NODE_ENV: source.NODE_ENV,
+    INTERNAL_API_URL: source.INTERNAL_API_URL || undefined,
     ENABLE_DEV_PAGES: source.ENABLE_DEV_PAGES || undefined,
     SECURITY_CONTACT: source.SECURITY_CONTACT,
   });

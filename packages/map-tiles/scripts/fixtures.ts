@@ -48,7 +48,10 @@ for (const map of MAPS) {
   await solid(COLORS[map].labels, 128)
     .jpeg({ quality: 60 })
     .toFile(path.join(TARGET, map, 'preview.jpg'));
+  await solid(COLORS[map].labels, 96)
+    .webp({ quality: 50 })
+    .toFile(path.join(TARGET, map, 'card.webp'));
 }
 console.log(
-  `✓ wrote ${count} fixture tiles + low-res/thumb images for ${MAPS.length} maps to ${TARGET}`,
+  `✓ wrote ${count} fixture tiles + low-res/thumb/card images for ${MAPS.length} maps to ${TARGET}`,
 );
