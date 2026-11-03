@@ -130,7 +130,7 @@ Split (2026-11-03, no staging/production servers yet): **10A** is everything tha
 **Exit (10A):** lint / typecheck / unit / integration / E2E green; production stack rehearsal (§9 DEPLOYMENT) passes.
 
 ### 10B — needs the VMs (blocked on hosting + Phase 0)
-- [ ] Provision staging + prod VMs (DEPLOYMENT §6), R2 buckets (tiles, backups), DNS; repo variables / secrets / `production` reviewers.
+- [ ] Provision staging + prod VMs (DEPLOYMENT §6), R2 buckets (tiles, backups, assets — Phase 11 thumbnails), DNS; repo variables / secrets / `production` reviewers.
 - [ ] First staging deploy through the pipeline; prod-like rollback test on staging.
 - [ ] k6 from a separate machine against the staging VM spec: p95 op broadcast < 400 ms, errors < 0.1 %, server CPU < 70 % (try `--scale server=2` if one process is the limit).
 - [ ] ZAP nightly green against staging; securityheaders.com A; SSL Labs A.
@@ -139,13 +139,14 @@ Split (2026-11-03, no staging/production servers yet): **10A** is everything tha
 - [ ] Phase 0 closed (legal text, name/domain) → tag `v1.0.0`, update CHANGELOG.
 
 ## Phase 11 — v1.1 (P1/P2 backlog; built while 10B / Phase 0 wait on hosting and decisions)
-- [ ] Public read-only share link for a board (P1): owner / editor create, revoke, regenerate from the board kebab; random 128-bit token stored hashed, optional expiry; `share_links` table + migration, REST routes, authz-matrix rows; `/s/[token]` read-only (no socket, labels / grid / measure), current state only, rate-limited; never leaks room ids, member names or user ids; CSP zero violations.
-- [ ] Board thumbnails on the dashboard (P1): 256×256 JPEG generated client-side 30 s after the user's last edit; `PUT /boards/:id/thumbnail` (Editor+, ≤ 100 KB, re-encoded with sharp); storage interface (local disk in dev / tests, S3 / R2 when `S3_*` is set); cards fall back to the map card image; dashboard Lighthouse doesn't regress.
-- [ ] Minimap (P2): bottom-right 160×160, collapsible, viewport rectangle, click / drag to move; low-res map image; hidden on phone.
-- [ ] Typing indicator (P2): "X is typing…", volatile, ≤ 1 event / 2 s, cleared after 4 s; `TODO(p2)` removed.
-- [ ] Drawing extras (P2): double-headed arrow toggle in the style bar; Measure "Save as line" → LINE element (Editor+); both undoable and synced.
+- [x] Public read-only share link for a board (P1): owner / editor create, revoke, regenerate from the board kebab; random 128-bit token stored hashed, optional expiry; `share_links` table + migration, REST routes, authz-matrix rows; `/s/[token]` read-only (no socket, labels / grid / measure), current state only, rate-limited; never leaks room ids, member names or user ids; CSP zero violations.
+- [x] Board thumbnails on the dashboard (P1): 256×256 JPEG generated client-side 30 s after the user's last edit; `PUT /boards/:id/thumbnail` (Editor+, ≤ 100 KB, re-encoded with sharp); storage interface (local disk in dev / tests, S3 / R2 when `S3_*` is set); cards fall back to the map card image; dashboard Lighthouse doesn't regress.
+- [x] Minimap (P2): bottom-right 160×160, collapsible, viewport rectangle, click / drag to move; low-res map image; hidden on phone.
+- [x] Typing indicator (P2): "X is typing…", volatile, ≤ 1 event / 2 s, cleared after 4 s; `TODO(p2)` removed.
+- [x] Drawing extras (P2): double-headed arrow toggle in the style bar; Measure "Save as line" → LINE element (Editor+); both undoable and synced.
 
 **Exit:** lint / typecheck / check:deps / unit / integration / E2E green; both authz matrices complete; frame-time benchmark A/B no regression; realtime smoke run; docs + CHANGELOG updated.
+_Status 2026-11-03: met — unit 121 + 71 + 219, integration 552, E2E 53 (+6 in `phase11.spec.ts`); REST matrix 57 routes × 5 callers, socket matrix +`chat:typing`; frame time A/B and dashboard Lighthouse no regression (CHANGELOG, Decisions (Phase 11)); smoke p50 18.5 / p95 23.8 ms. 10B: add the R2 `rotationlab-assets` bucket + `S3_*` / `PUBLIC_ASSETS_BASE_URL` (DEPLOYMENT §4)._
 
 ---
 
@@ -153,14 +154,14 @@ Split (2026-11-03, no staging/production servers yet): **10A** is everything tha
 | Item | Priority |
 |---|---|
 | Discord / Google OAuth login | P1 (v1.1) |
-| Public read-only share link for a board | P1 (v1.1) |
-| Board thumbnails on dashboard (client-generated, S3) | P1 |
+| ~~Public read-only share link for a board~~ — Phase 11 | P1 (v1.1) |
+| ~~Board thumbnails on dashboard (client-generated, S3)~~ — Phase 11 | P1 |
 | Element list view for screen readers | P2 |
-| Minimap | P2 |
-| Typing indicator | P2 |
-| Double-headed arrows, curved arrows | P2 |
+| ~~Minimap~~ — Phase 11 | P2 |
+| ~~Typing indicator~~ — Phase 11 | P2 |
+| ~~Double-headed arrows~~ (Phase 11), curved arrows | P2 |
 | Link own-player markers to members (auto IGN) | P2 |
-| "Save measure as line" | P2 |
+| ~~"Save measure as line"~~ — Phase 11 | P2 |
 | Zone simulator (random phase sequence generator with shrink animation) | P2 |
 | Timeline / step playback of a rotation (keyframes per board) | P2 |
 | PUBG API match telemetry replay overlay (positions over time) — world units already compatible | P3 |

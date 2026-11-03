@@ -168,8 +168,15 @@ test('minimap: viewport rectangle, click / drag moves the view, collapses, hidde
       number,
     ];
 
-  // zoom well in (maxBounds would clamp a wider view), then click the top-left quarter
-  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: 'Zoom in' }).click();
+  // zoom well in (maxBounds would clamp a wider view), each step settled, then click the
+  // top-left quarter — a click during a zoom animation would race it
+  const zoom = async () => Number(await canvas.getAttribute('data-zoom'));
+  const z0 = await zoom();
+  for (let i = 1; i <= 8; i++) {
+    await page.getByRole('button', { name: 'Zoom in' }).click();
+    await expect.poll(zoom).toBe(z0 + i * 0.5);
+  }
+  await page.waitForTimeout(300);
   const box = await surface.boundingBox();
   if (!box) throw new Error('no minimap');
   await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.25);
