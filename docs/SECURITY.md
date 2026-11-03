@@ -126,7 +126,7 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 - All secrets via environment variables (ENVIRONMENT.md). `.env*` in `.gitignore`; `.env.example` contains placeholders only.
 - Production secrets in the host's secret store / GitHub Actions encrypted secrets — never in images or compose files committed to git.
 - Rotate `JWT_SECRET` support: accept `JWT_SECRET_PREVIOUS` for 15 min during rotation.
-- `gitleaks` runs in CI on every push.
+- `gitleaks` runs in CI on every push. `.gitleaks.toml` extends the default rules with one narrow allowlist (Phase 11): exact public test vectors (AWS's documented SigV4 example key pair, a made-up share token), only inside `test/*.test.ts`. Never add a real or once-real credential there — rotate it instead.
 
 ## 9. Dependency & supply chain
 - `pnpm audit --prod` and GitHub Dependabot (weekly); fail CI on high/critical in prod dependencies.
