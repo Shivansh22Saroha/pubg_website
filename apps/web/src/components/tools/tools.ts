@@ -300,7 +300,11 @@ export class ArrowTool extends VertexTool {
       type: 'ARROW',
       geometry: { points: points.map(mutable) },
       style: this.ctx.style(),
-      props: this.ctx.arrowDoubleHeaded() ? { doubleHeaded: true } : {},
+      props: {
+        ...(this.ctx.arrowDoubleHeaded() ? { doubleHeaded: true } : {}),
+        // a straight two-point arrow has nothing to curve
+        ...(this.ctx.arrowCurved() && points.length >= 3 ? { curved: true } : {}),
+      },
     });
   }
 

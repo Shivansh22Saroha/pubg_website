@@ -45,6 +45,14 @@ const VECTOR = new Set(['STROKE', 'LINE', 'ARROW', 'CIRCLE', 'POLYGON']);
 const CLOSED = new Set(['CIRCLE', 'POLYGON']);
 const EMPTY: readonly string[] = [];
 
+/** an arrow flag on or off, keeping the other props ({} when none is left) */
+function withFlag(props: Record<string, unknown>, key: 'doubleHeaded' | 'curved', on: boolean) {
+  const next: Record<string, unknown> = { ...props };
+  if (on) next[key] = true;
+  else Reflect.deleteProperty(next, key);
+  return next;
+}
+
 const isOwnPlayer = (e: ViewElement) =>
   e.type === 'MARKER' && (e.props as { kind?: unknown }).kind === 'own_player';
 const linkedId = (e: ViewElement): string | undefined => {
@@ -103,6 +111,7 @@ export function StyleBar({
   const presetRadius = useToolStore((s) => s.presetRadius);
   const arrowDoubleHeaded = useToolStore((s) => s.arrowDoubleHeaded);
   const players = usePlayersStore((s) => s.players);
+  const arrowCurved = useToolStore((s) => s.arrowCurved);
   const selectedIds = useSelectionStore((s) => (tool === 'select' ? s.ids : EMPTY));
   const elements = useBoardStore((s) => s.view.elements);
   const layers = useBoardStore((s) => s.view.layers);
@@ -137,6 +146,7 @@ export function StyleBar({
     const anyVector = selected.some((e) => VECTOR.has(e.type));
     const arrows = selected.filter((e) => e.type === 'ARROW');
     const allDouble = arrows.length > 0 && arrows.every((e) => e.props.doubleHeaded === true);
+    const allCurved = arrows.length > 0 && arrows.every((e) => e.props.curved === true);
     const anyClosed = selected.some((e) => CLOSED.has(e.type));
     const single = selected.length === 1 ? first : undefined;
     const labelOf = (e: ViewElement) => {
@@ -181,15 +191,27 @@ export function StyleBar({
                 onClick={() => {
                   // one batch, one undo step, arrows only
                   edit(
-                    (i) => ({
-                      ...i,
-                      props: allDouble ? {} : { doubleHeaded: true },
-                    }),
+                    (i) => ({ ...i, props: withFlag(i.props, 'doubleHeaded', !allDouble) }),
                     (e) => e.type === 'ARROW',
                   );
                 }}
               >
                 ⟷
+              </Seg>
+            )}
+            {arrows.length > 0 && (
+              <Seg
+                aria-pressed={allCurved}
+                aria-label="Curved"
+                title="Curved arrow (through its bends)"
+                onClick={() => {
+                  edit(
+                    (i) => ({ ...i, props: withFlag(i.props, 'curved', !allCurved) }),
+                    (e) => e.type === 'ARROW',
+                  );
+                }}
+              >
+                ∿
               </Seg>
             )}
           </>
@@ -358,6 +380,18 @@ export function StyleBar({
               }}
             >
               ⟷
+            </Seg>
+          )}
+          {tool === 'arrow' && (
+            <Seg
+              aria-pressed={arrowCurved}
+              aria-label="Curved"
+              title="Curved arrow (through its bends)"
+              onClick={() => {
+                useToolStore.getState().setArrowCurved(!arrowCurved);
+              }}
+            >
+              ∿
             </Seg>
           )}
         </>

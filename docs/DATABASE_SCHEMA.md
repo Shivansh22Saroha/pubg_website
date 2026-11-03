@@ -223,7 +223,8 @@ type Pt = [x: number, y: number];          // integers 0..worldSize
 STROKE  geometry: { points: Pt[] }          // 2..2000 points, pre-simplified on client
 LINE    geometry: { points: [Pt, Pt] }
 ARROW   geometry: { points: Pt[] }          // 2..50 points (bends)
-        props: { doubleHeaded?: boolean }     // Phase 11 (strict; {} = one head)
+        props: { doubleHeaded?: boolean,      // Phase 11 (strict; {} = one straight-segment head)
+                 curved?: boolean }           // Phase 12: drawn as a curve through the points
 CIRCLE  geometry: { center: Pt, r: number } // r 100..600000
 POLYGON geometry: { points: Pt[] }          // 3..200
 TEXT    geometry: { at: Pt }   props: { text: string(1..120), size: 'sm'|'md'|'lg' }

@@ -137,6 +137,22 @@ describe('double-headed arrows (Phase 11)', () => {
   });
 });
 
+describe('curved arrows (Phase 12)', () => {
+  it('draw the sampled curve, not the stored bends', () => {
+    r.sync(
+      {
+        straight: el('straight', 'ARROW'),
+        curved: el('curved', 'ARROW', L1, { props: { curved: true } }),
+      },
+      layers(),
+    );
+    const lines = ([...map.onMap] as FakeLayer[]).map(
+      (g) => ((g.args[0] as FakeLayer[])[0]?.args[0] as unknown[]).length,
+    );
+    expect(lines.sort((x, y) => x - y)).toEqual([3, 33]); // 3 stored points; 2 bends × 16 + 1
+  });
+});
+
 describe('ElementRenderer diffing', () => {
   it('creates one Leaflet layer per element and renders every type', () => {
     const els = Object.fromEntries(

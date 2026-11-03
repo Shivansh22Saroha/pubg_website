@@ -95,7 +95,11 @@ export function hits(el: ViewElement, p: Pt, scene: Scene): boolean {
   const tol = Math.max(HIT_PX, el.style.width / 2 + 4) * scene.worldPerPx;
   const box = bboxOf(el);
   if (!box || !bboxContainsPoint(expandBBox(box, tol), p)) return false;
-  return hitTest({ type: el.type, geometry: geometry(el), style: el.style }, p, tol);
+  return hitTest(
+    { type: el.type, geometry: geometry(el), style: el.style, props: el.props },
+    p,
+    tol,
+  );
 }
 
 /** Layers whose elements are on screen (board-visible and not hidden locally): id → layer. */

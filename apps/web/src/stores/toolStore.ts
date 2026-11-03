@@ -57,6 +57,8 @@ interface ToolState {
   textSize: TextSize;
   /** arrow tool: new arrows get a head at both ends (Phase 11, remembered per device) */
   arrowDoubleHeaded: boolean;
+  /** arrow tool: new arrows are curved through their bends (Phase 12, remembered per device) */
+  arrowCurved: boolean;
   /** an armed zone preset radius (world units) for the circle tool */
   presetRadius: number | null;
   setTool: (tool: ToolId) => void;
@@ -67,6 +69,7 @@ interface ToolState {
   setMarkerLabel: (label: string) => void;
   setTextSize: (size: TextSize) => void;
   setArrowDoubleHeaded: (on: boolean) => void;
+  setArrowCurved: (on: boolean) => void;
   setPresetRadius: (r: number | null) => void;
 }
 
@@ -79,6 +82,7 @@ export const useToolStore = create<ToolState>((set, get) => ({
   markerLabel: '',
   textSize: 'md',
   arrowDoubleHeaded: typeof window !== 'undefined' && readPref(prefKeys.arrowDoubleHeaded) === '1',
+  arrowCurved: typeof window !== 'undefined' && readPref(prefKeys.arrowCurved) === '1',
   presetRadius: null,
   setTool: (tool) => {
     set({ tool, presetRadius: tool === 'circle' ? get().presetRadius : null });
@@ -105,6 +109,10 @@ export const useToolStore = create<ToolState>((set, get) => ({
   setArrowDoubleHeaded: (arrowDoubleHeaded) => {
     set({ arrowDoubleHeaded });
     writePref(prefKeys.arrowDoubleHeaded, arrowDoubleHeaded ? '1' : '0');
+  },
+  setArrowCurved: (arrowCurved) => {
+    set({ arrowCurved });
+    writePref(prefKeys.arrowCurved, arrowCurved ? '1' : '0');
   },
   setPresetRadius: (presetRadius) => {
     set({ presetRadius });

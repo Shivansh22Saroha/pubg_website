@@ -183,6 +183,7 @@ export function ToolLayer({
       worldPerPx: () => worldPerPx(map, tileWorld),
       style,
       arrowDoubleHeaded: () => useToolStore.getState().arrowDoubleHeaded,
+      arrowCurved: () => useToolStore.getState().arrowCurved,
       canCreate: () => {
         const reason = block();
         if (reason) explain(reason);

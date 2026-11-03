@@ -86,8 +86,10 @@ export const ElementInputSchema = z.discriminatedUnion('type', [
     ...common,
     type: z.literal('ARROW'),
     geometry: z.strictObject({ points: points(2, ELEMENT_LIMITS.arrowPoints) }),
-    /** Phase 11: a head at the start too */
-    props: z.strictObject({ doubleHeaded: z.boolean().optional() }).default({}),
+    /** Phase 11: a head at the start too; Phase 12: drawn as a smooth curve through the bends */
+    props: z
+      .strictObject({ doubleHeaded: z.boolean().optional(), curved: z.boolean().optional() })
+      .default({}),
   }),
   z.strictObject({
     ...common,

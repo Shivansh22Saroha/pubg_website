@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ElementInputSchema, elementAnchor } from '../src/index.js';
+import {
+  CURVE_SAMPLES,
+  ElementInputSchema,
+  curvePoints,
+  drawnPoints,
+  elementAnchor,
+  hitTest,
+} from '../src/index.js';
 
 describe('elementAnchor (Phase 12)', () => {
   it('a marker / text position, a circle centre, else the centre of its points', () => {
@@ -44,5 +51,53 @@ describe('linked own-player markers (Phase 12)', () => {
     expect(
       ElementInputSchema.safeParse(marker({ kind: 'own_player', memberId: 'alice' })).success,
     ).toBe(false);
+  });
+});
+
+describe('curved arrows (Phase 12)', () => {
+  const bend = [
+    [0, 0],
+    [10_000, 10_000],
+    [20_000, 0],
+  ] as [number, number][];
+
+  it('passes through every stored point, sampled per bend; two points stay straight', () => {
+    const c = curvePoints(bend);
+    expect(c).toHaveLength(2 * CURVE_SAMPLES + 1);
+    expect(c[0]).toEqual([0, 0]);
+    expect(c[CURVE_SAMPLES]).toEqual([10_000, 10_000]);
+    expect(c.at(-1)).toEqual([20_000, 0]);
+    expect(curvePoints(bend.slice(0, 2))).toEqual(bend.slice(0, 2));
+  });
+
+  it('is smooth: no sample on the straight chord between bends', () => {
+    const c = curvePoints(bend);
+    // halfway through the first span the curve bulges above the chord y = x
+    const mid = c[CURVE_SAMPLES / 2]!;
+    expect(mid[1]).toBeGreaterThan(mid[0]);
+  });
+
+  it('only curved ARROWs use the curve — for drawing and for hit-testing', () => {
+    const geometry = { points: bend };
+    expect(drawnPoints({ type: 'ARROW', geometry })).toBe(bend);
+    expect(drawnPoints({ type: 'LINE', geometry, props: { curved: true } })).toBe(bend);
+    const curved = drawnPoints({ type: 'ARROW', geometry, props: { curved: true } });
+    const mid = curved[CURVE_SAMPLES / 2]!;
+    expect(hitTest({ type: 'ARROW', geometry, props: { curved: true } }, mid, 50)).toBe(true);
+    // a point on the curve but off the straight segments misses the straight arrow
+    expect(hitTest({ type: 'ARROW', geometry }, mid, 50)).toBe(false);
+  });
+
+  it('ARROW props accept curved: boolean (strict)', () => {
+    const arrow = (props: unknown) => ({
+      ...marker({}),
+      type: 'ARROW',
+      geometry: { points: bend },
+      props,
+    });
+    expect(ElementInputSchema.safeParse(arrow({ curved: true, doubleHeaded: true })).success).toBe(
+      true,
+    );
+    expect(ElementInputSchema.safeParse(arrow({ curved: 1 })).success).toBe(false);
   });
 });

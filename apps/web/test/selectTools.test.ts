@@ -241,6 +241,7 @@ class FakeCtx {
       markerProps: () => ({ kind: 'pin' }),
       presetRadius: () => null,
       arrowDoubleHeaded: () => false,
+      arrowCurved: () => false,
       scene: () => this.scene,
       canEdit: () => this.editor,
       selection: () => this.selected,

@@ -212,6 +212,25 @@ describe('element ops (ARCHITECTURE §7.2)', () => {
     expect(bad).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
   });
 
+  it('curved arrows (Phase 12): stored and broadcast with both flags', async () => {
+    const l = await live();
+    const toOwner = collect(l.owner, 'board:op');
+    const el = {
+      ...arrow(l.f.boardId, l.layerIds[0]!),
+      props: { curved: true, doubleHeaded: true },
+    };
+    const res = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: el,
+    });
+    expect(res).toMatchObject({ ok: true });
+    await sleep(150);
+    expect(toOwner[0]).toMatchObject({
+      op: { element: { props: { curved: true, doubleHeaded: true } } },
+    });
+  });
+
   it('linked own-player markers (Phase 12): a member is accepted, anyone else refused', async () => {
     const l = await live();
     const base = {

@@ -100,3 +100,41 @@ test('linked own-player marker: pick a member in the style bar, everyone sees th
   await ctxA.close();
   await ctxB.close();
 });
+
+test('curved arrow: style-bar toggle, synced, and selecting it flips it back as one undo step', async ({
+  browser,
+}) => {
+  const { a, b, ctxA, ctxB } = await twoUsersInRoom(browser);
+  const box = await a.locator('.leaflet-container').boundingBox();
+  if (!box) throw new Error('no map');
+  const at = (fx: number, fy: number) =>
+    [box.x + box.width * fx, box.y + box.height * fy] as [number, number];
+  const arrows = (p: Page) =>
+    p.evaluate(() => window.__rlDebug?.elements().filter((e) => e.type === 'ARROW') ?? []);
+
+  await a.keyboard.press('a');
+  const toggle = a.getByTestId('style-bar').getByRole('button', { name: 'Curved' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  // click start, a bend, the end; Enter finishes
+  await a.mouse.click(...at(0.25, 0.6));
+  await a.mouse.click(...at(0.4, 0.35));
+  await a.mouse.click(...at(0.55, 0.6));
+  await a.keyboard.press('Enter');
+  await expect.poll(async () => (await arrows(b))[0]?.props).toEqual({ curved: true });
+
+  // the curve passes through its bend point, so a click there selects it
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await a.keyboard.press('v');
+  await a.mouse.click(...at(0.4, 0.35));
+  const sel = a.getByTestId('style-bar').getByRole('button', { name: 'Curved' });
+  await expect(sel).toHaveAttribute('aria-pressed', 'true');
+  await sel.click();
+  await expect.poll(async () => (await arrows(b))[0]?.props).toEqual({});
+  await a.keyboard.press('Escape');
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await a.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+  await expect.poll(async () => (await arrows(b))[0]?.props).toEqual({ curved: true });
+  await ctxA.close();
+  await ctxB.close();
+});

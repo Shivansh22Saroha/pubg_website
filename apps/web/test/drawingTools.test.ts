@@ -33,6 +33,7 @@ class Fake {
   textOpen: Pt | null = null;
   preset: number | null = null;
   doubleHeaded = false;
+  curved = false;
   allowed = true;
   measure: MeasureLine | null = null;
 
@@ -65,6 +66,7 @@ class Fake {
       markerProps: () => ({ kind: 'enemy_squad', number: 3, label: 'Pochinki boys' }),
       presetRadius: () => this.preset,
       arrowDoubleHeaded: () => this.doubleHeaded,
+      arrowCurved: () => this.curved,
       scene: () => ({ elements: {}, layers: [], hidden: {}, worldPerPx: K, textScale: 1 }),
       canEdit: () => true,
       selection: () => [],
@@ -184,6 +186,23 @@ describe('Arrow', () => {
     fake.doubleHeaded = true;
     draw();
     expect(fake.commits[1]?.props).toEqual({ doubleHeaded: true });
+  });
+
+  it('the curved toggle (Phase 12) curves arrows with bends, never a straight two-point one', () => {
+    fake.curved = true;
+    const arrow = new ArrowTool(fake.ctx());
+    const click = (x: number, y: number) => {
+      arrow.onPointerDown(p(x, y));
+      arrow.onPointerUp(p(x, y));
+    };
+    click(0, 0);
+    click(40_000, 0);
+    arrow.onKeyDown({ key: 'Enter', shiftKey: false });
+    click(0, 0);
+    click(40_000, 0);
+    click(40_000, 40_000);
+    arrow.onKeyDown({ key: 'Enter', shiftKey: false });
+    expect(fake.commits.map((c) => c.props)).toEqual([{}, { curved: true }]);
   });
 
   it('double-click finishes (its second click is not a new vertex)', () => {

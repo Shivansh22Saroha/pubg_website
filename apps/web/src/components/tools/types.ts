@@ -100,6 +100,8 @@ export interface ToolContext {
   presetRadius(): number | null;
   /** arrow tool: the style bar's double-headed toggle (Phase 11) */
   arrowDoubleHeaded(): boolean;
+  /** arrow tool: the style bar's curved toggle (Phase 12) */
+  arrowCurved(): boolean;
 
   // ---- select & eraser (Phase 6B) --------------------------------------------------------
   /** elements, layers and zoom for hit-testing */

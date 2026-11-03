@@ -1,6 +1,7 @@
 import type { Layer as BoardLayer } from '@rotationlab/shared';
 import type * as Leaflet from 'leaflet';
 import type { ViewElement } from '@/stores/boardModel';
+import { drawnPoints } from '@rotationlab/shared';
 import { markerElement, safeColor, textElement } from './markerDom';
 
 type Pt = [number, number];
@@ -110,7 +111,10 @@ export class ElementRenderer {
       case 'LINE':
         return { layer: L.polyline((g.points ?? []).map(ll), base), vector: true };
       case 'ARROW': {
-        const pts = g.points ?? [];
+        // Phase 12: a curved arrow is drawn (and its heads aimed) along its sampled curve
+        const pts: Pt[] = drawnPoints({ type: 'ARROW', geometry: g, props: el.props }).map(
+          ([x, y]) => [x, y],
+        );
         const line = L.polyline(pts.map(ll), base);
         const headStyle: Leaflet.PolylineOptions = {
           ...base,

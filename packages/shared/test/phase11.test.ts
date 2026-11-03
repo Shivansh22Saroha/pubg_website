@@ -27,7 +27,7 @@ describe('ARROW props (Phase 11: double-headed)', () => {
 
   it('rejects other values and unknown keys (strict)', () => {
     expect(ElementInputSchema.safeParse(arrow({ doubleHeaded: 'yes' })).success).toBe(false);
-    expect(ElementInputSchema.safeParse(arrow({ curved: true })).success).toBe(false);
+    expect(ElementInputSchema.safeParse(arrow({ wobbly: true })).success).toBe(false);
   });
 
   it('other shapes still take no props', () => {
