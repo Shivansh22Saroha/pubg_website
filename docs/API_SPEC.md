@@ -208,7 +208,7 @@ Implementation notes (Phase 5A/5B):
 | `summon` | `{ boardId }` | – | asks all to follow you; permission `board.edit` (OWNER/EDITOR). Receivers start following **immediately** and may opt out ("Don't follow", 5 s) |
 | `presence:heartbeat` | `{ roomId, boardId, idle: boolean }` | – | every 20 s |
 
-`ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly.
+`ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly. Phase 11: an ARROW's `props` may carry `doubleHeaded: true` (strict; anything else → `VALIDATION_ERROR`).
 
 ### 7.3 Server → client
 | Event | Payload |

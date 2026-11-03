@@ -300,7 +300,7 @@ export class ArrowTool extends VertexTool {
       type: 'ARROW',
       geometry: { points: points.map(mutable) },
       style: this.ctx.style(),
-      props: {},
+      props: this.ctx.arrowDoubleHeaded() ? { doubleHeaded: true } : {},
     });
   }
 

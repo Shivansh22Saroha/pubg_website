@@ -117,6 +117,26 @@ beforeEach(() => {
   FakeLayer.made = 0;
 });
 
+describe('double-headed arrows (Phase 11)', () => {
+  it('draw a second head, from the reversed path, only when props.doubleHeaded', () => {
+    r.sync(
+      { one: el('one', 'ARROW'), two: el('two', 'ARROW', L1, { props: { doubleHeaded: true } }) },
+      layers(),
+    );
+    const groups = [...map.onMap] as FakeLayer[];
+    const parts = groups.map((g) => (g.args[0] as FakeLayer[]).map((x) => x.kind));
+    expect(parts).toContainEqual(['polyline', 'polygon']);
+    expect(parts).toContainEqual(['polyline', 'polygon', 'polygon']);
+    const two = groups.find((g) => (g.args[0] as unknown[]).length === 3);
+    const heads = (two?.args[0] as FakeLayer[]).slice(1).map((h) => (h.args[0] as number[][])[0]);
+    // tips at the last point [20, 0] and the first point [0, 0] (LatLng = [y, x])
+    expect(heads).toEqual([
+      [0, 20],
+      [0, 0],
+    ]);
+  });
+});
+
 describe('ElementRenderer diffing', () => {
   it('creates one Leaflet layer per element and renders every type', () => {
     const els = Object.fromEntries(

@@ -86,13 +86,13 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 | **Select (V)** | click to select, Shift+click multi, drag on empty map = pan, Shift+drag = marquee select; drag selected to move; circle shows radius handle; text double-click to edit | – | moving many elements → single `element:batch` on drop (chunked ≤ 50 ops) |
 | **Pen (P)** | press-drag-release | STROKE | points sampled every ≥ 4 px screen distance, simplified (simplify-js, tolerance = 1.5 px in world units at current zoom), max 2 000 points (auto-commit and start a new stroke when exceeded) |
 | **Line (L)** | press-drag-release | LINE | Shift snaps to 15° |
-| **Arrow (A)** | click start, click bends, double-click / Enter to finish; or press-drag-release for a straight arrow | ARROW | max 50 points; head at last point; optional "double-headed" in style bar (P2) |
+| **Arrow (A)** | click start, click bends, double-click / Enter to finish; or press-drag-release for a straight arrow | ARROW | max 50 points; head at last point; **double-headed** toggle (⟷) in the style bar (Phase 11): remembered per device for new arrows, and on a selection of arrows it flips them as one undoable edit — stored as `props.doubleHeaded: true` |
 | **Circle (C)** | press at center, drag radius, release; radius label in m | CIRCLE | Zone preset dropdown places a circle of that radius on click; Shift = draw from edge |
 | **Polygon (G)** | click vertices, click first point or Enter to close; Backspace removes last vertex | POLYGON | min 3, max 200 vertices |
 | **Text (T)** | click → inline input → Enter commits, Esc cancels | TEXT | 1–120 chars, sizes sm/md/lg |
 | **Marker (M)** | pick kind from flyout (remembered), click to place; for enemy squad, number auto-increments (next unused 1–25) | MARKER | label editable via select → double-click |
 | **Eraser (E)** | click an element or drag across elements to delete those touched | – | respects locks/roles; batch delete |
-| **Measure (R)** | click points, double-click to finish; shows segment + total metres + travel time; Esc clears | – (local only) | P2: "Save as line" button converts to LINE element |
+| **Measure (R)** | click points, double-click to finish; shows segment + total metres + travel time; Esc clears | – (local only) | Phase 11: Editor+ get **Save as line** in the style bar once a measure is finished — LINE elements on the active layer with the Line tool's style (a LINE has 2 points, so N points → N − 1 lines), one action / one undo step; the local measure is then cleared |
 | **Laser (K)** | hold mouse button/finger to show a fading trail to everyone | – (ephemeral) | trail lifetime 1.5 s |
 
 **Select details** (Phase 6)
@@ -185,6 +185,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Travel time: `distance / speed` using `SPEEDS` config, formatted `~9 min`. Always labelled "approx.".
 - Optional P2: elevation is **not** available (no height data) — don't fake it.
 - Tool (R), every role, local only: click points, double-click / Enter finishes, Backspace removes the last point, Esc clears; per-segment lengths at midpoints, total + "~N min on foot · ~N min by vehicle (approx.)" at the end.
+- "Save as line" (Phase 11, Editor+, room only): see F6 — the same gating as drawing (locked / no layer / board full / queue full show the usual toast).
 
 ---
 

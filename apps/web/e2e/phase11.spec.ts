@@ -244,3 +244,66 @@ test('typing indicator: "X is typing…" for the others, gone when the message l
   await ctxA.close();
   await ctxB.close();
 });
+
+test('drawing extras: double-headed arrow and "Save as line" sync and undo like any element', async ({
+  browser,
+}) => {
+  const { a, b, ctxA, ctxB } = await twoUsersInRoom(browser);
+  const box = await a.locator('.leaflet-container').boundingBox();
+  if (!box) throw new Error('no map');
+  const at = (fx: number, fy: number) =>
+    [box.x + box.width * fx, box.y + box.height * fy] as [number, number];
+  const ofType = (p: Page, type: string) =>
+    p.evaluate((t) => window.__rlDebug?.elements().filter((e) => e.type === t) ?? [], type);
+  const undoKey = process.platform === 'darwin' ? 'Meta+z' : 'Control+z';
+  const redoKey = process.platform === 'darwin' ? 'Meta+Shift+z' : 'Control+y';
+
+  // ---- double-headed arrow: style-bar toggle, then press-drag-release
+  await a.keyboard.press('a');
+  const toggle = a.getByTestId('style-bar').getByRole('button', { name: 'Double-headed' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await a.mouse.move(...at(0.3, 0.3));
+  await a.mouse.down();
+  await a.mouse.move(...at(0.45, 0.4), { steps: 6 });
+  await a.mouse.move(...at(0.6, 0.5), { steps: 6 });
+  await a.mouse.up();
+  await expect.poll(async () => (await ofType(b, 'ARROW')).length).toBe(1);
+  expect((await ofType(b, 'ARROW'))[0]?.props).toEqual({ doubleHeaded: true });
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await a.keyboard.press(undoKey);
+  await expect.poll(async () => (await ofType(b, 'ARROW')).length).toBe(0);
+  await a.keyboard.press(redoKey);
+  await expect.poll(async () => (await ofType(b, 'ARROW')).length).toBe(1);
+
+  // toggling it on a selected arrow is one undoable edit
+  await a.keyboard.press('v');
+  await a.mouse.click(...at(0.45, 0.4)); // on the arrow's path
+  const selToggle = a.getByTestId('style-bar').getByRole('button', { name: 'Double-headed' });
+  await expect(selToggle).toHaveAttribute('aria-pressed', 'true');
+  await selToggle.click();
+  await expect.poll(async () => (await ofType(b, 'ARROW'))[0]?.props).toEqual({});
+  await a.keyboard.press('Escape');
+  await a.keyboard.press(undoKey);
+  await expect
+    .poll(async () => (await ofType(b, 'ARROW'))[0]?.props)
+    .toEqual({
+      doubleHeaded: true,
+    });
+
+  // ---- measure → Save as line (3 points → 2 lines, one undo step)
+  await a.keyboard.press('r');
+  await expect(a.getByTestId('measure-save')).toHaveCount(0); // nothing measured yet
+  await a.mouse.click(...at(0.2, 0.7));
+  await a.mouse.click(...at(0.4, 0.7));
+  await a.mouse.dblclick(...at(0.4, 0.85));
+  await a.getByTestId('measure-save').click();
+  await expect.poll(async () => (await ofType(b, 'LINE')).length).toBe(2);
+  await expect(a.locator('.rl-measure-total')).toHaveCount(0); // the local measure is cleared
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await a.keyboard.press(undoKey);
+  await expect.poll(async () => (await ofType(b, 'LINE')).length).toBe(0);
+  expect((await ofType(b, 'ARROW')).length).toBe(1); // only the last step was undone
+  await ctxA.close();
+  await ctxB.close();
+});

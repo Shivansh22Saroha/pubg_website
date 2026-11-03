@@ -15,6 +15,8 @@ import {
   type ZonePreset,
 } from '@rotationlab/shared';
 import { ChevronDown, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { v7 as uuid } from 'uuid';
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { safeColor } from '@/components/map/markerDom';
 import {
@@ -25,11 +27,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { editorActions, type EditSink } from '@/lib/editing';
+import { measureLines } from '@/lib/measureToLine';
+import { MAX_PENDING } from '@/stores/boardModel';
+import { useMeasureStore } from '@/stores/measureStore';
 import { cn } from '@/lib/utils';
 import type { ViewElement } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { styleFor, useToolStore, type TextSize } from '@/stores/toolStore';
+import { BLOCK_MESSAGES, creationBlock, resolveActiveLayer } from './gating';
 import { deleteChanges, editChanges } from './scene';
 import { isCreationTool } from './types';
 
@@ -87,6 +93,7 @@ export function StyleBar({
   const textSize = useToolStore((s) => s.textSize);
   const markerLabel = useToolStore((s) => s.markerLabel);
   const presetRadius = useToolStore((s) => s.presetRadius);
+  const arrowDoubleHeaded = useToolStore((s) => s.arrowDoubleHeaded);
   const selectedIds = useSelectionStore((s) => (tool === 'select' ? s.ids : EMPTY));
   const elements = useBoardStore((s) => s.view.elements);
   const layers = useBoardStore((s) => s.view.layers);
@@ -119,6 +126,8 @@ export function StyleBar({
       edit((i) => ({ ...i, style: { ...i.style, ...patch } }), only);
     };
     const anyVector = selected.some((e) => VECTOR.has(e.type));
+    const arrows = selected.filter((e) => e.type === 'ARROW');
+    const allDouble = arrows.length > 0 && arrows.every((e) => e.props.doubleHeaded === true);
     const anyClosed = selected.some((e) => CLOSED.has(e.type));
     const single = selected.length === 1 ? first : undefined;
     const labelOf = (e: ViewElement) => {
@@ -155,6 +164,25 @@ export function StyleBar({
             >
               ┄
             </Seg>
+            {arrows.length > 0 && (
+              <Seg
+                aria-pressed={allDouble}
+                aria-label="Double-headed"
+                title="Double-headed arrow"
+                onClick={() => {
+                  // one batch, one undo step, arrows only
+                  edit(
+                    (i) => ({
+                      ...i,
+                      props: allDouble ? {} : { doubleHeaded: true },
+                    }),
+                    (e) => e.type === 'ARROW',
+                  );
+                }}
+              >
+                ⟷
+              </Seg>
+            )}
           </>
         )}
         {anyClosed && (
@@ -238,6 +266,11 @@ export function StyleBar({
     );
   }
 
+  // ---- measure: "Save as line" (Phase 11) ---------------------------------------------------
+  if (tool === 'measure') {
+    return <MeasureSave role={role} styles={styles} commit={(c) => actions.commit(c)} />;
+  }
+
   // ---- drawing-tool mode -------------------------------------------------------------------
   if (!isCreationTool(tool)) return null;
   const st = styleFor({ styles }, tool);
@@ -273,6 +306,18 @@ export function StyleBar({
           >
             ┄
           </Seg>
+          {tool === 'arrow' && (
+            <Seg
+              aria-pressed={arrowDoubleHeaded}
+              aria-label="Double-headed"
+              title="Double-headed arrow"
+              onClick={() => {
+                useToolStore.getState().setArrowDoubleHeaded(!arrowDoubleHeaded);
+              }}
+            >
+              ⟷
+            </Seg>
+          )}
         </>
       )}
       {closed && (
@@ -516,5 +561,57 @@ function LabelInput({
       onBlur={commit}
       className="h-7 w-36 rounded-control border bg-bg px-2 text-xs outline-none focus:ring-2 focus:ring-accent"
     />
+  );
+}
+
+/**
+ * Measure tool, Editor+ (Phase 11, FEATURES F11): once a measure is finished, "Save as line"
+ * turns it into LINE elements on the active layer with the Line tool's style — one action, so
+ * one undo removes it — and clears the local measure line.
+ */
+function MeasureSave({
+  role,
+  styles,
+  commit,
+}: {
+  role: RoomRole;
+  styles: ReturnType<typeof useToolStore.getState>['styles'];
+  commit: (changes: { id: string; before: null; after: ElementInput }[]) => boolean;
+}) {
+  const line = useMeasureStore((s) => s.line);
+  if (!can(role, 'board.edit') || !line?.finished || line.points.length < 2) return null;
+  const save = () => {
+    const b = useBoardStore.getState();
+    const layer = resolveActiveLayer(b.view.layers, useToolStore.getState().activeLayerId);
+    const block = creationBlock({
+      role,
+      layer,
+      elementCount: Object.keys(b.view.elements).length,
+      queueFull: b.pending.length >= MAX_PENDING,
+    });
+    if (block || !layer || !b.boardId) {
+      toast.error(BLOCK_MESSAGES[block ?? 'no-layer'](layer?.name), { id: `draw-${block}` });
+      return;
+    }
+    const lines = measureLines(line.points, {
+      boardId: b.boardId,
+      layerId: layer.id,
+      style: styleFor({ styles }, 'line'),
+      newId: uuid,
+    });
+    if (lines.length === 0) return;
+    if (commit(lines.map((after) => ({ id: after.id, before: null, after })))) {
+      useMeasureStore.setState({ line: null });
+      toast.success(lines.length === 1 ? 'Saved as a line' : `Saved as ${lines.length} lines`);
+    }
+  };
+  return (
+    <Shell testId="style-bar" mode="tool">
+      <span className="px-1 text-xs text-text-muted">Measure</span>
+      <Divider />
+      <Seg data-testid="measure-save" onClick={save} className="px-2.5">
+        Save as line
+      </Seg>
+    </Shell>
   );
 }
