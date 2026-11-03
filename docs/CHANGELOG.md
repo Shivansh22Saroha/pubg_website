@@ -616,6 +616,7 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 - New dependencies (all in TECH_STACK): `@node-rs/argon2` 2.2.2, `jose` 6.2.13, `@fastify/cookie` 11.1.3, `@fastify/rate-limit` 11.2.1, `uuid` 14.0.3, `@tanstack/react-query` 5.104.5, `react-hook-form` 7.91.0, `@hookform/resolvers` 6.0.0 (Zod 4 compatible), `sonner` 2.0.8.
 
 ### Fixed
+- 2026-11-03 — CI `security` job: dropped `cache: pnpm` from its `setup-node` step. The job never runs `pnpm install`, so on a cache miss setup-node's post step failed the job ("Path(s) specified in the action for caching do(es) not exist") although the audit and gitleaks had passed — seen on `main` before and after the Phase 11 merge.
 - 2026-11-03 — Realtime shutdown: `broadcastPresence` could still publish through the Redis adapter while its clients were quitting (the adapter's rejected publish isn't returned to the caller), so `pnpm test:int` on a clean `main` passed 499 / 499 but exited 1 on 8 unhandled "Connection is closed" rejections in this VM. It now returns once `close()` has started, like `notifyFollowers`.
 - 2026-10-26 — Accessibility issues found by the Phase 9 axe pass in earlier phases' UI:
   - White on `#EF4444` destructive buttons (3.8:1).
