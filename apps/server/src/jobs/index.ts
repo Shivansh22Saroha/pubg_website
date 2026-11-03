@@ -3,8 +3,14 @@ import type { PrismaClient } from '@prisma/client';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
 import cron from 'node-cron';
+import type { AssetStorage } from '../lib/storage.js';
 import { pruneBoardOps } from '../modules/elements/service.js';
-import { cleanupTokens, expireInvites, purgeDeletedRooms } from './maintenance.js';
+import {
+  cleanupTokens,
+  expireInvites,
+  expireShareLinks,
+  purgeDeletedRooms,
+} from './maintenance.js';
 
 const INSTANCE = randomUUID();
 
@@ -36,7 +42,12 @@ export async function withLeaderLock(
 }
 
 /** Schedules the background jobs (ARCHITECTURE §11), each on one leader instance at a time. */
-export function startJobs(deps: { prisma: PrismaClient; redis: Redis; log: FastifyBaseLogger }) {
+export function startJobs(deps: {
+  prisma: PrismaClient;
+  redis: Redis;
+  log: FastifyBaseLogger;
+  assets?: AssetStorage;
+}) {
   const job = (name: string, schedule: string, run: () => Promise<unknown>) =>
     cron.schedule(schedule, () => {
       void withLeaderLock(deps.redis, name, 10 * 60_000, async () => {
@@ -47,8 +58,11 @@ export function startJobs(deps: { prisma: PrismaClient; redis: Redis; log: Fasti
     });
   const tasks = [
     job('prune-board-ops', '*/15 * * * *', () => pruneBoardOps(deps.prisma)),
-    job('purge-deleted-rooms', '7 * * * *', () => purgeDeletedRooms(deps.prisma)),
+    job('purge-deleted-rooms', '7 * * * *', () =>
+      purgeDeletedRooms(deps.prisma, new Date(), deps.assets),
+    ),
     job('expire-invites', '17 * * * *', () => expireInvites(deps.prisma)),
+    job('expire-share-links', '19 * * * *', () => expireShareLinks(deps.prisma)),
     job('cleanup-tokens', '27 3 * * *', () => cleanupTokens(deps.prisma)),
   ];
   return () => {

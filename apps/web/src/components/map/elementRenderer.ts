@@ -112,15 +112,19 @@ export class ElementRenderer {
       case 'ARROW': {
         const pts = g.points ?? [];
         const line = L.polyline(pts.map(ll), base);
-        const head = L.polygon(this.arrowHead(pts, width), {
+        const headStyle: Leaflet.PolylineOptions = {
           ...base,
           dashArray: undefined,
           fill: true,
           fillColor: color,
           fillOpacity: 1,
           weight: 1,
-        });
-        return { layer: L.featureGroup([line, head]), vector: true };
+        };
+        const parts: Leaflet.Layer[] = [line, L.polygon(this.arrowHead(pts, width), headStyle)];
+        // Phase 11: double-headed — the same head, computed from the reversed path
+        if ((el.props as { doubleHeaded?: unknown }).doubleHeaded === true)
+          parts.push(L.polygon(this.arrowHead([...pts].reverse(), width), headStyle));
+        return { layer: L.featureGroup(parts), vector: true };
       }
       case 'CIRCLE':
         return {

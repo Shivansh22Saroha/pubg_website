@@ -36,6 +36,7 @@ model User {
   bansIssued       RoomBan[]      @relation("BanIssuer")
   chatMessages     ChatMessage[]
   snapshots        Snapshot[]
+  shareLinks       ShareLink[]
 
   @@map("users")
 }
@@ -165,6 +166,7 @@ model Board {
   ops          BoardOp[]
   pings        ChatMessage[]
   snapshots    Snapshot[]
+  shareLink    ShareLink?
 
   @@index([roomId, position])
   @@map("boards")
@@ -311,4 +313,20 @@ model AuditLog {
   @@index([roomId, createdAt(sort: Desc)])
   @@index([actorId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+/// Phase 11: public read-only link to one board (DATABASE_SCHEMA §3.14). At most one per board;
+/// regenerating replaces the token. Only the SHA-256 of the 128-bit token is stored.
+model ShareLink {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boardId   String    @unique @map("board_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  createdBy String?   @map("created_by") @db.Uuid
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator   User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt])
+  @@map("share_links")
 }

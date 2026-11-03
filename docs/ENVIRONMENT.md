@@ -41,9 +41,10 @@ Generate secrets with: `openssl rand -base64 48`
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | if email | `smtp.resend.com` / `587` / … / `RotationLab <no-reply@example.com>` | outgoing mail |
 | `CAPTCHA_PROVIDER` | – | `none` | `none` \| `turnstile` \| `hcaptcha` (register form) |
 | `CAPTCHA_SECRET` | if captcha | | server-side verify key |
-| `S3_ENDPOINT` | P1 | `https://<acct>.r2.cloudflarestorage.com` | for board thumbnails |
-| `S3_BUCKET` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_REGION` | P1 | `rotationlab-assets` / … / `auto` | |
-| `PUBLIC_ASSETS_BASE_URL` | P1 | `https://assets.example.com` | public URL for thumbnails |
+| `S3_ENDPOINT` | prod (Phase 11) | `https://<acct>.r2.cloudflarestorage.com` | board thumbnails on R2 / S3 (path-style, SigV4). **All five** of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `PUBLIC_ASSETS_BASE_URL` or none — a partial set fails at boot |
+| `S3_BUCKET` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_REGION` | prod (Phase 11) | `rotationlab-assets` / … / `auto` | an R2 API token with Object Read & Write on that bucket only |
+| `PUBLIC_ASSETS_BASE_URL` | prod (Phase 11) | `https://assets.example.com` | public URL the browser loads thumbnails from (also set on the **web** container, for its CSP `img-src`) |
+| `ASSETS_DIR` | – | `data/assets` | local thumbnail storage when S3 is not configured (dev, tests); served at `/api/v1/assets/*`. The production container's root FS is read-only, so production uses S3 (a warning is logged otherwise) |
 | `DEMO_BOARD_IDS` | – | `uuid1,uuid2,uuid3` | boards exposed read-only at `/explore` (≤ 3 uuids, comma-separated; unset → none). `pnpm --filter server seed` prints the line; the E2E API supervisor seeds them itself |
 | `SENTRY_DSN` | – | | error tracking (Phase 10): unexpected 5xx only, no tracing, no cookies / headers / bodies / query strings / user info. Unset → off |
 | `SENTRY_ENVIRONMENT` | – | `production` | Sentry environment tag; default `NODE_ENV`. Release = `rotationlab-server@<package version>` |
@@ -86,6 +87,7 @@ Server-only web settings (Phase 9; `src/lib/serverEnv.ts`) — read per request 
 | `MAINTENANCE` | – | `false` | `true` → maintenance banner on every page (pair with the server's `MAINTENANCE`) |
 | `INTERNAL_API_URL` | ✓ | `http://server:4000` | also read per request by the server-side prefetch (dashboard) |
 | `SECURITY_CONTACT` | prod | `mailto:security@example.com` | `Contact:` of `/.well-known/security.txt` (SECURITY §13); `mailto:` or `https:` URL. Unset → the file is a 404 |
+| `PUBLIC_ASSETS_BASE_URL` | with S3 | `https://assets.example.com` | the API's thumbnail origin, added to the pages' CSP `img-src` (read per request by `src/proxy.ts`; Phase 11). Same value as the server's |
 
 ## 3. Map tiles (`packages/map-tiles/.env`)
 | Variable | Example | Description |

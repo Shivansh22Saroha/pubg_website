@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
+import sharp from 'sharp';
 import type { LightMyRequestResponse } from 'fastify';
 import type { AddressInfo } from 'node:net';
 import type { ClientToServerEvents, ServerToClientEvents } from '@rotationlab/shared';
@@ -8,6 +12,7 @@ import { io as ioClient, type Socket as ClientSocketBase } from 'socket.io-clien
 import { afterAll, afterEach, beforeEach, inject } from 'vitest';
 import { buildApp, type App } from '../../src/app.js';
 import type { Mailer } from '../../src/lib/mailer.js';
+import { createLocalStorage, type AssetStorage } from '../../src/lib/storage.js';
 import { APP_ORIGIN, CSRF, captureLogs, testConfig } from '../helpers.js';
 
 export { CSRF };
@@ -17,10 +22,13 @@ export const redis = new Redis(inject('redisUrl'), { maxRetriesPerRequest: 1 });
 
 const apps: App[] = [];
 
+/** thumbnails of this test file land in a throw-away dir, never apps/server/data */
+export const assetsDir = mkdtempSync(path.join(tmpdir(), 'rl-assets-'));
+
 /** Fresh app per call (config overrides allowed). Logs are captured, never printed. */
 export async function makeApp(
   overrides: Record<string, string> = {},
-  opts: { mailer?: Mailer } = {},
+  opts: { mailer?: Mailer; assets?: AssetStorage } = {},
 ) {
   const logs = captureLogs();
   const config = testConfig({
@@ -29,7 +37,14 @@ export async function makeApp(
     LOG_LEVEL: 'trace',
     ...overrides,
   });
-  const app = await buildApp({ config, prisma, redis, logStream: logs, ...opts });
+  const app = await buildApp({
+    config,
+    prisma,
+    redis,
+    logStream: logs,
+    assets: createLocalStorage(assetsDir),
+    ...opts,
+  });
   apps.push(app);
   await app.ready();
   return { app, logs, config };
@@ -45,7 +60,7 @@ export function useCleanState() {
     for (let attempt = 1; ; attempt++) {
       try {
         await prisma.$executeRawUnsafe(
-          'TRUNCATE TABLE audit_logs, snapshots, chat_messages, board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
+          'TRUNCATE TABLE audit_logs, share_links, snapshots, chat_messages, board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
         );
         break;
       } catch (err) {
@@ -334,3 +349,18 @@ export function arrow(boardId: string, layerId: string, over: Record<string, unk
 }
 
 export const opId = () => randomUUID();
+
+/** a valid 256×256 JPEG thumbnail (Phase 11) */
+export function thumbJpeg(
+  opts: { width?: number; height?: number; color?: string; format?: 'jpeg' | 'png' } = {},
+): Promise<Buffer> {
+  const img = sharp({
+    create: {
+      width: opts.width ?? 256,
+      height: opts.height ?? 256,
+      channels: 3,
+      background: opts.color ?? '#336699',
+    },
+  });
+  return (opts.format === 'png' ? img.png() : img.jpeg({ quality: 70 })).toBuffer();
+}

@@ -134,6 +134,44 @@ describe('chat:send', () => {
   });
 });
 
+describe('chat:typing (Phase 11)', () => {
+  it('relays { userId } to the rest of the room, not the sender, at most once per 2 s', async () => {
+    const { f, owner, editor } = await room();
+    const seenByOwner = collect<{ userId: string }>(owner, 'chat:typing');
+    const seenByEditor = collect(editor, 'chat:typing');
+    for (let i = 0; i < 5; i++) {
+      editor.emit('chat:typing', { roomId: f.roomId });
+      await sleep(100);
+    }
+    await sleep(200);
+    expect(seenByOwner).toEqual([{ userId: f.editor.id }]);
+    expect(seenByEditor).toEqual([]);
+    await sleep(1_700); // the 2 s window has passed
+    editor.emit('chat:typing', { roomId: f.roomId });
+    await sleep(250);
+    expect(seenByOwner).toHaveLength(2);
+  });
+
+  it('dropped before room:join, for another room and for invalid payloads', async () => {
+    const { f, owner } = await room();
+    const seen = collect(owner, 'chat:typing');
+    const viewer = await connect(url, f.viewer.jar);
+    viewer.emit('chat:typing', { roomId: f.roomId }); // not joined yet
+    viewer.emit('chat:typing', { roomId: f.roomId, extra: 1 } as never);
+    viewer.emit('chat:typing', { roomId: 'nope' });
+    await sleep(300);
+    expect(seen).toEqual([]);
+    const other = await createRoom(app, f.owner.jar, { name: 'Elsewhere' });
+    await joinBoard(viewer, f.roomId, f.boardId);
+    viewer.emit('chat:typing', { roomId: other.room.id }); // a room it never joined
+    await sleep(300);
+    expect(seen).toEqual([]);
+    viewer.emit('chat:typing', { roomId: f.roomId }); // viewers chat too
+    await sleep(300);
+    expect(seen).toHaveLength(1);
+  });
+});
+
 describe('pings', () => {
   it('stores a ping on a board of this room', async () => {
     const { f, editor } = await room();

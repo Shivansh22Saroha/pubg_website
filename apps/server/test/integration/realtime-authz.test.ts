@@ -177,6 +177,12 @@ const VOLATILE: VolatileRow[] = [
     payload: ({ f }) => ({ boardId: f.boardId, center: [1, 2], zoom: 1 }),
     delivered: everyMember,
   },
+  // Phase 11: to the rest of the room, after room:join (the outsider can't join)
+  {
+    event: 'chat:typing',
+    payload: ({ f }) => ({ roomId: f.roomId }),
+    delivered: everyMember,
+  },
 ];
 
 useCleanState();

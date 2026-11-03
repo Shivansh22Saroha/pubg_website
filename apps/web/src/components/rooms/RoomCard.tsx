@@ -18,7 +18,10 @@ import { ApiError } from '@/lib/api';
 import { useDeleteRoom, useLeaveRoom, useUpdateRoom } from '@/lib/rooms';
 import { MapThumb, RoleBadge, timeAgo } from './bits';
 
-/** Dashboard room card (UI_UX_SPEC §3.3). Thumbnails (P1) fall back to the room initial. */
+/**
+ * Dashboard room card (UI_UX_SPEC §3.3): the most recently edited board's thumbnail (Phase 11),
+ * else the map's card image.
+ */
 export function RoomCard({ room, priority = false }: { room: RoomSummary; priority?: boolean }) {
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
   const [text, setText] = useState('');
@@ -40,6 +43,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
           <MapThumb
             mapId={room.primaryMapId}
             variant="card"
+            src={room.thumbnailUrl}
             priority={priority}
             className="size-full opacity-80"
           />

@@ -13,6 +13,8 @@ export interface CspOptions {
   socketUrl?: string | undefined;
   /** NEXT_PUBLIC_SENTRY_DSN — its host receives error reports */
   sentryDsn?: string | undefined;
+  /** PUBLIC_ASSETS_BASE_URL (server-only) — board thumbnails on R2 / S3 (Phase 11) */
+  assetsBaseUrl?: string | undefined;
 }
 
 /** Origin of an absolute http(s) URL; null for relative paths (same origin) or anything else. */
@@ -28,8 +30,16 @@ function origin(url: string | undefined): string | null {
 /** http(s)://host → ws(s)://host, for Socket.IO's websocket upgrade */
 const wsOrigin = (o: string) => o.replace(/^http/, 'ws');
 
-export function buildCsp({ nonce, dev, tilesBaseUrl, socketUrl, sentryDsn }: CspOptions): string {
+export function buildCsp({
+  nonce,
+  dev,
+  tilesBaseUrl,
+  socketUrl,
+  sentryDsn,
+  assetsBaseUrl,
+}: CspOptions): string {
   const tiles = origin(tilesBaseUrl);
+  const assets = origin(assetsBaseUrl);
   const socket = origin(socketUrl);
   const sentry = origin(sentryDsn);
   const list = (...xs: (string | null | false)[]) => xs.filter(Boolean).join(' ');
@@ -41,8 +51,8 @@ export function buildCsp({ nonce, dev, tilesBaseUrl, socketUrl, sentryDsn }: Csp
     'style-src': "'self' 'unsafe-inline'",
     // next/font self-hosts the fonts
     'font-src': "'self'",
-    // blob: PNG export preview; data: Leaflet / inline SVG icons
-    'img-src': list("'self'", 'data:', 'blob:', tiles),
+    // blob: PNG export preview; data: Leaflet / inline SVG icons; assets: board thumbnails
+    'img-src': list("'self'", 'data:', 'blob:', tiles, assets),
     // tiles: export reads them back through fetch/canvas
     'connect-src': list("'self'", tiles, socket, socket && wsOrigin(socket), sentry),
     'frame-ancestors': "'none'",

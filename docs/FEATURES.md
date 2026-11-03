@@ -42,6 +42,7 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - HUD shows cursor grid ref `F-M 4,7` + metres from top-left.
 - Sea / out-of-bounds: `maxBounds` with 10 % padding, `maxBoundsViscosity: 0.8`.
 - While tiles load, show the 819 px low-res image as an `ImageOverlay` under the tile layer.
+- Minimap [MAP-5] (Phase 11): bottom-right, 160×160, collapsible; the low-res image plus the current view's rectangle (clamped to the map). Click / drag on it re-centres the map; arrow keys pan while focused. Using it is a manual move (ends follow mode, F8). Hidden on phones.
 
 **AC**
 - Pan/zoom 60 fps on a 2020 mid-range laptop with 1 000 elements.
@@ -56,7 +57,13 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - Delete: Owner only, confirm dialog, cannot delete the last board. Users on a deleted board are moved to the first board with a toast.
 - Tab order via drag & drop (Editor+), persisted in `position`.
 - Each user's current board is local state; switching does `board:subscribe`. Last board per room remembered in `localStorage`.
-- Thumbnail: generated client-side (256×256 JPEG of fit view) by the last editor 30 s after their last edit, uploaded via `PUT /boards/:id/thumbnail` (P1; until then show map thumbnail).
+- Thumbnail (Phase 11): generated client-side (256×256 JPEG of the fit view) by an editor 30 s after **their** last edit of the board (each local op restarts the clock; remote ops don't), uploaded via `PUT /boards/:id/thumbnail`. Drawn from the board model, not the live map: the map's low-res image, then visible layers bottom → top (markers as dots, no text labels). Leaving the board before the 30 s cancels it; failures are silent. The dashboard card shows the thumbnail of the room's most recently updated board, else the map's card image (also when the thumbnail fails to load).
+
+### F4b. Public read-only share link (Phase 11, v1.1)
+- Board kebab → **Share link…** (owner / editor). The dialog creates the link with an expiry (24 h, **7 days** default, 30 days, never), shows the URL once with Copy ("Copy it now — for safety the link is only shown once"), and afterwards shows "A link is active · Expires … · created …" with **Regenerate link** (new URL; the old one stops working at once) and **Revoke** (two clicks). One link per board.
+- `/s/{token}` opens without an account: the board as it is at load time (reload for the latest; no socket, no live updates), tiles + grid + labels (HUD, N / Shift+G) and Measure (R). No tools, chat, presence, room name, member names or ids. CTA "Create account".
+- Invalid, revoked, regenerated-away, expired links and deleted rooms all show "This link is invalid or has expired."
+- AC: a viewer sees no "Share link…"; after revoke the visitor's reload shows the error; the page raises no CSP violation and opens no socket.
 
 ---
 
@@ -79,13 +86,13 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 | **Select (V)** | click to select, Shift+click multi, drag on empty map = pan, Shift+drag = marquee select; drag selected to move; circle shows radius handle; text double-click to edit | – | moving many elements → single `element:batch` on drop (chunked ≤ 50 ops) |
 | **Pen (P)** | press-drag-release | STROKE | points sampled every ≥ 4 px screen distance, simplified (simplify-js, tolerance = 1.5 px in world units at current zoom), max 2 000 points (auto-commit and start a new stroke when exceeded) |
 | **Line (L)** | press-drag-release | LINE | Shift snaps to 15° |
-| **Arrow (A)** | click start, click bends, double-click / Enter to finish; or press-drag-release for a straight arrow | ARROW | max 50 points; head at last point; optional "double-headed" in style bar (P2) |
+| **Arrow (A)** | click start, click bends, double-click / Enter to finish; or press-drag-release for a straight arrow | ARROW | max 50 points; head at last point; **double-headed** toggle (⟷) in the style bar (Phase 11): remembered per device for new arrows, and on a selection of arrows it flips them as one undoable edit — stored as `props.doubleHeaded: true` |
 | **Circle (C)** | press at center, drag radius, release; radius label in m | CIRCLE | Zone preset dropdown places a circle of that radius on click; Shift = draw from edge |
 | **Polygon (G)** | click vertices, click first point or Enter to close; Backspace removes last vertex | POLYGON | min 3, max 200 vertices |
 | **Text (T)** | click → inline input → Enter commits, Esc cancels | TEXT | 1–120 chars, sizes sm/md/lg |
 | **Marker (M)** | pick kind from flyout (remembered), click to place; for enemy squad, number auto-increments (next unused 1–25) | MARKER | label editable via select → double-click |
 | **Eraser (E)** | click an element or drag across elements to delete those touched | – | respects locks/roles; batch delete |
-| **Measure (R)** | click points, double-click to finish; shows segment + total metres + travel time; Esc clears | – (local only) | P2: "Save as line" button converts to LINE element |
+| **Measure (R)** | click points, double-click to finish; shows segment + total metres + travel time; Esc clears | – (local only) | Phase 11: Editor+ get **Save as line** in the style bar once a measure is finished — LINE elements on the active layer with the Line tool's style (a LINE has 2 points, so N points → N − 1 lines), one action / one undo step; the local measure is then cleared |
 | **Laser (K)** | hold mouse button/finger to show a fading trail to everyone | – (ephemeral) | trail lifetime 1.5 s |
 
 **Select details** (Phase 6)
@@ -137,7 +144,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - **Ephemeral events are best-effort**: cursors, laser, `stroke:preview` ghosts and follow-mode view updates may be dropped and are never replayed; the UI tolerates gaps (ghosts vanish after 3 s without updates, cursors fade).
 - **Cursors**: shown only for users on the same board; name pill; hidden while user is idle > 5 s (fade) or follow mode active.
 - **Presence**: online dot; idle (2 min no input) shows half-opacity avatar; board dots on tabs.
-- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following"). "Manual" = drag, wheel, double-click, pan/zoom keys, Space / middle-mouse pan, the HUD zoom / fit buttons, or opening a ping chip; programmatic moves never count. A "Following {name} · Stop" pill sits at the top of the map; the follower's own cursor isn't broadcast meanwhile. The leader learns its follower count (`followers:update`) and sends `view:update` (≤ 10 Hz) only while it is > 0, plus at once when a follower joins or its new board is subscribed, and every 1.5 s as a resend (view updates are best-effort). Started from a presence avatar's menu (Follow / Go to their board). If the leader leaves the room or goes offline, followers stop with a toast "{name} left — stopped following".
+- **Follow**: follower's map mirrors leader's `center/zoom` with 200 ms smoothing; switching boards follows too. Any manual pan/zoom by follower exits follow mode (toast "Stopped following"). "Manual" = drag, wheel, double-click, pan/zoom keys, Space / middle-mouse pan, the HUD zoom / fit buttons, the minimap, or opening a ping chip; programmatic moves never count. A "Following {name} · Stop" pill sits at the top of the map; the follower's own cursor isn't broadcast meanwhile. The leader learns its follower count (`followers:update`) and sends `view:update` (≤ 10 Hz) only while it is > 0, plus at once when a follower joins or its new board is subscribed, and every 1.5 s as a resend (view updates are best-effort). Started from a presence avatar's menu (Follow / Go to their board). If the leader leaves the room or goes offline, followers stop with a toast "{name} left — stopped following".
 - **Summon**: leader triggers (Editor+, own avatar → "Summon everyone"); each member starts following at once and gets a non-blocking toast "{name} is presenting — following" with a "Don't follow" button (5 s).
 - **Sync indicator** states defined in UI_UX_SPEC §3.5.
 - **Reconnect**: exponential backoff 0.5 s → 10 s with jitter; on reconnect rejoin room + resubscribe board with `sinceSeq`.
@@ -153,7 +160,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Ping creation: click 📍 in the chat input → cursor becomes crosshair → click map → chip attached to input; send. Shortcut: `Alt+click` anywhere on the map attaches a ping and focuses the chat input. (`P` is reserved for Pen.)
 - Ping chip text: `📍 {gridRef} · {board name}`; click → switch board if needed, fly to, pulse.
 - Pings also show a temporary pulse on the map for all users on that board when sent (3 s).
-- Typing indicator "Rudra is typing…" (P2 — not built in v1; the event contract exists).
+- Typing indicator (P2, Phase 11): "Rudra is typing…" / "A and B are typing…" / "Several people are typing…" above the input, for other members only. A client sends a volatile `chat:typing` at most every 2 s while the input has text; a name clears 4 s after its last event or when that person's message arrives. Best effort (volatile), not a live region.
 - Pings must point at a board of this room and inside that board's map; anything else is `VALIDATION_ERROR` (no hint whether a board exists).
 - Chat text: trimmed, NFC, control characters stripped except `\n`, 1–500 code points; shown as text only (no HTML, no auto-links). Viewers can chat and ping. Optimistic send with a pending state; a failed message offers Retry (same `clientId`, so never duplicated) or discard. Enter sends, Shift+Enter is a newline, a counter shows from 400 characters. Delete own messages (owner: any) from a hover menu.
 - Unread badge counts other people's **user** messages that arrive while the chat isn't on screen (panel closed → on the panel toggle; another tab → on the Chat tab). System messages don't count.
@@ -178,6 +185,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Travel time: `distance / speed` using `SPEEDS` config, formatted `~9 min`. Always labelled "approx.".
 - Optional P2: elevation is **not** available (no height data) — don't fake it.
 - Tool (R), every role, local only: click points, double-click / Enter finishes, Backspace removes the last point, Esc clears; per-segment lengths at midpoints, total + "~N min on foot · ~N min by vehicle (approx.)" at the end.
+- "Save as line" (Phase 11, Editor+, room only): see F6 — the same gating as drawing (locked / no layer / board full / queue full show the usual toast).
 
 ---
 

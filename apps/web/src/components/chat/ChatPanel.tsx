@@ -26,6 +26,8 @@ import { cn } from '@/lib/utils';
 import { groupMessages, type ChatGroup, type ChatItem } from '@/stores/chatModel';
 import { useChatStore } from '@/stores/chatStore';
 import { usePresenceStore } from '@/stores/presenceStore';
+import { typingLabel } from '@/stores/typingModel';
+import { useTypingStore } from '@/stores/typingStore';
 import { selectChatVisible, useWorkspaceStore } from '@/stores/workspaceStore';
 
 /** a scrolled-up list is "at the bottom" within this many px */
@@ -202,6 +204,7 @@ export function ChatPanel({
           </button>
         </div>
       )}
+      <TypingIndicator members={members} />
       {/* keyed by room: a half-written message doesn't follow you into another room */}
       <Composer key={roomId} boards={boards} session={session} />
     </div>
@@ -399,6 +402,33 @@ function PingChip({
   );
 }
 
+/**
+ * Phase 11 (FEATURES F9): "X is typing…" above the input, from volatile `chat:typing` events;
+ * a name drops 4 s after its last event or as soon as their message arrives. Not a live region
+ * (it would chatter); the message itself is announced.
+ */
+function TypingIndicator({ members }: { members: Member[] }) {
+  const typing = useTypingStore((s) => s.typing);
+  const active = Object.keys(typing).length > 0;
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => {
+      useTypingStore.getState().prune();
+    }, 500);
+    return () => {
+      clearInterval(t);
+    };
+  }, [active]);
+  const names = Object.keys(typing).map(
+    (id) => members.find((m) => m.user.id === id)?.user.displayName ?? 'Someone',
+  );
+  return (
+    <p data-testid="typing-indicator" className="h-5 truncate px-3 text-xs text-text-muted italic">
+      {typingLabel(names)}
+    </p>
+  );
+}
+
 function Composer({ boards, session }: { boards: Board[]; session: RoomSession | null }) {
   const [text, setText] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
@@ -456,6 +486,7 @@ function Composer({ boards, session }: { boards: Board[]; session: RoomSession |
           placeholder="Message the room…"
           onChange={(e) => {
             setText(e.target.value);
+            if (e.target.value.trim()) session?.sendTyping();
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {

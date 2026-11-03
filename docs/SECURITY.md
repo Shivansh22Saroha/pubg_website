@@ -40,6 +40,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | Create/edit/delete elements; create/rename/recolor/reorder/delete **unlocked** layers | ✓ | ✓ | ✗ |
 | Lock/unlock layers; rename/recolor/delete a **locked** layer | ✓ | ✗ | ✗ |
 | Create/rename boards, snapshots, restore | ✓ | ✓ | ✗ |
+| Create / regenerate / revoke a board's public share link (Phase 11) | ✓ | ✓ | ✗ |
 | Delete boards | ✓ | ✗ | ✗ |
 | Create invites | ✓ | ✓ (role ≤ EDITOR) | ✗ |
 | Change roles, kick, room settings, password, delete room | ✓ | ✗ | ✗ |
@@ -51,6 +52,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | Z5 **MUST** | Kick / role downgrade takes effect immediately: server removes the user's sockets from the room channels and disconnects them. |
 | Z6 | Room passwords hashed with argon2id; checked only at join time; wrong attempts rate-limited 5 / 10 min per user+room. |
 | Z7 | Invite codes: 10 chars Crockford base32 from CSPRNG (~50 bits) + `GET /invites/:code` rate limit 30 / min / IP — brute force infeasible. Expiry and max-uses enforced in the accept transaction (`use_count < max_uses` with row lock). |
+| Z8 | Share links (Phase 11): 128-bit CSPRNG token, stored only as SHA-256, shown once; one per board; optional expiry; revoke / regenerate take effect immediately (no cache: `no-store`). The public read is rate-limited 30 / min / IP and returns one board without room id, author ids or member names; every failure is the same 404. The page sets `referrer: no-referrer` and `noindex`, opens no socket, and the API log masks the token. |
 
 ## 4. Input validation & output encoding
 | # | Control |
@@ -62,6 +64,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | V5 **MUST** | Colors validated by `^#[0-9A-Fa-f]{6}$` before use in SVG/CSS (prevents CSS/SVG injection via style strings). |
 | V6 | URLs in chat are shown as plain text (no auto-linking in v1). |
 | V7 **MUST** | Prisma parameterised queries only; any raw SQL uses `$queryRaw` tagged templates, never string concatenation. |
+| V8 | Uploaded images (board thumbnails, Phase 11): ≤ 100 KB raw `image/jpeg` only, JPEG magic bytes checked, decoded by sharp with `limitInputPixels` = 256², exactly 256×256, then **re-encoded** (no EXIF / ICC / trailing data survives) and stored under a server-generated random key — never a client-chosen name or path. |
 
 ## 5. Transport & browser security
 | # | Control |
@@ -105,6 +108,7 @@ Implemented (Phase 10):
 | Room creation | 10 / day / user, max 30 owned rooms |
 | Invite accept | 20 / hour / user |
 | `GET /public/demo-boards` | 30 / min / IP (Phase 9) |
+| `GET /public/share/:token` | 30 / min / IP (Phase 11) |
 | Socket limits | see API_SPEC §7.4 |
 | Body size | REST 100 KB (snapshots restore via id, not body); socket 64 KB |
 
@@ -122,7 +126,7 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 - All secrets via environment variables (ENVIRONMENT.md). `.env*` in `.gitignore`; `.env.example` contains placeholders only.
 - Production secrets in the host's secret store / GitHub Actions encrypted secrets — never in images or compose files committed to git.
 - Rotate `JWT_SECRET` support: accept `JWT_SECRET_PREVIOUS` for 15 min during rotation.
-- `gitleaks` runs in CI on every push.
+- `gitleaks` runs in CI on every push. `.gitleaks.toml` extends the default rules with one narrow allowlist (Phase 11): exact public test vectors (AWS's documented SigV4 example key pair, a made-up share token), only inside `test/*.test.ts`. Never add a real or once-real credential there — rotate it instead.
 
 ## 9. Dependency & supply chain
 - `pnpm audit --prod` and GitHub Dependabot (weekly); fail CI on high/critical in prod dependencies.
@@ -142,6 +146,7 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 | Repudiation | "Who deleted our plan?" | `updated_by` on elements, op log 24 h, audit log for destructive actions, auto-snapshot before restore |
 | Info disclosure | IDOR on `/rooms/:id` | membership check, 404 for non-members (Z2) |
 | Info disclosure | Invite code guessing | 50-bit codes + rate limit + expiry (Z7) |
+| Info disclosure | Share-link guessing / leaking room or member data | 128-bit hashed tokens, rate limit, uniform 404, stripped response (Z8) |
 | Info disclosure | XSS via chat/label stealing data | no HTML rendering (V4), CSP with nonces (T4) |
 | DoS | Socket flood of cursor events | token buckets, volatile drop, disconnect abusers |
 | DoS | Giant stroke / 100k elements | payload + count limits (V2) |

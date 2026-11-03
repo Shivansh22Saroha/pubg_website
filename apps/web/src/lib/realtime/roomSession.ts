@@ -17,10 +17,13 @@ import type {
 import type { QueryClient } from '@tanstack/react-query';
 import { v7 as uuid } from 'uuid';
 import { fetchMessages } from '@/lib/chat';
+import { emitLocalEdit } from '@/lib/localEdits';
 import { keys } from '@/lib/rooms';
 import { hasGap, type LocalOp, type PendingOp } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
 import { useChatStore } from '@/stores/chatStore';
+import { TYPING_SEND_MS } from '@/stores/typingModel';
+import { useTypingStore } from '@/stores/typingStore';
 import { useFollowStore } from '@/stores/followStore';
 import { useLaserStore } from '@/stores/laserStore';
 import { usePresenceStore } from '@/stores/presenceStore';
@@ -77,6 +80,7 @@ export class RoomSession {
   private laserLimit = new Throttle(LASER_INTERVAL_MS);
   private viewLimit = new Throttle(VIEW_INTERVAL_MS);
   private lastLaser = 0;
+  private lastTyping = 0;
   private offs: (() => void)[] = [];
 
   constructor(
@@ -92,6 +96,7 @@ export class RoomSession {
     useBoardStore.getState().setMe(this.meId);
     if (useChatStore.getState().roomId !== this.roomId)
       useChatStore.getState().reset(this.roomId, this.meId);
+    useTypingStore.getState().reset();
     this.listen();
     this.timers.push(
       setInterval(() => {
@@ -276,6 +281,7 @@ export class RoomSession {
     const boardId = this.boardId;
     const list = ops.map((op): PendingOp => ({ opId: uuid(), boardId, op }));
     if (!useBoardStore.getState().localMany(list, this.online)) return null;
+    emitLocalEdit(boardId);
     if (this.online) this.emitAll(list);
     return list.map((p) => p.opId);
   }
@@ -287,6 +293,7 @@ export class RoomSession {
     if (!this.boardId) return null;
     const pending: PendingOp = { opId: uuid(), boardId: this.boardId, op };
     if (!useBoardStore.getState().local(pending)) return null;
+    emitLocalEdit(pending.boardId);
     if (this.online) this.emitOp(pending);
     return pending.opId;
   }
@@ -433,6 +440,14 @@ export class RoomSession {
     void this.emitChat(clientId, body, ping);
   }
 
+  /** Phase 11: "I'm typing" — volatile, at most once per 2 s (the server drops extras too). */
+  sendTyping() {
+    const now = Date.now();
+    if (!this.online || now - this.lastTyping < TYPING_SEND_MS) return;
+    this.lastTyping = now;
+    this.socket.volatile.emit('chat:typing', { roomId: this.roomId });
+  }
+
   /** Resend a failed message with the same clientId (the server dedupes). */
   retryChat(clientId: string) {
     const p = useChatStore.getState().pending.find((x) => x.clientId === clientId);
@@ -510,10 +525,14 @@ export class RoomSession {
     this.on('chat:message', ({ message }) => {
       if (message.roomId !== this.roomId) return;
       useChatStore.getState().receive(message);
+      if (message.author) useTypingStore.getState().stopped(message.author.id); // they sent it
       // a fresh ping pulses for everyone on that board (3 s)
       const ping = message.ping;
       if (ping?.boardId && ping.boardId === this.boardId)
         usePulseStore.getState().add({ boardId: ping.boardId, x: ping.x, y: ping.y, kind: 'ping' });
+    });
+    this.on('chat:typing', ({ userId }) => {
+      if (userId !== this.meId) useTypingStore.getState().seen(userId);
     });
     this.on('chat:deleted', ({ messageId }) => {
       useChatStore.getState().deleted(messageId);

@@ -79,6 +79,17 @@ export const EnvSchema = z
     METRICS_TOKEN: optionalString,
     /** DEPLOYMENT §7: every request but /api/health and /metrics gets 503 MAINTENANCE */
     MAINTENANCE: bool.default(false),
+    /**
+     * Board thumbnails (Phase 11). With every S3_* + PUBLIC_ASSETS_BASE_URL set they go to
+     * S3 / R2; otherwise to local disk under ASSETS_DIR, served at /api/v1/assets/*.
+     */
+    S3_ENDPOINT: optionalString.pipe(z.url().optional()),
+    S3_BUCKET: optionalString,
+    S3_ACCESS_KEY_ID: optionalString,
+    S3_SECRET_ACCESS_KEY: optionalString,
+    S3_REGION: z.string().default('auto'),
+    PUBLIC_ASSETS_BASE_URL: optionalString.pipe(z.url().optional()),
+    ASSETS_DIR: z.string().default('data/assets'),
   })
   .superRefine((e, ctx) => {
     if (e.NODE_ENV === 'production' && !e.COOKIE_SECURE) {
@@ -101,6 +112,24 @@ export const EnvSchema = z
         path: ['SMTP_HOST'],
         message: 'required when EMAIL_ENABLED=true',
       });
+    }
+    const s3 = [
+      'S3_ENDPOINT',
+      'S3_BUCKET',
+      'S3_ACCESS_KEY_ID',
+      'S3_SECRET_ACCESS_KEY',
+      'PUBLIC_ASSETS_BASE_URL',
+    ] as const;
+    const s3Set = s3.filter((k) => e[k] !== undefined);
+    if (s3Set.length > 0 && s3Set.length < s3.length) {
+      for (const k of s3.filter((key) => e[key] === undefined)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [k],
+          message:
+            'S3 storage needs all of S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY and PUBLIC_ASSETS_BASE_URL',
+        });
+      }
     }
     if (e.COOKIE_SECURE && e.COOKIE_DOMAIN) {
       ctx.addIssue({

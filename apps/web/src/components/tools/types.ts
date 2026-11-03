@@ -98,6 +98,8 @@ export interface ToolContext {
   markerProps(): { kind: MarkerKind; number?: number; label?: string };
   /** circle tool: a zone preset radius (world units) armed in the style bar, or null */
   presetRadius(): number | null;
+  /** arrow tool: the style bar's double-headed toggle (Phase 11) */
+  arrowDoubleHeaded(): boolean;
 
   // ---- select & eraser (Phase 6B) --------------------------------------------------------
   /** elements, layers and zoom for hit-testing */

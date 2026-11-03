@@ -55,4 +55,18 @@ describe('buildCsp', () => {
       'https://o1.ingest.sentry.io',
     ]);
   });
+
+  it('adds the thumbnail storage origin to img-src only (Phase 11)', () => {
+    const d = directives(
+      buildCsp({
+        nonce: 'n',
+        dev: false,
+        tilesBaseUrl: '/tiles',
+        assetsBaseUrl: 'https://assets.example.com/x',
+      }),
+    );
+    expect(d['img-src']).toContain('https://assets.example.com');
+    expect(d['connect-src']).not.toContain('assets.example.com');
+    expect(buildCsp({ nonce: 'n', dev: false, tilesBaseUrl: '/tiles' })).not.toContain('assets');
+  });
 });

@@ -16,27 +16,36 @@ export function MapThumb({
   className,
   variant = 'thumb',
   priority = false,
+  src,
 }: {
   mapId: MapId;
   className?: string;
   variant?: 'thumb' | 'card';
+  /** a board thumbnail (Phase 11); falls back to the map image when missing or broken */
+  src?: string | null;
   /** above the fold and likely the LCP (the first dashboard card): fetch first, never lazy */
   priority?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const [customFailed, setCustomFailed] = useState(false);
+  const custom = src && !customFailed ? src : null;
   return (
     <div className={cn('relative overflow-hidden bg-surface-2', className)}>
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element -- static tile asset, no optimisation wanted
         <img
-          src={`${tilesBase}/${variant === 'card' ? MAPS[mapId].card : MAPS[mapId].thumbnail}`}
+          src={
+            custom ??
+            `${tilesBase}/${variant === 'card' ? MAPS[mapId].card : MAPS[mapId].thumbnail}`
+          }
           alt=""
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
           {...(priority ? { fetchPriority: 'high' as const } : {})}
           className="size-full object-cover"
           onError={() => {
-            setFailed(true);
+            if (custom) setCustomFailed(true);
+            else setFailed(true);
           }}
         />
       )}

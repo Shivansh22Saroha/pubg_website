@@ -13,6 +13,7 @@ rooms 1──* room_bans *──1 users
 rooms 1──* boards 1──* layers 1──* elements
                   boards 1──* board_ops
                   boards 1──* snapshots
+                  boards 1──1 share_links (optional)
 rooms 1──* chat_messages *──1 users (author, nullable after deletion)
 users / rooms 1──* audit_logs
 ```
@@ -123,7 +124,7 @@ PK `(room_id, user_id)`. Written by `DELETE /rooms/:roomId/members/:userId { ban
 | position | int | NOT NULL (tab order) |
 | last_seq | bigint | NOT NULL default 0 |
 | element_count | int | NOT NULL default 0, CHECK ≤ 5000 |
-| thumbnail_key | text | NULL (object storage key) |
+| thumbnail_key | text | NULL (object storage key `thumbnails/<boardId>/<random>.jpg`, Phase 11; replaced per upload without touching `updated_at`) |
 | created_by | uuid | FK → users SET NULL |
 | created_at / updated_at | timestamptz | NOT NULL |
 Index `(room_id, position)`. App-level limit 20 boards per room.
@@ -205,12 +206,24 @@ Index `(room_id, id DESC)`. CHECK ping fields all null or all set (board may lat
 | id uuid PK | actor_id uuid NULL | room_id uuid NULL | action varchar(48) (e.g. `room.kick`, `role.change`, `auth.login_failed`, `snapshot.restore`) | target_id uuid NULL | meta jsonb | ip_hash char(64) NULL | created_at |
 Index `(room_id, created_at DESC)`, `(actor_id, created_at DESC)`. Retention 90 days.
 
+### 3.14 `share_links` (Phase 11)
+| Column | Type | Constraints |
+|---|---|---|
+| id | uuid | PK |
+| board_id | uuid | FK → boards CASCADE, UNIQUE (one link per board; regenerate replaces the token in place) |
+| token_hash | char(64) | NOT NULL UNIQUE, CHECK `~ '^[0-9a-f]{64}$'` — SHA-256 hex of the 128-bit token; the token itself is never stored |
+| created_by | uuid | NULL FK → users SET NULL |
+| expires_at | timestamptz | NULL (never) |
+| created_at | timestamptz | NOT NULL (reset on regenerate) |
+Index `(expires_at)` for the hourly `expireShareLinks` job, which deletes expired rows. Revoke is a hard delete (audit rows keep the history).
+
 ## 4. JSON shapes (validated by Zod in `packages/shared`, world units = cm)
 ```ts
 type Pt = [x: number, y: number];          // integers 0..worldSize
 STROKE  geometry: { points: Pt[] }          // 2..2000 points, pre-simplified on client
 LINE    geometry: { points: [Pt, Pt] }
 ARROW   geometry: { points: Pt[] }          // 2..50 points (bends)
+        props: { doubleHeaded?: boolean }     // Phase 11 (strict; {} = one head)
 CIRCLE  geometry: { center: Pt, r: number } // r 100..600000
 POLYGON geometry: { points: Pt[] }          // 3..200
 TEXT    geometry: { at: Pt }   props: { text: string(1..120), size: 'sm'|'md'|'lg' }

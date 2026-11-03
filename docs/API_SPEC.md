@@ -44,7 +44,7 @@ Cursor-based: `?limit=50&before=<id>` → response `{ items: [...], nextCursor: 
 PublicUser = { id, username, displayName, ign: string|null, avatarColor }
 Me         = PublicUser & { email, emailVerified: boolean, createdAt }
 RoomSummary= { id, name, description, role: 'OWNER'|'EDITOR'|'VIEWER', memberCount, onlineCount,
-               boardCount, lastActivityAt, thumbnailUrl: string|null, hasPassword: boolean,
+               boardCount, lastActivityAt, thumbnailUrl: string|null /* Phase 11: the primaryMapId board's thumbnail */, hasPassword: boolean,
                primaryMapId: 'erangel'|'miramar'|'rondo' /* map of the most recently updated board */ }
 Member     = { user: PublicUser, role, joinedAt, online: boolean }
 Board      = { id, roomId, name, mapId: 'erangel'|'miramar'|'rondo', position, elementCount, updatedAt }
@@ -138,6 +138,16 @@ Snapshot notes (Phase 8): saving / restoring needs `board.manage` (OWNER / EDITO
 
 Layer and element mutations go through **Socket.IO only** (§7).
 
+### 5b. Share links (Phase 11)
+| Method & path | Role | Body | Success |
+|---|---|---|---|
+| `GET /boards/:boardId/share` | OWNER, EDITOR | – | `{ share: { createdAt, expiresAt: string\|null } \| null }` — never the token |
+| `POST /boards/:boardId/share` | OWNER, EDITOR | `{ expiresIn: '24h'\|'7d'\|'30d'\|'never' }` (strict) | `201 { share, url }`, `Cache-Control: no-store`. Creates the board's link, or **regenerates** it: a new token replaces the old one, which stops working at once. The only response that carries the URL |
+| `DELETE /boards/:boardId/share` | OWNER, EDITOR | – | `204` (revoke; a board without a link is a no-op) |
+| `GET /public/share/:token` | – (public) | – | `{ board, layers, elements, expiresAt }` — the board **as it is now**, same shape as a demo board (§8): no `roomId`, `createdBy` / `updatedBy: null`, no member names. 30 / min / IP, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` |
+
+Notes: permission `board.share` (OWNER / EDITOR); non-members `404`, viewers `403`. One link per board. The token is 16 random bytes, base64url (22 chars, `ShareTokenSchema`); only its SHA-256 is stored, so the URL `{APP_ORIGIN}/s/{token}` can't be shown again — the dialog offers Regenerate. A malformed token → `400`; unknown, revoked, regenerated-away, expired, or a deleted room → the same `404 NOT_FOUND` "This link is invalid or has expired". Create / regenerate / revoke write audit rows (`share.create`, `share.regenerate`, `share.revoke`). The API's request log masks the token (`/public/share/[redacted]`). An hourly job deletes expired links.
+
 ## 6. Chat (REST part)
 | Method & path | Role | Query | Success |
 |---|---|---|---|
@@ -189,7 +199,7 @@ Implementation notes (Phase 5A/5B):
 | `layer:reorder` | `{ opId, boardId, order: layerId[] }` | `{ seq }` | |
 | `layer:clear` | `{ opId, boardId, layerId }` | `{ seq }` | |
 | `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | a ping to another room's (or a missing) board, or outside that board's map → `VALIDATION_ERROR` (never revealing whether the board exists); body: NFC, control chars stripped except `\n`, trimmed, 1–500 code points; `room.interact` (viewers too) after `room:join`; ping board must be in this room and the point inside its map (`VALIDATION_ERROR`); 5 / 10 s per socket (`RATE_LIMITED`); a resent `clientId` returns the stored message and is not broadcast again |
-| `chat:typing` | `{ roomId }` | – | volatile, ≤ 1 / 2 s — **P2, not handled yet** |
+| `chat:typing` | `{ roomId }` | – (no ack, volatile) | Phase 11: relayed as `chat:typing { userId }` to the rest of the room (not the sender), at most once per 2 s per socket (extras dropped). Only after `room:join` of that room and while a member (`room.interact`, viewers too); invalid / over-cap / foreign-room packets are dropped silently. Receivers show "X is typing…" for 4 s after the last event, or until X's message arrives |
 | `cursor:move` | `{ boardId, x, y }` | – (no ack, volatile) | ≤ 20 Hz |
 | `stroke:preview` | `{ boardId, tempId, points: Pt[], style }` | – volatile, best-effort | only new points since last; ≤ 20 Hz |
 | `laser:point` | `{ boardId, x, y }` | – volatile | |
@@ -198,7 +208,7 @@ Implementation notes (Phase 5A/5B):
 | `summon` | `{ boardId }` | – | asks all to follow you; permission `board.edit` (OWNER/EDITOR). Receivers start following **immediately** and may opt out ("Don't follow", 5 s) |
 | `presence:heartbeat` | `{ roomId, boardId, idle: boolean }` | – | every 20 s |
 
-`ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly.
+`ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly. Phase 11: an ARROW's `props` may carry `doubleHeaded: true` (strict; anything else → `VALIDATION_ERROR`).
 
 ### 7.3 Server → client
 | Event | Payload |
@@ -239,7 +249,8 @@ Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violati
 | `GET /api/health` | `{ status: 'ok', db: 'ok', redis: 'ok', version }` |
 | `GET /api/v1/maps` | static map registry `{ items: [{ id, name, worldSize, tileBaseUrl: { labels, clean }, maxNativeZoom, thumbnailUrl }] }` |
 | `GET /api/v1/public/demo-boards` | read-only demo boards for `/explore`: `{ items: [{ board, layers, elements }] }`, no auth, rate-limited 30 / min / IP, `Cache-Control: public, max-age=300`. Only boards whose id is in `DEMO_BOARD_IDS` (≤ 3, env order; ids that don't exist or whose room is deleted are skipped; unset → `{ items: [] }`). The id list never comes from the request. Nothing points back at a room or a person: `board` has no `roomId`, elements have `createdBy` / `updatedBy: null` |
-| `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+, `image/jpeg` body ≤ 100 KB, 256×256 (server re-encodes with sharp and stores in object storage) — P1 |
+| `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+ (`board.edit`), raw `image/jpeg` body ≤ 100 KB, exactly 256×256 → `200 { thumbnailUrl }`. The server checks the JPEG magic bytes, decodes with sharp (pixel cap), re-encodes (q80, metadata stripped) and stores it under a fresh random key `thumbnails/<boardId>/<128-bit>.jpg`, then deletes the previous one; `boards.updated_at` is not touched. Other content types → `415 BAD_REQUEST`; > 100 KB → `413 PAYLOAD_TOO_LARGE`; not a 256×256 JPEG → `400 VALIDATION_ERROR`; viewers `403`, non-members `404` (Phase 11) |
+| `GET /api/v1/assets/thumbnails/:boardId/:file` | public; the **local** storage backend only (dev / tests): serves a stored thumbnail (`image/jpeg`, immutable cache). Keys are unguessable like the R2 URLs; anything not shaped like a key we write → `400` / `404` (Phase 11) |
 | `GET /metrics` | Prometheus, **internal network only** (Caddy never routes it). Process defaults, `http_request_duration_seconds{method,route,status}`, `socketio_connected_clients`. With `METRICS_TOKEN` set it also needs `Authorization: Bearer <token>`; a missing or wrong token gets `404` (Phase 10) |
 
 ## 9. Example: create a room

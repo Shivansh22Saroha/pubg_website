@@ -244,3 +244,14 @@ export const RoomMemberParamsSchema = z.strictObject({ roomId: z.uuid(), userId:
 export const RoomInviteParamsSchema = z.strictObject({ roomId: z.uuid(), inviteId: z.uuid() });
 export const BoardParamsSchema = z.strictObject({ boardId: z.uuid() });
 export const InviteCodeParamsSchema = z.strictObject({ code: InviteCodeSchema });
+
+// ---- board thumbnails (Phase 11) -----------------------------------------------------------
+
+/** `PUT /boards/:boardId/thumbnail`: a 256×256 JPEG, ≤ 100 KB, re-encoded by the server. */
+export const THUMBNAIL = { size: 256, maxBytes: 100 * 1024, quality: 0.8 } as const;
+export const ThumbnailResponseSchema = z.object({ thumbnailUrl: z.string() });
+/** local storage backend: `GET /api/v1/assets/thumbnails/:boardId/:file` */
+export const AssetParamsSchema = z.strictObject({
+  boardId: z.uuid(),
+  file: z.string().regex(/^[A-Za-z0-9_-]{22}\.jpg$/),
+});

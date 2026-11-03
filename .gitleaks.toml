@@ -1,0 +1,14 @@
+# gitleaks (CI security job, SECURITY §8): the default rules, plus a narrow allowlist for
+# public test vectors. Every entry must be a value that is not and never was a credential.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public test vectors in test files: AWS's documented SigV4 example key pair (apps/server/test/unit/storage.test.ts) and a made-up share-link token"
+condition = "AND"
+paths = ['''(^|/)test/[^/]+\.test\.ts$''']
+regexes = [
+  '''^AKIAIOSFODNN7EXAMPLE$''',
+  '''^wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY$''',
+  '''^AbCdEfGhIjKlMnOpQr_-12$''',
+]

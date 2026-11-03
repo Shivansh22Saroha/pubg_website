@@ -32,6 +32,7 @@ class Fake {
   previews: string[] = [];
   textOpen: Pt | null = null;
   preset: number | null = null;
+  doubleHeaded = false;
   allowed = true;
   measure: MeasureLine | null = null;
 
@@ -63,6 +64,7 @@ class Fake {
       textSize: () => 'lg',
       markerProps: () => ({ kind: 'enemy_squad', number: 3, label: 'Pochinki boys' }),
       presetRadius: () => this.preset,
+      arrowDoubleHeaded: () => this.doubleHeaded,
       scene: () => ({ elements: {}, layers: [], hidden: {}, worldPerPx: K, textScale: 1 }),
       canEdit: () => true,
       selection: () => [],
@@ -166,6 +168,22 @@ describe('Arrow', () => {
       [50_000, 0],
       [50_000, 50_000],
     ]);
+  });
+
+  it('the style bar toggle makes it double-headed (Phase 11); off by default', () => {
+    const arrow = new ArrowTool(fake.ctx());
+    const draw = () => {
+      arrow.onPointerDown(p(0, 0));
+      arrow.onPointerUp(p(0, 0));
+      arrow.onPointerDown(p(40_000, 0));
+      arrow.onPointerUp(p(40_000, 0));
+      arrow.onKeyDown({ key: 'Enter', shiftKey: false });
+    };
+    draw();
+    expect(fake.commits[0]?.props).toEqual({});
+    fake.doubleHeaded = true;
+    draw();
+    expect(fake.commits[1]?.props).toEqual({ doubleHeaded: true });
   });
 
   it('double-click finishes (its second click is not a new vertex)', () => {

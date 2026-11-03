@@ -2,6 +2,7 @@
  * Dev / E2E-only debug hook (`window.__rlDebug`). Only ever reached through a dynamic import
  * behind a build-time constant (see RoomWorkspace), so production bundles don't contain it.
  */
+import { flushThumbnail } from '@/hooks/useThumbnailUploader';
 import { MAPS, MARKER_KINDS, type ElementInput, type MapId } from '@rotationlab/shared';
 import { v7 as uuid } from 'uuid';
 import type { RoomSession } from '@/lib/realtime/roomSession';
@@ -33,6 +34,8 @@ export interface RlDebug {
   emit(event: string, payload: unknown): Promise<unknown>;
   /** user ids with a live laser trail on this board */
   laserUsers(): string[];
+  /** run the armed board-thumbnail upload now (Phase 11); false when none is armed */
+  flushThumbnail(): Promise<boolean>;
 }
 
 declare global {
@@ -192,6 +195,7 @@ export function installRlDebug(session: RoomSession, mapId: MapId): () => void {
       return { undo: h?.undo.length ?? 0, redo: h?.redo.length ?? 0 };
     },
     laserUsers: () => Object.keys(useLaserStore.getState().trails),
+    flushThumbnail,
     emit: (event, payload) =>
       (
         getSocket().timeout(5_000) as unknown as {

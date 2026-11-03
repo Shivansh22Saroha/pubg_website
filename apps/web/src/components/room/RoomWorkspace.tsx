@@ -32,6 +32,7 @@ import { isTouchLayout, useBreakpoint } from '@/hooks/useBreakpoint';
 import { useMe } from '@/hooks/useMe';
 import { env } from '@/env';
 import { useRoomRealtime } from '@/hooks/useRoomRealtime';
+import { useThumbnailUploader } from '@/hooks/useThumbnailUploader';
 import { ApiError } from '@/lib/api';
 import { loadDebugHook } from '@/lib/debug/loadDebugHook';
 import { makeNameOf } from '@/lib/editing';
@@ -111,6 +112,13 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
     setPicked(id);
     writePref(prefKeys.lastBoard(roomId), id);
   };
+
+  // Phase 11: 30 s after my last edit, refresh the board's dashboard thumbnail
+  useThumbnailUploader(
+    active?.id,
+    active?.mapId,
+    query.data ? can(query.data.room.role, 'board.edit') : false,
+  );
 
   const { session, onCursor } = useRoomRealtime(roomId, me.data?.id, active?.id, {
     onKicked: () => {

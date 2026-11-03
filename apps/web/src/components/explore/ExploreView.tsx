@@ -1,14 +1,13 @@
 'use client';
 
 import { MAPS } from '@rotationlab/shared';
-import { Ruler } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { exploreBoards, useDemoBoards } from '@/lib/explore';
-import { shortcutsBlocked } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
+import { MEASURE_HINT, MeasureButton, useMeasureToggle } from './MeasureToggle';
 
 // Leaflet touches `window` at import time → client-only, and kept out of every other bundle.
 const ExploreMap = dynamic(() => import('./ExploreMap'), {
@@ -27,23 +26,9 @@ export function ExploreView() {
   const demo = useDemoBoards();
   const boards = useMemo(() => exploreBoards(demo.data ?? []), [demo.data]);
   const [index, setIndex] = useState(0);
-  const [measuring, setMeasuring] = useState(false);
+  const [measuring, setMeasuring] = useMeasureToggle();
   const board = boards[index] ?? boards[0];
   const bare = demo.isSuccess && demo.data.length === 0;
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (shortcutsBlocked(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === 'r' || e.key === 'R') {
-        setMeasuring((m) => !m);
-        e.preventDefault();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-    };
-  }, []);
 
   return (
     <>
@@ -68,25 +53,16 @@ export function ExploreView() {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          aria-pressed={measuring}
-          aria-label="Measure"
-          title="Measure (R)"
-          data-testid="explore-measure"
-          onClick={() => {
+        <MeasureButton
+          measuring={measuring}
+          testId="explore-measure"
+          onToggle={() => {
             setMeasuring((m) => !m);
           }}
-          className={cn(
-            'ml-auto flex h-9 items-center gap-1.5 rounded-control px-3 text-[13px] font-medium pointer-coarse:h-11',
-            measuring ? 'bg-accent text-accent-fg' : 'text-text-muted hover:bg-surface-2',
-          )}
-        >
-          <Ruler className="size-4" aria-hidden /> Measure
-        </button>
+        />
         <p className="w-full text-xs text-text-muted" aria-live="polite">
           {measuring
-            ? 'Click points to measure · double-click or Enter to finish · Backspace removes a point · Esc clears'
+            ? MEASURE_HINT
             : bare
               ? 'No demo boards are set up here — showing the bare maps.'
               : board?.name

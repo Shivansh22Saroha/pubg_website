@@ -14,6 +14,7 @@ import {
   PASSWORD,
   prisma,
   setupRoom,
+  thumbJpeg,
   useCleanState,
   type RoomFixture,
 } from './harness.js';
@@ -40,12 +41,17 @@ interface Ctx {
   messageId: string;
   /** a snapshot saved by the editor (delete: author or owner) */
   snapshotId: string;
+  /** the board's public share token (Phase 11) */
+  shareToken: string;
+  /** a 256×256 JPEG, and the URL of the board's stored thumbnail (Phase 11) */
+  jpeg: Buffer;
+  thumbnailUrl: string;
 }
 
 interface Row {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   url: string;
-  request: (ctx: Ctx) => { url: string; payload?: object };
+  request: (ctx: Ctx) => { url: string; payload?: object; headers?: Record<string, string> };
   expect: Expect;
 }
 
@@ -399,6 +405,51 @@ const MATRIX: Row[] = [
     request: () => ({ url: '/api/v1/public/demo-boards' }),
     expect: everyone(200), // no auth; only DEMO_BOARD_IDS are served (public-demo.test.ts)
   },
+  // ---- thumbnails (Phase 11) -----------------------------------------------------------
+  {
+    method: 'PUT',
+    url: '/api/v1/boards/:boardId/thumbnail',
+    request: ({ f, jpeg }) => ({
+      url: `/api/v1/boards/${f.boardId}/thumbnail`,
+      payload: jpeg,
+      headers: { 'content-type': 'image/jpeg' },
+    }),
+    expect: room(403, 200, 200),
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/assets/thumbnails/:boardId/:file',
+    request: ({ thumbnailUrl }) => ({ url: thumbnailUrl }),
+    expect: everyone(200), // unguessable 128-bit key, like the S3 URLs (thumbnails.test.ts)
+  },
+  // ---- share links (Phase 11) ---------------------------------------------------------
+  {
+    method: 'GET',
+    url: '/api/v1/boards/:boardId/share',
+    request: ({ f }) => ({ url: `/api/v1/boards/${f.boardId}/share` }),
+    expect: room(403, 200, 200),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/boards/:boardId/share',
+    request: ({ f }) => ({
+      url: `/api/v1/boards/${f.boardId}/share`,
+      payload: { expiresIn: '7d' },
+    }),
+    expect: room(403, 201, 201),
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/boards/:boardId/share',
+    request: ({ f }) => ({ url: `/api/v1/boards/${f.boardId}/share` }),
+    expect: room(403, 204, 204),
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/public/share/:token',
+    request: ({ shareToken }) => ({ url: `/api/v1/public/share/${shareToken}` }),
+    expect: everyone(200), // the token is the only credential (share.test.ts)
+  },
   {
     method: 'GET',
     url: '/api/v1/config',
@@ -475,8 +526,22 @@ async function context(): Promise<Ctx> {
   const snapshot = await call(app, f.editor.jar, 'POST', `/api/v1/boards/${f.boardId}/snapshots`, {
     name: 'Plan A',
   });
+  const share = await call(app, f.owner.jar, 'POST', `/api/v1/boards/${f.boardId}/share`, {
+    expiresIn: 'never',
+  });
+  const jpeg = await thumbJpeg();
+  const thumb = await app.inject({
+    method: 'PUT',
+    url: `/api/v1/boards/${f.boardId}/thumbnail`,
+    headers: { ...CSRF, 'content-type': 'image/jpeg' },
+    cookies: f.owner.jar.cookies,
+    payload: jpeg,
+  });
   return {
     f,
+    jpeg,
+    thumbnailUrl: thumb.json<{ thumbnailUrl: string }>().thumbnailUrl,
+    shareToken: share.json<{ url: string }>().url.split('/s/')[1] ?? '',
     messageId: message.id,
     snapshotId: snapshot.json<{ snapshot: { id: string } }>().snapshot.id,
     spareBoardId: spare.json<{ board: { id: string } }>().board.id,
@@ -505,11 +570,11 @@ describe('authz matrix', () => {
     for (const caller of CALLERS) {
       it(`${row.method} ${row.url} as ${caller} → ${row.expect[caller]}`, async () => {
         const ctx = await context();
-        const { url, payload } = row.request(ctx);
+        const { url, payload, headers } = row.request(ctx);
         const res = await app.inject({
           method: row.method,
           url,
-          headers: row.method === 'GET' ? {} : CSRF,
+          headers: { ...(row.method === 'GET' ? {} : CSRF), ...headers },
           cookies: caller === 'anonymous' ? {} : ctx.f[caller].jar.cookies,
           ...(payload ? { payload } : {}),
         });

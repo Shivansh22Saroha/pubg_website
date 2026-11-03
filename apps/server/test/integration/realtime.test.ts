@@ -188,6 +188,29 @@ describe('element ops (ARCHITECTURE §7.2)', () => {
     expect((await prisma.element.findUniqueOrThrow({ where: { id: el.id } })).seq).toBe(1n);
   });
 
+  it('double-headed arrows (Phase 11): stored and broadcast; a bad flag is rejected', async () => {
+    const l = await live();
+    const toOwner = collect(l.owner, 'board:op');
+    const el = { ...arrow(l.f.boardId, l.layerIds[0]!), props: { doubleHeaded: true } };
+    const res = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: el,
+    });
+    expect(res).toMatchObject({ ok: true });
+    await sleep(150);
+    expect(toOwner[0]).toMatchObject({ op: { element: { props: { doubleHeaded: true } } } });
+    expect((await prisma.element.findUniqueOrThrow({ where: { id: el.id } })).props).toEqual({
+      doubleHeaded: true,
+    });
+    const bad = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: { ...el, props: { doubleHeaded: 'yes' } },
+    });
+    expect(bad).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
+  });
+
   it('a viewer emitting via the raw socket is rejected: nothing broadcast, DB unchanged', async () => {
     const l = await live();
     const toOwner = collect(l.owner, 'board:op');

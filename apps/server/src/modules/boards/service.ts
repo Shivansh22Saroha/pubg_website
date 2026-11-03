@@ -10,6 +10,7 @@ import type { z } from 'zod';
 import { AppError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
 import type { AuthUser } from '../../lib/policy.js';
+import type { AssetStorage } from '../../lib/storage.js';
 import type { RoomEvents } from '../rooms/events.js';
 import { fromMapId, toBoard, toLayer } from '../rooms/mappers.js';
 import type { RoomPolicy } from '../rooms/policy.js';
@@ -20,6 +21,8 @@ export interface BoardServiceDeps {
   prisma: PrismaClient;
   policy: RoomPolicy;
   events: RoomEvents;
+  /** to delete a deleted board's thumbnail (Phase 11) */
+  assets?: AssetStorage;
 }
 
 /** Rewrites positions 0…n-1 in the given order. */
@@ -166,6 +169,7 @@ export function createBoardService(d: BoardServiceDeps) {
         );
       });
       events.emit('board:deleted', { roomId: board.roomId, boardId, name: board.name });
+      if (board.thumbnailKey) d.assets?.remove(board.thumbnailKey).catch(() => undefined);
     },
 
     /** REST fallback of `board:subscribe` (API_SPEC §5) — used by PNG export / thumbnails. */
