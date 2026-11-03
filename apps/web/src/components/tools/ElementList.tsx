@@ -1,6 +1,15 @@
 'use client';
 
-import { can, type Member, type MarkerKind, type RoomRole } from '@rotationlab/shared';
+import {
+  MAPS,
+  can,
+  elementAnchor,
+  gridRef,
+  type Board,
+  type Member,
+  type MarkerKind,
+  type RoomRole,
+} from '@rotationlab/shared';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { editorActions, makeNameOf, type EditSink } from '@/lib/editing';
@@ -8,6 +17,7 @@ import type { ViewElement } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { useToolStore } from '@/stores/toolStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { deleteChanges } from './scene';
 import { MARKER_LABELS } from './Toolbar';
 
@@ -34,23 +44,35 @@ export function elementLabel(el: Pick<ViewElement, 'type' | 'props'>): string {
 
 const PAGE = 100;
 
+/** "F-M 4,7" for an element, '' when it has no position on the map. */
+export function elementLocation(el: Pick<ViewElement, 'geometry'>, worldSize: number): string {
+  const at = elementAnchor(el.geometry);
+  return at ? (gridRef(at, worldSize)?.label ?? '') : '';
+}
+
 /**
- * Element list (UI_UX_SPEC §10, P2): the board as a table — type, label, layer, author — with
- * Select and Delete, for keyboard and screen-reader users. Same rules as the map: hidden-for-me
- * layers are listed but marked, locked layers can't be edited, viewers only select.
+ * Element list (UI_UX_SPEC §10, P2): the board as a table — type, label, location, layer,
+ * author — for keyboard and screen-reader users. **Show** (every role) centres the map on the
+ * element like a ping chip; Select and Delete follow the map's rules (Editor+, unlocked layers).
  */
 export function ElementList({
   role,
   session,
   members,
   meId,
+  boards,
 }: {
   role: RoomRole;
   session: EditSink | null;
   members: Member[];
   meId: string;
+  /** the room's boards — the active one's map gives grid refs */
+  boards: Board[];
 }) {
   const elements = useBoardStore((s) => s.view.elements);
+  const boardId = useBoardStore((s) => s.boardId);
+  const mapId = boards.find((b) => b.id === boardId)?.mapId;
+  const worldSize = mapId ? MAPS[mapId].worldSize : null;
   const layers = useBoardStore((s) => s.view.layers);
   const selected = useSelectionStore((s) => s.ids);
   const [limit, setLimit] = useState(PAGE);
@@ -82,19 +104,22 @@ export function ElementList({
         <caption className="sr-only">Elements on this board ({rows.length})</caption>
         <thead className="text-text-muted">
           <tr>
-            <th scope="col" className="w-[22%] px-1 py-1 font-medium">
+            <th scope="col" className="w-[17%] px-1 py-1 font-medium">
               Type
             </th>
             <th scope="col" className="px-1 py-1 font-medium">
               Label
             </th>
-            <th scope="col" className="w-[20%] px-1 py-1 font-medium">
+            <th scope="col" className="w-[17%] px-1 py-1 font-medium">
+              Location
+            </th>
+            <th scope="col" className="w-[14%] px-1 py-1 font-medium">
               Layer
             </th>
-            <th scope="col" className="w-[18%] px-1 py-1 font-medium">
+            <th scope="col" className="w-[13%] px-1 py-1 font-medium">
               Author
             </th>
-            <th scope="col" className="w-[30%] px-1 py-1 font-medium">
+            <th scope="col" className="w-[24%] px-1 py-1 font-medium">
               <span className="sr-only">Actions</span>
             </th>
           </tr>
@@ -106,10 +131,15 @@ export function ElementList({
             const name = `${TYPE_NAMES[el.type]} ${label === '—' ? '' : label}`.trim();
             const canDelete = edit && layer !== undefined && !layer.locked;
             const isSelected = selected.includes(el.id);
+            const at = elementAnchor(el.geometry);
+            const where = worldSize ? elementLocation(el, worldSize) : '';
             return (
               <tr key={el.id} className="border-t">
                 <td className="truncate px-1 py-1">{TYPE_NAMES[el.type]}</td>
                 <td className="truncate px-1 py-1">{label}</td>
+                <td className="truncate px-1 py-1 font-mono" data-testid="element-location">
+                  {where}
+                </td>
                 <td className="truncate px-1 py-1">
                   {layer?.name ?? ''}
                   {layer?.locked && <span className="sr-only"> (locked)</span>}
@@ -117,6 +147,21 @@ export function ElementList({
                 <td className="truncate px-1 py-1">{nameOf(el.createdBy)}</td>
                 <td className="px-1 py-1">
                   <span className="flex justify-end gap-1">
+                    {at && boardId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        aria-label={`Show ${name}${where ? ` at ${where}` : ''} on the map`}
+                        onClick={() => {
+                          useWorkspaceStore
+                            .getState()
+                            .requestFocus({ boardId, x: at[0], y: at[1] });
+                        }}
+                      >
+                        Show
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"

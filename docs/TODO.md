@@ -148,6 +148,14 @@ Split (2026-11-03, no staging/production servers yet): **10A** is everything tha
 **Exit:** lint / typecheck / check:deps / unit / integration / E2E green; both authz matrices complete; frame-time benchmark A/B no regression; realtime smoke run; docs + CHANGELOG updated.
 _Status 2026-11-03: met — unit 121 + 71 + 219, integration 552, E2E 53 (+6 in `phase11.spec.ts`); REST matrix 57 routes × 5 callers, socket matrix +`chat:typing`; frame time A/B and dashboard Lighthouse no regression (CHANGELOG, Decisions (Phase 11)); smoke p50 18.5 / p95 23.8 ms. 10B: add the R2 `rotationlab-assets` bucket + `S3_*` / `PUBLIC_ASSETS_BASE_URL` (DEPLOYMENT §4)._
 
+## Phase 12 — P2 batch (no new services; built while 10B / Phase 0 wait)
+- [ ] Element list for screen readers (P2): the Phase 9 list (Layers → List) gains a **Location** column (grid ref, e.g. `F-M 4,7`) and a **Show** action (centre the map on the element) for every role, viewers included.
+- [ ] Link own-player markers to members (P2, FEATURES F7): an `own_player` marker can be linked to a room member; its label is that member's IGN (else display name), live. The server validates the link (a current member); public views (share link, explore) never see the member id or the auto label.
+- [ ] Curved arrows (P2): a "Curved" toggle (style bar, like double-headed) draws an arrow as a smooth curve through its bend points; rendering, hit-testing, thumbnails and export follow the curve.
+- [ ] Loot markers with PUBG item icons (P2): a `loot` marker kind whose icon is picked from PUBG's `Icons/Item` + `Icons/CarePackage` (pubg/api-assets@32b13b5) — built by the map-tiles pipeline, deployed with the tiles, fixture icons in tests, a drawn fallback when an icon is missing. Licensing: same open Phase 0 question as the map art.
+
+**Exit:** lint / typecheck / check:deps / unit / integration / E2E green; both authz matrices complete; frame-time A/B no regression; docs + CHANGELOG updated.
+
 ---
 
 ## Backlog (post-v1)
@@ -156,7 +164,7 @@ _Status 2026-11-03: met — unit 121 + 71 + 219, integration 552, E2E 53 (+6 in 
 | Discord / Google OAuth login | P1 (v1.1) |
 | ~~Public read-only share link for a board~~ — Phase 11 | P1 (v1.1) |
 | ~~Board thumbnails on dashboard (client-generated, S3)~~ — Phase 11 | P1 |
-| Element list view for screen readers | P2 |
+| ~~Element list view for screen readers~~ — built in Phase 9; location + Show in Phase 12 | P2 |
 | ~~Minimap~~ — Phase 11 | P2 |
 | ~~Typing indicator~~ — Phase 11 | P2 |
 | ~~Double-headed arrows~~ (Phase 11), curved arrows | P2 |

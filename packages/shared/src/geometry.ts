@@ -213,6 +213,17 @@ export function anchorBBox(g: AnyGeometry): BBox | null {
 }
 
 /**
+ * One point that stands for an element (Phase 12: element list location, "Show"): a marker /
+ * text's position, a circle's centre, else the centre of its points' box. Integers.
+ */
+export function elementAnchor(g: AnyGeometry): Pt | null {
+  if (g.at) return [Math.round(g.at[0]), Math.round(g.at[1])];
+  if (g.center) return [Math.round(g.center[0]), Math.round(g.center[1])];
+  const b = anchorBBox(g);
+  return b ? [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)] : null;
+}
+
+/**
  * Shrinks a translation so `box` moved by (dx, dy) stays inside 0…worldSize — the whole
  * selection moves rigidly instead of being squashed against the edge. Integers out.
  */
