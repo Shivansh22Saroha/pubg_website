@@ -6,6 +6,7 @@ import {
   pageApi,
   registerViaUi,
   serveFixtureTiles,
+  twoUsersInRoom,
   uniqueName,
 } from './fixtures';
 
@@ -217,4 +218,29 @@ test('minimap: viewport rectangle, click / drag moves the view, collapses, hidde
   await expect(p.getByTestId('map-canvas')).toBeVisible();
   await expect(p.getByTestId('minimap')).toHaveCount(0);
   await phone.close();
+});
+
+test('typing indicator: "X is typing…" for the others, gone when the message lands or after 4 s', async ({
+  browser,
+}) => {
+  const { a, b, nameA, ctxA, ctxB } = await twoUsersInRoom(browser);
+  const indicatorB = b.getByTestId('typing-indicator');
+  const input = a.getByRole('textbox', { name: 'Message' });
+  await input.click();
+  await input.pressSequentially('rotate ', { delay: 30 });
+  await expect(indicatorB).toHaveText(`${nameA} is typing…`);
+  await expect(a.getByTestId('typing-indicator')).toHaveText(''); // never yourself
+  await input.press('Enter');
+  await expect(b.getByTestId('chat-body').filter({ hasText: 'rotate' })).toBeVisible();
+  await expect(indicatorB).toHaveText('');
+
+  // a typist who stops: cleared ~4 s after the last event
+  await a.waitForTimeout(2_100); // past the 2 s send throttle
+  await input.pressSequentially('hold', { delay: 30 });
+  await expect(indicatorB).toHaveText(`${nameA} is typing…`);
+  const t0 = Date.now();
+  await expect(indicatorB).toHaveText('', { timeout: 8_000 });
+  expect(Date.now() - t0).toBeGreaterThan(2_500);
+  await ctxA.close();
+  await ctxB.close();
 });

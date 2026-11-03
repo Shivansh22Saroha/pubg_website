@@ -3,6 +3,7 @@ import {
   BoardSubscribeSchema,
   can,
   ChatSendSchema,
+  ChatTypingSchema,
   CursorMoveSchema,
   ElementBatchSchema,
   ElementDeleteSchema,
@@ -69,7 +70,11 @@ export const VOLATILE_EVENTS = [
   'stroke:preview',
   'laser:point',
   'view:update',
+  'chat:typing',
 ] as const;
+
+/** Phase 11: a socket's typing pings are relayed at most once per 2 s (FEATURES F9) */
+export const TYPING_INTERVAL_MS = 2_000;
 
 /** Serialisable per-socket state (RemoteSocket.data survives fetchSockets across instances). */
 export interface SocketData {
@@ -519,6 +524,18 @@ export function createRealtime(d: RealtimeDeps): {
     onVolatile('view:update', ViewUpdateSchema, async (p) => {
       if (await subscribedBoard(p.boardId))
         socket.volatile.to(ch.followers(user.id)).emit('view:update', { userId: user.id, ...p });
+    });
+
+    // typing indicator (Phase 11): to the rest of the room, ≤ 1 per 2 s per socket; only after
+    // room:join and while still a member (room.interact — viewers chat too)
+    let lastTyping = 0;
+    onVolatile('chat:typing', ChatTypingSchema, async ({ roomId }) => {
+      const now = Date.now();
+      if (now - lastTyping < TYPING_INTERVAL_MS) return;
+      if (!socket.data.rooms.includes(roomId)) return;
+      if (!can(await d.policy.roleOf(roomId, user.id), 'room.interact')) return;
+      lastTyping = now;
+      socket.volatile.to(ch.room(roomId)).emit('chat:typing', { userId: user.id });
     });
 
     // leaders this socket followed: their counts drop once it is gone

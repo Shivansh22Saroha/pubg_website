@@ -199,7 +199,7 @@ Implementation notes (Phase 5A/5B):
 | `layer:reorder` | `{ opId, boardId, order: layerId[] }` | `{ seq }` | |
 | `layer:clear` | `{ opId, boardId, layerId }` | `{ seq }` | |
 | `chat:send` | `{ clientId, roomId, body, ping?: { boardId, x, y } }` | `{ message: ChatMessage }` | a ping to another room's (or a missing) board, or outside that board's map → `VALIDATION_ERROR` (never revealing whether the board exists); body: NFC, control chars stripped except `\n`, trimmed, 1–500 code points; `room.interact` (viewers too) after `room:join`; ping board must be in this room and the point inside its map (`VALIDATION_ERROR`); 5 / 10 s per socket (`RATE_LIMITED`); a resent `clientId` returns the stored message and is not broadcast again |
-| `chat:typing` | `{ roomId }` | – | volatile, ≤ 1 / 2 s — **P2, not handled yet** |
+| `chat:typing` | `{ roomId }` | – (no ack, volatile) | Phase 11: relayed as `chat:typing { userId }` to the rest of the room (not the sender), at most once per 2 s per socket (extras dropped). Only after `room:join` of that room and while a member (`room.interact`, viewers too); invalid / over-cap / foreign-room packets are dropped silently. Receivers show "X is typing…" for 4 s after the last event, or until X's message arrives |
 | `cursor:move` | `{ boardId, x, y }` | – (no ack, volatile) | ≤ 20 Hz |
 | `stroke:preview` | `{ boardId, tempId, points: Pt[], style }` | – volatile, best-effort | only new points since last; ≤ 20 Hz |
 | `laser:point` | `{ boardId, x, y }` | – volatile | |

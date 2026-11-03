@@ -160,7 +160,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Ping creation: click 📍 in the chat input → cursor becomes crosshair → click map → chip attached to input; send. Shortcut: `Alt+click` anywhere on the map attaches a ping and focuses the chat input. (`P` is reserved for Pen.)
 - Ping chip text: `📍 {gridRef} · {board name}`; click → switch board if needed, fly to, pulse.
 - Pings also show a temporary pulse on the map for all users on that board when sent (3 s).
-- Typing indicator "Rudra is typing…" (P2 — not built in v1; the event contract exists).
+- Typing indicator (P2, Phase 11): "Rudra is typing…" / "A and B are typing…" / "Several people are typing…" above the input, for other members only. A client sends a volatile `chat:typing` at most every 2 s while the input has text; a name clears 4 s after its last event or when that person's message arrives. Best effort (volatile), not a live region.
 - Pings must point at a board of this room and inside that board's map; anything else is `VALIDATION_ERROR` (no hint whether a board exists).
 - Chat text: trimmed, NFC, control characters stripped except `\n`, 1–500 code points; shown as text only (no HTML, no auto-links). Viewers can chat and ping. Optimistic send with a pending state; a failed message offers Retry (same `clientId`, so never duplicated) or discard. Enter sends, Shift+Enter is a newline, a counter shows from 400 characters. Delete own messages (owner: any) from a hover menu.
 - Unread badge counts other people's **user** messages that arrive while the chat isn't on screen (panel closed → on the panel toggle; another tab → on the Chat tab). System messages don't count.

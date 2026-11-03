@@ -204,7 +204,7 @@ export interface ClientToServerEvents {
   'laser:point': (p: In<typeof LaserPointSchema>) => void;
   'view:update': (p: In<typeof ViewUpdateSchema>) => void;
   'chat:send': (p: In<typeof ChatSendSchema>, ack: Ack<{ message: ChatMessage }>) => void;
-  // TODO(p2): typing indicator — contract only, no server handler yet (FEATURES F9)
+  /** volatile, no ack: relayed to the rest of the room ≤ 1 / 2 s per socket (Phase 11) */
   'chat:typing': (p: In<typeof ChatTypingSchema>) => void;
 }
 
