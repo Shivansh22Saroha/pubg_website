@@ -40,6 +40,8 @@ interface Ctx {
   messageId: string;
   /** a snapshot saved by the editor (delete: author or owner) */
   snapshotId: string;
+  /** the board's public share token (Phase 11) */
+  shareToken: string;
 }
 
 interface Row {
@@ -399,6 +401,34 @@ const MATRIX: Row[] = [
     request: () => ({ url: '/api/v1/public/demo-boards' }),
     expect: everyone(200), // no auth; only DEMO_BOARD_IDS are served (public-demo.test.ts)
   },
+  // ---- share links (Phase 11) ---------------------------------------------------------
+  {
+    method: 'GET',
+    url: '/api/v1/boards/:boardId/share',
+    request: ({ f }) => ({ url: `/api/v1/boards/${f.boardId}/share` }),
+    expect: room(403, 200, 200),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/boards/:boardId/share',
+    request: ({ f }) => ({
+      url: `/api/v1/boards/${f.boardId}/share`,
+      payload: { expiresIn: '7d' },
+    }),
+    expect: room(403, 201, 201),
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/boards/:boardId/share',
+    request: ({ f }) => ({ url: `/api/v1/boards/${f.boardId}/share` }),
+    expect: room(403, 204, 204),
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/public/share/:token',
+    request: ({ shareToken }) => ({ url: `/api/v1/public/share/${shareToken}` }),
+    expect: everyone(200), // the token is the only credential (share.test.ts)
+  },
   {
     method: 'GET',
     url: '/api/v1/config',
@@ -475,8 +505,12 @@ async function context(): Promise<Ctx> {
   const snapshot = await call(app, f.editor.jar, 'POST', `/api/v1/boards/${f.boardId}/snapshots`, {
     name: 'Plan A',
   });
+  const share = await call(app, f.owner.jar, 'POST', `/api/v1/boards/${f.boardId}/share`, {
+    expiresIn: 'never',
+  });
   return {
     f,
+    shareToken: share.json<{ url: string }>().url.split('/s/')[1] ?? '',
     messageId: message.id,
     snapshotId: snapshot.json<{ snapshot: { id: string } }>().snapshot.id,
     spareBoardId: spare.json<{ board: { id: string } }>().board.id,

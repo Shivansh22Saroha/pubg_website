@@ -36,6 +36,8 @@ import { createMemoryMailer, createSmtpMailer, type Mailer } from './lib/mailer.
 import { createSnapshotService } from './modules/snapshots/service.js';
 import { publicRoutes } from './modules/public/routes.js';
 import { createPublicService } from './modules/public/service.js';
+import { shareRoutes } from './modules/share/routes.js';
+import { createShareService } from './modules/share/service.js';
 import { createBoardService } from './modules/boards/service.js';
 import { inviteRoutes } from './modules/invites/routes.js';
 import { createInviteService } from './modules/invites/service.js';
@@ -85,8 +87,41 @@ export const REDACT_PATHS = [
   '*.raw',
 ];
 
+/** Share-link tokens are bearer credentials in the path: never log them (Phase 11). */
+export function maskUrl(url: string): string {
+  return url.replace(/(\/public\/share\/)[^/?#]+/, '$1[redacted]');
+}
+
+/** Fastify's default request serializer, with the URL masked. */
+const serializers = {
+  req(req: {
+    method: string;
+    url: string;
+    headers: Record<string, unknown>;
+    host?: string;
+    ip?: string;
+    socket?: { remotePort?: number };
+  }) {
+    return {
+      method: req.method,
+      url: maskUrl(req.url),
+      version:
+        typeof req.headers['accept-version'] === 'string'
+          ? req.headers['accept-version']
+          : undefined,
+      host: req.host,
+      remoteAddress: req.ip,
+      remotePort: req.socket?.remotePort,
+    };
+  },
+};
+
 function loggerOptions(config: Config, stream?: LogStream): FastifyServerOptions['logger'] {
-  const base = { level: config.LOG_LEVEL, redact: { paths: REDACT_PATHS, censor: '[redacted]' } };
+  const base = {
+    level: config.LOG_LEVEL,
+    redact: { paths: REDACT_PATHS, censor: '[redacted]' },
+    serializers,
+  };
   if (stream) return { ...base, stream };
   if (config.NODE_ENV === 'test') return false;
   return config.NODE_ENV === 'development'
@@ -257,6 +292,10 @@ export async function buildApp({
   await app.register(publicRoutes, {
     prefix: '/api/v1',
     service: createPublicService({ prisma, demoBoardIds: config.DEMO_BOARD_IDS }),
+  });
+  await app.register(shareRoutes, {
+    prefix: '/api/v1',
+    share: createShareService({ prisma, policy, appOrigin: config.APP_ORIGIN }),
   });
 
   // ---- realtime (Socket.IO on the same HTTP server, path /realtime) -------------------

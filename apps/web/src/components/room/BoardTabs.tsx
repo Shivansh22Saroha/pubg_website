@@ -19,6 +19,7 @@ import { ApiError } from '@/lib/api';
 import { useCreateBoard, useDeleteBoard, useUpdateBoard } from '@/lib/rooms';
 import { cn } from '@/lib/utils';
 import { usePresenceStore } from '@/stores/presenceStore';
+import { ShareDialog } from './ShareDialog';
 
 type DialogState =
   { kind: 'new' } | { kind: 'rename'; board: Board } | { kind: 'delete'; board: Board } | null;
@@ -58,6 +59,8 @@ export function BoardTabs({
   const remove = useDeleteBoard(roomId);
   const canManage = can(role, 'board.manage');
   const canDelete = can(role, 'board.delete');
+  const canShare = can(role, 'board.share');
+  const [shareBoard, setShareBoard] = useState<Board | null>(null);
   const fail = (err: unknown) =>
     toast.error(err instanceof ApiError ? err.message : 'Something went wrong');
 
@@ -142,6 +145,15 @@ export function BoardTabs({
               >
                 Snapshots…
               </DropdownMenuItem>
+              {canShare && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setShareBoard(current);
+                  }}
+                >
+                  Share link…
+                </DropdownMenuItem>
+              )}
               {canManage && (
                 <>
                   <DropdownMenuSeparator />
@@ -207,6 +219,16 @@ export function BoardTabs({
           </button>
         )}
       </div>
+
+      {shareBoard && (
+        <ShareDialog
+          board={shareBoard}
+          open
+          onOpenChange={(o) => {
+            if (!o) setShareBoard(null);
+          }}
+        />
+      )}
 
       <Dialog
         open={dialog !== null}

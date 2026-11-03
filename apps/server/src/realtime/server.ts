@@ -211,20 +211,21 @@ export function createRealtime(d: RealtimeDeps): {
     })();
   });
 
+  let closing = false;
+
   // ---- presence broadcast ---------------------------------------------------------------
   /** Never rejects (it is often fire-and-forget): a Redis failure is logged, not thrown. */
   async function broadcastPresence(roomId: string) {
     try {
-      io.to(ch.room(roomId)).emit('presence:update', {
-        roomId,
-        users: await presence.list(roomId),
-      });
+      const users = await presence.list(roomId);
+      // shutting down: the adapter would publish on Redis clients that are quitting, and its
+      // rejected publish isn't returned to us (seen as unhandled "Connection is closed")
+      if (closing) return;
+      io.to(ch.room(roomId)).emit('presence:update', { roomId, users });
     } catch (err) {
       log.warn({ err, roomId }, 'presence broadcast failed');
     }
   }
-
-  let closing = false;
 
   /** Tells a leader (all their sockets) how many sockets follow them — never rejects. */
   async function notifyFollowers(leaderId: string, only?: RtSocket) {

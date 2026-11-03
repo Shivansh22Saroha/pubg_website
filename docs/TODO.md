@@ -138,6 +138,15 @@ Split (2026-11-03, no staging/production servers yet): **10A** is everything tha
 - [ ] Uptime monitoring (`/api/health` every minute → Discord); Sentry DSNs set.
 - [ ] Phase 0 closed (legal text, name/domain) → tag `v1.0.0`, update CHANGELOG.
 
+## Phase 11 — v1.1 (P1/P2 backlog; built while 10B / Phase 0 wait on hosting and decisions)
+- [ ] Public read-only share link for a board (P1): owner / editor create, revoke, regenerate from the board kebab; random 128-bit token stored hashed, optional expiry; `share_links` table + migration, REST routes, authz-matrix rows; `/s/[token]` read-only (no socket, labels / grid / measure), current state only, rate-limited; never leaks room ids, member names or user ids; CSP zero violations.
+- [ ] Board thumbnails on the dashboard (P1): 256×256 JPEG generated client-side 30 s after the user's last edit; `PUT /boards/:id/thumbnail` (Editor+, ≤ 100 KB, re-encoded with sharp); storage interface (local disk in dev / tests, S3 / R2 when `S3_*` is set); cards fall back to the map card image; dashboard Lighthouse doesn't regress.
+- [ ] Minimap (P2): bottom-right 160×160, collapsible, viewport rectangle, click / drag to move; low-res map image; hidden on phone.
+- [ ] Typing indicator (P2): "X is typing…", volatile, ≤ 1 event / 2 s, cleared after 4 s; `TODO(p2)` removed.
+- [ ] Drawing extras (P2): double-headed arrow toggle in the style bar; Measure "Save as line" → LINE element (Editor+); both undoable and synced.
+
+**Exit:** lint / typecheck / check:deps / unit / integration / E2E green; both authz matrices complete; frame-time benchmark A/B no regression; realtime smoke run; docs + CHANGELOG updated.
+
 ---
 
 ## Backlog (post-v1)

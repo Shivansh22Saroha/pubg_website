@@ -138,6 +138,16 @@ Snapshot notes (Phase 8): saving / restoring needs `board.manage` (OWNER / EDITO
 
 Layer and element mutations go through **Socket.IO only** (§7).
 
+### 5b. Share links (Phase 11)
+| Method & path | Role | Body | Success |
+|---|---|---|---|
+| `GET /boards/:boardId/share` | OWNER, EDITOR | – | `{ share: { createdAt, expiresAt: string\|null } \| null }` — never the token |
+| `POST /boards/:boardId/share` | OWNER, EDITOR | `{ expiresIn: '24h'\|'7d'\|'30d'\|'never' }` (strict) | `201 { share, url }`, `Cache-Control: no-store`. Creates the board's link, or **regenerates** it: a new token replaces the old one, which stops working at once. The only response that carries the URL |
+| `DELETE /boards/:boardId/share` | OWNER, EDITOR | – | `204` (revoke; a board without a link is a no-op) |
+| `GET /public/share/:token` | – (public) | – | `{ board, layers, elements, expiresAt }` — the board **as it is now**, same shape as a demo board (§8): no `roomId`, `createdBy` / `updatedBy: null`, no member names. 30 / min / IP, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` |
+
+Notes: permission `board.share` (OWNER / EDITOR); non-members `404`, viewers `403`. One link per board. The token is 16 random bytes, base64url (22 chars, `ShareTokenSchema`); only its SHA-256 is stored, so the URL `{APP_ORIGIN}/s/{token}` can't be shown again — the dialog offers Regenerate. A malformed token → `400`; unknown, revoked, regenerated-away, expired, or a deleted room → the same `404 NOT_FOUND` "This link is invalid or has expired". Create / regenerate / revoke write audit rows (`share.create`, `share.regenerate`, `share.revoke`). The API's request log masks the token (`/public/share/[redacted]`). An hourly job deletes expired links.
+
 ## 6. Chat (REST part)
 | Method & path | Role | Query | Success |
 |---|---|---|---|

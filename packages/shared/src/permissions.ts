@@ -35,6 +35,8 @@ export const PERMISSIONS = {
   /** create/rename/duplicate/reorder boards, snapshots, restore */
   'board.manage': ['OWNER', 'EDITOR'],
   'board.delete': ['OWNER'],
+  /** create / regenerate / revoke a board's public read-only share link (Phase 11) */
+  'board.share': ['OWNER', 'EDITOR'],
   /** create invites (with role ≤ the creator's own) and list them */
   'invite.create': ['OWNER', 'EDITOR'],
   /** roles, kick, room settings, password, lock, transfer, delete room */

@@ -13,6 +13,8 @@ export const LIMITS = {
   invitePreview: { max: 30, timeWindow: '1 minute' },
   /** FEATURES F13: `/explore`'s demo boards, per IP */
   demoBoards: { max: 30, timeWindow: '1 minute' },
+  /** Phase 11: a public share link's board, per IP */
+  sharedBoard: { max: 30, timeWindow: '1 minute' },
   roomCreateDaily: { max: 10, windowSec: 86_400 },
   inviteAcceptHourly: { max: 20, windowSec: 3600 },
   /** SECURITY §6: forgot-password 3 / hour / email + 10 / hour / IP */

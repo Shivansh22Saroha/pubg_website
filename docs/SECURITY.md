@@ -40,6 +40,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | Create/edit/delete elements; create/rename/recolor/reorder/delete **unlocked** layers | ✓ | ✓ | ✗ |
 | Lock/unlock layers; rename/recolor/delete a **locked** layer | ✓ | ✗ | ✗ |
 | Create/rename boards, snapshots, restore | ✓ | ✓ | ✗ |
+| Create / regenerate / revoke a board's public share link (Phase 11) | ✓ | ✓ | ✗ |
 | Delete boards | ✓ | ✗ | ✗ |
 | Create invites | ✓ | ✓ (role ≤ EDITOR) | ✗ |
 | Change roles, kick, room settings, password, delete room | ✓ | ✗ | ✗ |
@@ -51,6 +52,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | Z5 **MUST** | Kick / role downgrade takes effect immediately: server removes the user's sockets from the room channels and disconnects them. |
 | Z6 | Room passwords hashed with argon2id; checked only at join time; wrong attempts rate-limited 5 / 10 min per user+room. |
 | Z7 | Invite codes: 10 chars Crockford base32 from CSPRNG (~50 bits) + `GET /invites/:code` rate limit 30 / min / IP — brute force infeasible. Expiry and max-uses enforced in the accept transaction (`use_count < max_uses` with row lock). |
+| Z8 | Share links (Phase 11): 128-bit CSPRNG token, stored only as SHA-256, shown once; one per board; optional expiry; revoke / regenerate take effect immediately (no cache: `no-store`). The public read is rate-limited 30 / min / IP and returns one board without room id, author ids or member names; every failure is the same 404. The page sets `referrer: no-referrer` and `noindex`, opens no socket, and the API log masks the token. |
 
 ## 4. Input validation & output encoding
 | # | Control |
@@ -105,6 +107,7 @@ Implemented (Phase 10):
 | Room creation | 10 / day / user, max 30 owned rooms |
 | Invite accept | 20 / hour / user |
 | `GET /public/demo-boards` | 30 / min / IP (Phase 9) |
+| `GET /public/share/:token` | 30 / min / IP (Phase 11) |
 | Socket limits | see API_SPEC §7.4 |
 | Body size | REST 100 KB (snapshots restore via id, not body); socket 64 KB |
 
@@ -142,6 +145,7 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 | Repudiation | "Who deleted our plan?" | `updated_by` on elements, op log 24 h, audit log for destructive actions, auto-snapshot before restore |
 | Info disclosure | IDOR on `/rooms/:id` | membership check, 404 for non-members (Z2) |
 | Info disclosure | Invite code guessing | 50-bit codes + rate limit + expiry (Z7) |
+| Info disclosure | Share-link guessing / leaking room or member data | 128-bit hashed tokens, rate limit, uniform 404, stripped response (Z8) |
 | Info disclosure | XSS via chat/label stealing data | no HTML rendering (V4), CSP with nonces (T4) |
 | DoS | Socket flood of cursor events | token buckets, volatile drop, disconnect abusers |
 | DoS | Giant stroke / 100k elements | payload + count limits (V2) |

@@ -28,6 +28,12 @@ export async function expireInvites(prisma: PrismaClient, now = new Date()): Pro
   return count;
 }
 
+/** Deletes share links past their expiry (Phase 11; the public read checks expiry anyway). */
+export async function expireShareLinks(prisma: PrismaClient, now = new Date()): Promise<number> {
+  const { count } = await prisma.shareLink.deleteMany({ where: { expiresAt: { lt: now } } });
+  return count;
+}
+
 /** Deletes refresh tokens expired or revoked > 30 days ago, used / expired email tokens, old audit rows. */
 export async function cleanupTokens(
   prisma: PrismaClient,

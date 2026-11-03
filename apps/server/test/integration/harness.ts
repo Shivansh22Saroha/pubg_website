@@ -45,7 +45,7 @@ export function useCleanState() {
     for (let attempt = 1; ; attempt++) {
       try {
         await prisma.$executeRawUnsafe(
-          'TRUNCATE TABLE audit_logs, snapshots, chat_messages, board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
+          'TRUNCATE TABLE audit_logs, share_links, snapshots, chat_messages, board_ops, elements, room_bans, layers, boards, room_invites, room_members, rooms, refresh_tokens, email_tokens, users RESTART IDENTITY CASCADE',
         );
         break;
       } catch (err) {

@@ -58,6 +58,12 @@ Feature-by-feature behavior. Each section: purpose · rules · edge cases · acc
 - Each user's current board is local state; switching does `board:subscribe`. Last board per room remembered in `localStorage`.
 - Thumbnail: generated client-side (256×256 JPEG of fit view) by the last editor 30 s after their last edit, uploaded via `PUT /boards/:id/thumbnail` (P1; until then show map thumbnail).
 
+### F4b. Public read-only share link (Phase 11, v1.1)
+- Board kebab → **Share link…** (owner / editor). The dialog creates the link with an expiry (24 h, **7 days** default, 30 days, never), shows the URL once with Copy ("Copy it now — for safety the link is only shown once"), and afterwards shows "A link is active · Expires … · created …" with **Regenerate link** (new URL; the old one stops working at once) and **Revoke** (two clicks). One link per board.
+- `/s/{token}` opens without an account: the board as it is at load time (reload for the latest; no socket, no live updates), tiles + grid + labels (HUD, N / Shift+G) and Measure (R). No tools, chat, presence, room name, member names or ids. CTA "Create account".
+- Invalid, revoked, regenerated-away, expired links and deleted rooms all show "This link is invalid or has expired."
+- AC: a viewer sees no "Share link…"; after revoke the visitor's reload shows the error; the page raises no CSP violation and opens no socket.
+
 ---
 
 ## F5. Layers [BOARD-4]

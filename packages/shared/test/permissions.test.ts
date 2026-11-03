@@ -21,6 +21,7 @@ const MATRIX: Record<Permission, Record<RoomRole, boolean>> = {
   'layer.lock': { OWNER: true, EDITOR: false, VIEWER: false },
   'board.manage': { OWNER: true, EDITOR: true, VIEWER: false },
   'board.delete': { OWNER: true, EDITOR: false, VIEWER: false },
+  'board.share': { OWNER: true, EDITOR: true, VIEWER: false },
   'invite.create': { OWNER: true, EDITOR: true, VIEWER: false },
   'room.manage': { OWNER: true, EDITOR: false, VIEWER: false },
   'chat.deleteAny': { OWNER: true, EDITOR: false, VIEWER: false },

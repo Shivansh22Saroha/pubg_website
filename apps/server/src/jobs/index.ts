@@ -4,7 +4,12 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
 import cron from 'node-cron';
 import { pruneBoardOps } from '../modules/elements/service.js';
-import { cleanupTokens, expireInvites, purgeDeletedRooms } from './maintenance.js';
+import {
+  cleanupTokens,
+  expireInvites,
+  expireShareLinks,
+  purgeDeletedRooms,
+} from './maintenance.js';
 
 const INSTANCE = randomUUID();
 
@@ -49,6 +54,7 @@ export function startJobs(deps: { prisma: PrismaClient; redis: Redis; log: Fasti
     job('prune-board-ops', '*/15 * * * *', () => pruneBoardOps(deps.prisma)),
     job('purge-deleted-rooms', '7 * * * *', () => purgeDeletedRooms(deps.prisma)),
     job('expire-invites', '17 * * * *', () => expireInvites(deps.prisma)),
+    job('expire-share-links', '19 * * * *', () => expireShareLinks(deps.prisma)),
     job('cleanup-tokens', '27 3 * * *', () => cleanupTokens(deps.prisma)),
   ];
   return () => {
