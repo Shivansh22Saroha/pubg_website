@@ -14,7 +14,9 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { editorActions, makeNameOf, type EditSink } from '@/lib/editing';
 import type { ViewElement } from '@/stores/boardModel';
+import { linkedLabel } from '@/lib/linkedPlayers';
 import { useBoardStore } from '@/stores/boardStore';
+import { usePlayersStore } from '@/stores/playersStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { useToolStore } from '@/stores/toolStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
@@ -31,13 +33,20 @@ const TYPE_NAMES: Record<ViewElement['type'], string> = {
   MARKER: 'Marker',
 };
 
-/** What a screen reader hears for an element: its text, or the marker's kind, number, label. */
-export function elementLabel(el: Pick<ViewElement, 'type' | 'props'>): string {
+/**
+ * What a screen reader hears for an element: its text, or the marker's kind, number, label —
+ * a linked own-player marker's label is its member's IGN (Phase 12).
+ */
+export function elementLabel(
+  el: Pick<ViewElement, 'type' | 'props'>,
+  names: Readonly<Record<string, string>> = {},
+): string {
   const p = el.props as { text?: string; kind?: MarkerKind; number?: number; label?: string };
   if (el.type === 'TEXT') return p.text ?? '';
   if (el.type === 'MARKER') {
     const kind = p.kind ? MARKER_LABELS[p.kind] : 'Marker';
-    return [kind, p.number, p.label].filter((x) => x !== undefined && x !== '').join(' ');
+    const label = linkedLabel(el, names) ?? p.label;
+    return [kind, p.number, label].filter((x) => x !== undefined && x !== '').join(' ');
   }
   return '';
 }
@@ -75,6 +84,7 @@ export function ElementList({
   const worldSize = mapId ? MAPS[mapId].worldSize : null;
   const layers = useBoardStore((s) => s.view.layers);
   const selected = useSelectionStore((s) => s.ids);
+  const playerNames = usePlayersStore((s) => s.byId);
   const [limit, setLimit] = useState(PAGE);
   const nameOf = useMemo(
     () => makeNameOf(meId, Object.fromEntries(members.map((m) => [m.user.id, m.user.displayName]))),
@@ -127,7 +137,7 @@ export function ElementList({
         <tbody>
           {rows.slice(0, limit).map((el) => {
             const layer = byLayer.get(el.layerId);
-            const label = elementLabel(el) || '—';
+            const label = elementLabel(el, playerNames) || '—';
             const name = `${TYPE_NAMES[el.type]} ${label === '—' ? '' : label}`.trim();
             const canDelete = edit && layer !== undefined && !layer.locked;
             const isSelected = selected.includes(el.id);

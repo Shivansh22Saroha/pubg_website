@@ -30,6 +30,7 @@ import { editorActions, type EditSink } from '@/lib/editing';
 import { measureLines } from '@/lib/measureToLine';
 import { MAX_PENDING } from '@/stores/boardModel';
 import { useMeasureStore } from '@/stores/measureStore';
+import { usePlayersStore } from '@/stores/playersStore';
 import { cn } from '@/lib/utils';
 import type { ViewElement } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
@@ -43,6 +44,13 @@ const WIDTH_LABEL: Record<number, string> = { 2: 'S', 4: 'M', 7: 'L' };
 const VECTOR = new Set(['STROKE', 'LINE', 'ARROW', 'CIRCLE', 'POLYGON']);
 const CLOSED = new Set(['CIRCLE', 'POLYGON']);
 const EMPTY: readonly string[] = [];
+
+const isOwnPlayer = (e: ViewElement) =>
+  e.type === 'MARKER' && (e.props as { kind?: unknown }).kind === 'own_player';
+const linkedId = (e: ViewElement): string | undefined => {
+  const id = (e.props as { memberId?: unknown }).memberId;
+  return typeof id === 'string' ? id : undefined;
+};
 
 /** One change = one batch: parse so a patch can never send something the server rejects. */
 function patched(input: ElementInput, fn: (i: ElementInput) => unknown): ElementInput {
@@ -94,6 +102,7 @@ export function StyleBar({
   const markerLabel = useToolStore((s) => s.markerLabel);
   const presetRadius = useToolStore((s) => s.presetRadius);
   const arrowDoubleHeaded = useToolStore((s) => s.arrowDoubleHeaded);
+  const players = usePlayersStore((s) => s.players);
   const selectedIds = useSelectionStore((s) => (tool === 'select' ? s.ids : EMPTY));
   const elements = useBoardStore((s) => s.view.elements);
   const layers = useBoardStore((s) => s.view.layers);
@@ -197,7 +206,40 @@ export function StyleBar({
             />
           </>
         )}
-        {single && (single.type === 'MARKER' || single.type === 'TEXT') && (
+        {single && isOwnPlayer(single) && (
+          <>
+            <Divider />
+            <select
+              aria-label="Linked player"
+              data-testid="player-link"
+              value={linkedId(single) ?? ''}
+              onChange={(e) => {
+                const id = e.target.value;
+                // one batch, one undo step; a link replaces a typed label (the IGN is shown)
+                edit((i) => {
+                  const props: Record<string, unknown> = { ...i.props };
+                  Reflect.deleteProperty(props, 'label');
+                  if (id) props.memberId = id;
+                  else Reflect.deleteProperty(props, 'memberId');
+                  return { ...i, props };
+                });
+              }}
+              className="h-7 max-w-40 rounded-control border bg-bg px-1 text-xs outline-none focus:ring-2 focus:ring-accent"
+            >
+              <option value="">Not linked</option>
+              {players.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label === p.displayName ? p.label : `${p.label} (${p.displayName})`}
+                </option>
+              ))}
+              {/* a link to someone who has left the room stays visible until changed */}
+              {linkedId(single) && !players.some((p) => p.id === linkedId(single)) && (
+                <option value={linkedId(single)}>Former member</option>
+              )}
+            </select>
+          </>
+        )}
+        {single && (single.type === 'MARKER' || single.type === 'TEXT') && !linkedId(single) && (
           <>
             <Divider />
             <LabelInput

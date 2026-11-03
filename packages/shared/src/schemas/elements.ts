@@ -117,11 +117,18 @@ export const ElementInputSchema = z.discriminatedUnion('type', [
     ...common,
     type: z.literal('MARKER'),
     geometry: z.strictObject({ at: PtSchema }),
-    props: z.strictObject({
-      kind: z.enum(MARKER_KINDS),
-      number: z.number().int().min(1).max(ELEMENT_LIMITS.markerNumberMax).optional(),
-      label: textField(0, ELEMENT_LIMITS.markerLabelMax).optional(),
-    }),
+    props: z
+      .strictObject({
+        kind: z.enum(MARKER_KINDS),
+        number: z.number().int().min(1).max(ELEMENT_LIMITS.markerNumberMax).optional(),
+        label: textField(0, ELEMENT_LIMITS.markerLabelMax).optional(),
+        /** Phase 12: an own-player marker linked to a room member (label = their IGN, live) */
+        memberId: z.uuid().optional(),
+      })
+      .refine((p) => p.memberId === undefined || p.kind === 'own_player', {
+        message: 'Only own-player markers can be linked to a member',
+        path: ['memberId'],
+      }),
   }),
 ]);
 export type ElementInput = z.output<typeof ElementInputSchema>;

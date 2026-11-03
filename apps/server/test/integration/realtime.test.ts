@@ -21,6 +21,7 @@ import {
   register,
   setupRoom,
   sleep,
+  STYLE,
   useCleanState,
   type ClientSocket,
   type RoomFixture,
@@ -209,6 +210,44 @@ describe('element ops (ARCHITECTURE §7.2)', () => {
       element: { ...el, props: { doubleHeaded: 'yes' } },
     });
     expect(bad).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
+  });
+
+  it('linked own-player markers (Phase 12): a member is accepted, anyone else refused', async () => {
+    const l = await live();
+    const base = {
+      boardId: l.f.boardId,
+      layerId: l.layerIds[0]!,
+      type: 'MARKER',
+      geometry: { at: [100_000, 100_000] },
+      style: STYLE,
+      z: 0,
+    };
+    const ok = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: {
+        ...base,
+        id: opId(),
+        props: { kind: 'own_player', number: 1, memberId: l.f.viewer.id },
+      },
+    });
+    expect(ok).toMatchObject({ ok: true });
+    const outsider = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: {
+        ...base,
+        id: opId(),
+        props: { kind: 'own_player', number: 2, memberId: l.f.outsider.id },
+      },
+    });
+    expect(outsider).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
+    const wrongKind = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: { ...base, id: opId(), props: { kind: 'enemy_squad', memberId: l.f.viewer.id } },
+    });
+    expect(wrongKind).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
   });
 
   it('a viewer emitting via the raw socket is rejected: nothing broadcast, DB unchanged', async () => {

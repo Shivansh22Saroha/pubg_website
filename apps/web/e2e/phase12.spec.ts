@@ -1,12 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { debugCount, pageApi, twoUsersInRoom } from './fixtures';
+import { debugCount, debugPending, pageApi, twoUsersInRoom } from './fixtures';
 
 /** Phase 12 (P2 batch): element list location / Show, linked players, curved arrows, loot. */
 
 const STYLE = { color: '#EF4444', width: 4, dashed: false, fillOpacity: 0 };
 const uuid = () => crypto.randomUUID();
 
-/** an element through the real socket path (the debug hook's raw emit), on the first layer */
+/**
+ * An element through the real socket path (the debug hook's raw emit), on the first layer.
+ * The server doesn't echo an op to its sender, so only the *other* pages receive it.
+ */
 async function addElement(
   page: Page,
   boardId: string,
@@ -58,6 +61,42 @@ test('element list: location column and Show — viewers too', async ({ browser 
     .toBe(true);
   // a viewer can look but not edit
   await expect(list.getByRole('button', { name: /^Delete/ })).toHaveCount(0);
+  await ctxA.close();
+  await ctxB.close();
+});
+
+test('linked own-player marker: pick a member in the style bar, everyone sees their name, undo unlinks', async ({
+  browser,
+}) => {
+  const { a, b, nameB, ctxA, ctxB, boardId } = await twoUsersInRoom(browser);
+  // created by B: a raw emit isn't echoed to its sender, so A receives it like any remote op
+  const id = await addElement(b, boardId, {
+    type: 'MARKER',
+    geometry: { at: [408_000, 408_000] },
+    props: { kind: 'own_player', number: 2 },
+  });
+  await expect.poll(() => debugCount(a)).toBe(1);
+
+  // select it from the element list, then link it in the style bar
+  await a.getByRole('tab', { name: 'Layers' }).click();
+  await a.getByTestId('layers-view-list').click();
+  await a.getByRole('button', { name: /^Select Marker Own player 2/ }).click();
+  const picker = a.getByTestId('player-link');
+  await expect(picker).toHaveValue('');
+  await picker.selectOption({ label: nameB });
+  await expect
+    .poll(() =>
+      b.evaluate((elId) => window.__rlDebug?.elements().find((e) => e.id === elId)?.props, id),
+    )
+    .toMatchObject({ kind: 'own_player', number: 2, memberId: expect.any(String) });
+  await expect(b.locator('.rl-marker-label')).toHaveText(nameB);
+  await expect(a.locator('.rl-marker-label')).toHaveText(nameB);
+  // the typed-label input is replaced by the link
+  await expect(a.getByTestId('style-bar').getByRole('textbox', { name: 'Label' })).toHaveCount(0);
+
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await a.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+  await expect(b.locator('.rl-marker-label')).toHaveCount(0);
   await ctxA.close();
   await ctxB.close();
 });

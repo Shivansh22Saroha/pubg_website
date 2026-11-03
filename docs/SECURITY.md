@@ -53,6 +53,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | Z6 | Room passwords hashed with argon2id; checked only at join time; wrong attempts rate-limited 5 / 10 min per user+room. |
 | Z7 | Invite codes: 10 chars Crockford base32 from CSPRNG (~50 bits) + `GET /invites/:code` rate limit 30 / min / IP — brute force infeasible. Expiry and max-uses enforced in the accept transaction (`use_count < max_uses` with row lock). |
 | Z8 | Share links (Phase 11): 128-bit CSPRNG token, stored only as SHA-256, shown once; one per board; optional expiry; revoke / regenerate take effect immediately (no cache: `no-store`). The public read is rate-limited 30 / min / IP and returns one board without room id, author ids or member names; every failure is the same 404. The page sets `referrer: no-referrer` and `noindex`, opens no socket, and the API log masks the token. |
+| Z9 | Linked player markers (Phase 12): `props.memberId` is validated server-side against the board's room membership on every write, and stripped from every public response (share links, demo boards) so anonymous viewers never learn a user id or a member's name through a marker. |
 
 ## 4. Input validation & output encoding
 | # | Control |

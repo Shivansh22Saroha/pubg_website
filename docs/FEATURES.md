@@ -136,7 +136,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 | hold | `#22C55E` | – | optional |
 | pin | layer color | – | optional |
 - Hover tooltip: label + "placed by {user} · {time ago}".
-- Own player markers can be linked to a member (dropdown) so the IGN label auto-updates (P2).
+- Own player markers can be linked to a member (P2, Phase 12): select one own-player marker → "Linked player" in the style bar (members by IGN, else display name; "Not linked"). The link is stored as `props.memberId` (one undoable edit; it replaces a typed label). The marker's label is resolved when drawn — that member's IGN, else display name — so it follows renames as soon as the room's member list refreshes; nothing name-like is stored. The server accepts only a current member of the room. A link to someone who left shows no label (the glyph still reads "P{n}") and the picker shows "Former member". Share links and `/explore` never receive the member id, so those viewers see "P{n}" only.
 
 ---
 

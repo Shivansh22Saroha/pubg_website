@@ -5,7 +5,10 @@ import L from 'leaflet';
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import { withTransform } from '@/components/tools/scene';
+import { withPlayerLabels } from '@/lib/linkedPlayers';
 import { useBoardStore } from '@/stores/boardStore';
+import type { ViewElement } from '@/stores/boardModel';
+import { usePlayersStore } from '@/stores/playersStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { ElementRenderer } from './elementRenderer';
 
@@ -37,6 +40,7 @@ export function ElementLayer({ config }: { config: MapConfig }) {
       );
     };
 
+    const labelCache = new WeakMap<ViewElement, { name: string | undefined; out: ViewElement }>();
     let frame = 0;
     const sync = () => {
       cancelAnimationFrame(frame);
@@ -46,7 +50,9 @@ export function ElementLayer({ config }: { config: MapConfig }) {
         const layers = view.layers.some((l) => hiddenLayers[l.id])
           ? view.layers.map((l) => (hiddenLayers[l.id] ? { ...l, visible: false } : l))
           : view.layers;
-        renderer.sync(withTransform(view.elements, transform), layers);
+        // linked own-player markers show their member's IGN (Phase 12)
+        const named = withPlayerLabels(view.elements, usePlayersStore.getState().byId, labelCache);
+        renderer.sync(withTransform(named, transform), layers);
       });
     };
     const onZoom = () => {
@@ -63,11 +69,15 @@ export function ElementLayer({ config }: { config: MapConfig }) {
     const offSelection = useSelectionStore.subscribe((s, prev) => {
       if (s.transform !== prev.transform || s.hiddenLayers !== prev.hiddenLayers) sync();
     });
+    const offPlayers = usePlayersStore.subscribe((s, prev) => {
+      if (s.byId !== prev.byId) sync();
+    });
     map.on('zoomend', onZoom);
     return () => {
       cancelAnimationFrame(frame);
       unsubscribe();
       offSelection();
+      offPlayers();
       map.off('zoomend', onZoom);
       renderer.destroy();
       canvas.remove();
