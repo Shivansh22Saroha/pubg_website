@@ -72,7 +72,7 @@ export function VerifyEmail() {
       {shown === 'done' && (
         <>
           <CheckCircle2 className="mx-auto size-8 text-success" aria-hidden />
-          <h1 className="font-display text-2xl font-bold">Email verified</h1>
+          <h1 className="font-display text-[30px] leading-none font-bold">Email verified</h1>
           <Link href="/dashboard" className={buttonVariants()}>
             Continue
           </Link>
@@ -80,7 +80,7 @@ export function VerifyEmail() {
       )}
       {shown === 'failed' && (
         <>
-          <h1 className="font-display text-2xl font-bold">Couldn’t verify</h1>
+          <h1 className="font-display text-[30px] leading-none font-bold">Couldn’t verify</h1>
           <p className="text-sm text-text-muted">
             {why}. Log in and use “Resend” to get a new link.
           </p>
@@ -100,7 +100,7 @@ export function ForgotPassword() {
   if (sent) {
     return (
       <div className="flex flex-col gap-3" role="status">
-        <h1 className="font-display text-2xl font-bold">Check your email</h1>
+        <h1 className="font-display text-[30px] leading-none font-bold">Check your email</h1>
         <p className="text-sm text-text-muted">
           If an account exists for {email}, we sent a link to reset its password. It expires in 30
           minutes.
@@ -130,7 +130,7 @@ export function ForgotPassword() {
           });
       }}
     >
-      <h1 className="font-display text-2xl font-bold">Reset your password</h1>
+      <h1 className="font-display text-[30px] leading-none font-bold">Reset your password</h1>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -163,7 +163,7 @@ export function ResetPassword() {
   if (done) {
     return (
       <div className="flex flex-col gap-3" role="status">
-        <h1 className="font-display text-2xl font-bold">Password changed</h1>
+        <h1 className="font-display text-[30px] leading-none font-bold">Password changed</h1>
         <p className="text-sm text-text-muted">
           You were logged out everywhere. Log in with your new password.
         </p>
@@ -202,7 +202,7 @@ export function ResetPassword() {
           });
       }}
     >
-      <h1 className="font-display text-2xl font-bold">Choose a new password</h1>
+      <h1 className="font-display text-[30px] leading-none font-bold">Choose a new password</h1>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="new-password">New password</Label>
         <Input

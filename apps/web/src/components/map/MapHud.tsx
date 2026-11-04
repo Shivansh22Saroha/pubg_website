@@ -40,7 +40,8 @@ function HudButton({
       onClick={onClick}
       className={cn(
         'flex size-8 items-center justify-center rounded-control text-text transition-colors duration-150 ease-hud hover:bg-surface-2',
-        pressed === true && 'bg-accent text-accent-fg hover:bg-accent/90',
+        pressed === true &&
+          'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-105',
       )}
     >
       {children}
@@ -95,8 +96,7 @@ export function MapHud({
       ? `${ref.label} · ${formatMetres(cursor[0] / 100)}, ${formatMetres(cursor[1] / 100)}`
       : '—';
 
-  const panel =
-    'pointer-events-auto rounded-panel border bg-overlay shadow-panel backdrop-blur-[8px]';
+  const panel = 'pointer-events-auto glass rounded-panel';
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-2 p-3">
       <output

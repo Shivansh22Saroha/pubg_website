@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function ExplorePage() {
   return (
     <div className="flex h-dvh flex-col">
-      <SiteHeader />
+      <SiteHeader wide />
       <Providers>
         <ExploreView />
       </Providers>

@@ -56,7 +56,7 @@ export function JoinCard({ code }: { code: string }) {
         : 'Could not load this invite.';
     return (
       <div className="flex flex-col gap-4 text-center">
-        <h1 className="font-display text-2xl font-bold">Invite not found</h1>
+        <h1 className="font-display text-[30px] leading-none font-bold">Invite not found</h1>
         <p role="alert" className="text-text-muted">
           {msg}
         </p>
@@ -88,7 +88,10 @@ export function JoinCard({ code }: { code: string }) {
     <div className="flex flex-col gap-5">
       <div>
         <p className="section-label text-xs text-text-muted">You're invited to</p>
-        <h1 className="font-display text-2xl font-bold" data-testid="join-room-name">
+        <h1
+          className="font-display text-[30px] leading-none font-bold"
+          data-testid="join-room-name"
+        >
           {room.name}
         </h1>
         <p className="mt-1 flex items-center gap-2 text-sm text-text-muted">

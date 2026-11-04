@@ -92,7 +92,9 @@ function ToolButton({
       className={cn(
         'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
         'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
-        active ? 'bg-accent text-accent-fg' : 'hover:bg-surface-2 hover:text-text',
+        active
+          ? 'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_6px_16px_-6px_var(--accent-glow)]'
+          : 'hover:bg-surface-3 hover:text-text',
         disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-muted',
       )}
     >
@@ -150,7 +152,7 @@ export function Toolbar({
       data-tour="toolbar"
       data-orientation={orientation}
       className={cn(
-        'flex shrink-0 items-center gap-1 bg-bg',
+        'flex shrink-0 items-center gap-1 bg-[linear-gradient(90deg,var(--surface),var(--bg))]',
         horizontal
           ? 'h-14 w-full flex-row overflow-x-auto overscroll-x-contain border-t px-2 pointer-coarse:h-16'
           : 'w-14 flex-col overflow-y-auto border-r py-2',
@@ -188,7 +190,7 @@ export function Toolbar({
                   side={horizontal ? 'top' : 'right'}
                   align="start"
                   sideOffset={8}
-                  className="z-50 w-52 rounded-panel border bg-surface p-1 shadow-panel"
+                  className="glass z-50 w-52 rounded-panel p-1"
                   aria-label="Marker kind"
                 >
                   <ul role="listbox" aria-label="Marker kind" className="flex flex-col">

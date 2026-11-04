@@ -16,7 +16,7 @@ export default async function SharedBoardPage({ params }: { params: Promise<{ to
   const { token } = await params;
   return (
     <div className="flex h-dvh flex-col">
-      <SiteHeader />
+      <SiteHeader wide />
       <Providers>
         <SharedBoardView token={token} />
       </Providers>

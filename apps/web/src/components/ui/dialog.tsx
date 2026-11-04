@@ -18,10 +18,10 @@ export function DialogContent({
 }: ComponentProps<typeof DialogPrimitive.Content> & { title: string; description?: ReactNode }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/65 backdrop-blur-[3px]" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 flex max-h-[90dvh] w-[calc(100vw-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-panel border bg-surface p-6 shadow-panel',
+          'fixed top-1/2 left-1/2 z-50 flex max-h-[90dvh] w-[calc(100vw-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-hero border border-border-strong/70 bg-surface p-6 shadow-panel',
           className,
         )}
         {...(description ? {} : { 'aria-describedby': undefined })}
@@ -29,7 +29,7 @@ export function DialogContent({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
-            <DialogPrimitive.Title className="font-display text-xl font-bold">
+            <DialogPrimitive.Title className="font-display text-2xl leading-tight font-bold">
               {title}
             </DialogPrimitive.Title>
             {description && (

@@ -13,6 +13,27 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 
 ## [Unreleased]
 
+### Changed
+- 2026-11-04 — **Premium UI pass** (UI_UX_SPEC §2–3; no behaviour, API or data changes).
+  - **Tokens** (`globals.css`, UI_UX_SPEC §2.1 updated): deeper graphite base, a third surface step, `--border-strong`, a 1 px inset top highlight on raised surfaces, an accent gradient (`--accent-hi` → `--accent`) with a soft glow. New utilities: `surface-raised`, `glass` (HUD chrome over the map), `app-backdrop` (faint map grid behind non-map pages). Radius 8 / 12 / 18 px. `section-label` is sentence case now.
+  - **Primitives:** accent buttons get the gradient + inset highlight, and disabled accent buttons a neutral fill instead of a half-transparent amber; outline buttons are quieter; inputs, selects and textareas sit recessed with a 3 px focus glow; dialogs blur the page behind them; dropdown menus are glass.
+  - **Landing:** full-bleed Erangel hero (`public/landing/hero-erangel.webp`, a 1920×1080 crop of the no-text art) with the real 1.02 km grid letters and a squad plan drawn over it — drop on Pochinki, rotation, zone, enemy squads. One CSS-only animation draws the rotation on load (off with reduced motion); `HeroMap` is pure SVG, no client JS and no map code. A legend under the CTAs names the markers. Features are alternating image/text rows instead of three identical cards; a closing CTA band ("Open a room"). The header floats over the hero.
+  - **Brand mark:** a drawn scope reticle (`BrandMark` / `Wordmark` in `SiteChrome.tsx`) replaces the lucide crosshair everywhere.
+  - **Auth:** glass card over the map art with the grid on top; larger headings; links in accent.
+  - **Dashboard:** sticky blurred header over the grid backdrop; the invite-code panel no longer stretches to the height of the room grid; room cards get a hover lift, a gradient under the map, glass chips, tinted role badges and icon-led facts (online / members / last activity) instead of a dotted string.
+  - **Room:** gradient top bar and toolbar, tinted active tab with an amber map icon, gradient active tool, glass HUD / minimap / style bar / long-press menu / follow pill; refined marker and text label pills on the map; an empty-chat state that explains pings; the map's out-of-bounds area matches the page.
+  - `/explore` and `/s/[token]` headers span the full width, aligned with their edge-to-edge maps.
+
+### Fixed
+- 2026-11-04 — Dashboard: the "Have an invite code?" panel stretched to the full height of the room list (grid `align-items: stretch`).
+
+### Decisions (premium pass)
+- Kept the spec's identity (dark HUD, amber, Rajdhani / Inter / JetBrains Mono) and made the map itself the visual signature rather than adding a new palette or typeface — no new dependencies.
+- The hero drawing's coordinates are computed from the crop (source x 410–6144, y 1638–4863 of the 8192 px art), so the grid letters are the real Erangel squares (Pochinki sits in M, as in game).
+- Second landing CTA is labelled "Open a room": E2E looks up "Create a room" by role and name, which must stay unique.
+- `phase9.spec.ts` "never scroll sideways" is marked `test.slow()`: it visits ten pages and took 30–39 s in a cloud VM on both the old and new UI.
+- Checked in a cloud VM with the real map tiles (all three maps, every zoom) and screenshots of every screen; unit 432/432, integration 556/556, E2E 55/57 then 50/57 — the failures are the 1 s realtime-sync timing tests, which failed at the same rate on the unchanged UI there (that VM ran Prisma through its WASM query compiler because the native engine download was blocked). Map panning frame time: 17–19 ms new vs 17–24 ms old.
+
 ### Docs
 - 2026-10-25 — Initial specification pack created: README, PRD, ARCHITECTURE, UI_UX_SPEC, DATABASE_SCHEMA, API_SPEC, SECURITY, TECH_STACK, USER_FLOWS, FEATURES, ENVIRONMENT, TESTING, DEPLOYMENT, CHANGELOG, TODO.
 - Verified PUBG `api-assets` map files: high-res art for Erangel (~95 MB), Miramar (~112 MB) and Rondo (~118–122 MB) is stored in Git LFS with labelled (`_Main_`) and unlabelled (`_Main_No_Text_`) variants; low-res variants are 819×819; `Rondo_Main_Low_Res.png` is actually JPEG data. Telemetry names: Erangel `Erangel_Main`/`Baltic_Main`, Miramar `Desert_Main`, Rondo `Neon_Main`.

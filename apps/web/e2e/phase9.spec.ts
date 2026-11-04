@@ -388,6 +388,8 @@ test('the room tour shows once — not after a reload, not in another context fo
 test('360 px: landing, auth, dashboard, settings, join and explore never scroll sideways', async ({
   browser,
 }) => {
+  // visits ten pages, each waiting for network idle: close to the default 30 s on slow runners
+  test.slow();
   const { ctxA, ctxB, a } = await twoUsersInRoom(browser, {
     a: { viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true },
   });

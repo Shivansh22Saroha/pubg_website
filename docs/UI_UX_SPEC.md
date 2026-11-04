@@ -14,21 +14,28 @@ Principles
 ### 2.1 Colors (dark theme — default and only theme in v1)
 | Token | Hex | Use |
 |---|---|---|
-| `--bg` | `#0B0F14` | app background |
-| `--surface` | `#121821` | cards, panels |
-| `--surface-2` | `#18202B` | inputs, hovered rows |
-| `--overlay` | `rgba(18,24,33,0.88)` + `backdrop-blur: 8px` | panels floating over the map |
-| `--border` | `#263241` | 1 px borders, dividers |
-| `--text` | `#E6EDF3` | primary text |
-| `--text-muted` | `#8B98A9` | secondary text, placeholders |
-| `--accent` | `#F2A900` | primary buttons, active tool, focus ring |
+| `--bg` | `#090C11` | app background |
+| `--surface` | `#10151C` | cards, panels |
+| `--surface-2` | `#161D26` | hovered rows, secondary fills |
+| `--surface-3` | `#1C2531` | hover on toolbar buttons, disabled primary buttons |
+| `--overlay` | `rgba(13,18,25,0.78)` + `backdrop-blur: 14px` (the `glass` utility) | chrome floating over the map: HUD, minimap, style bar, menus |
+| `--border` | `#222C39` | 1 px borders, dividers |
+| `--border-strong` | `#324154` | dialogs, glass edges, input hover |
+| `--highlight` | `rgba(255,255,255,0.06)` | 1 px inset top highlight on raised surfaces |
+| `--text` | `#E8EDF2` | primary text |
+| `--text-muted` | `#8E9AAB` | secondary text, placeholders |
+| `--accent` | `#F5B301` | primary buttons, active tool, focus ring |
+| `--accent-hi` | `#FFCB3D` | top of the accent gradient on primary buttons and the active tool |
+| `--accent-glow` | `rgba(245,179,1,0.28)` | input focus ring, soft glow under primary buttons |
 | `--accent-fg` | `#111111` | text on accent |
 | `--success` | `#22C55E` | online dot, synced |
 | `--warning` | `#F59E0B` | reconnecting |
 | `--danger` | `#EF4444` | destructive, enemy default |
 | `--info` | `#38BDF8` | pings, links |
 
-Contrast: text on `--surface` ≥ 7:1; muted text ≥ 4.5:1. Focus ring: 2 px `--accent` + 2 px offset.
+Contrast: text on `--surface` ≥ 7:1; muted text ≥ 4.5:1 (≈ 6.4:1 after the 2026-11 premium pass). Focus ring: 2 px `--accent` + 2 px offset; text inputs use a 3 px `--accent-glow` ring instead.
+
+Surfaces (premium pass): `surface-raised` (cards, side panels: surface + border + inset highlight) and `glass` (anything floating over the map). Section labels are sentence case, not all caps. Radius: 8 px controls, 12 px panels, 18 px hero surfaces (dialogs, landing frames).
 
 ### 2.2 Drawing palette (10 swatches, in order)
 `#F2A900` amber · `#EF4444` red · `#F97316` orange · `#FACC15` yellow · `#22C55E` green · `#14B8A6` teal · `#38BDF8` sky · `#6366F1` indigo · `#EC4899` pink · `#F8FAFC` white

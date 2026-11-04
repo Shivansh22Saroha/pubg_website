@@ -59,16 +59,16 @@ export function MapThumb({
 }
 
 const ROLE_STYLE: Record<RoomRole, string> = {
-  OWNER: 'border-accent/50 text-accent',
-  EDITOR: 'border-info/50 text-info',
-  VIEWER: 'border-border text-text-muted',
+  OWNER: 'border-accent/40 bg-accent/10 text-accent',
+  EDITOR: 'border-info/40 bg-info/10 text-info',
+  VIEWER: 'border-border-strong bg-surface-2 text-text-muted',
 };
 const ROLE_LABEL: Record<RoomRole, string> = { OWNER: 'Owner', EDITOR: 'Editor', VIEWER: 'Viewer' };
 
 export function RoleBadge({ role }: { role: RoomRole }) {
   return (
     <span
-      className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', ROLE_STYLE[role])}
+      className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', ROLE_STYLE[role])}
     >
       {ROLE_LABEL[role]}
     </span>
