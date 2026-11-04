@@ -3,14 +3,18 @@ import type { ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-2 rounded-control text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ease-hud disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-control text-[13px] font-semibold whitespace-nowrap transition-colors duration-150 ease-hud disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        accent: 'bg-accent text-accent-fg hover:bg-accent/90',
-        outline: 'border border-accent text-accent hover:bg-accent/10',
+        // Phase 13: filled buttons are blocks — a dark edge and a hard offset shadow they sink into
+        accent:
+          'press border-2 border-bg bg-accent text-accent-fg shadow-[var(--shadow-accent)] hover:shadow-[var(--shadow-accent-lg)]',
+        outline:
+          'press border-2 border-accent bg-bg text-accent shadow-[var(--shadow-hard-sm)] hover:bg-accent/10',
         ghost: 'text-text hover:bg-surface-2',
-        destructive: 'bg-danger-strong text-white hover:bg-danger-strong/90',
+        destructive:
+          'press border-2 border-bg bg-danger-strong text-white shadow-[var(--shadow-danger)] hover:bg-danger-strong/90',
       },
       size: {
         // touch: ≥ 44 px targets (UI_UX_SPEC §7)

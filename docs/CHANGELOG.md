@@ -49,6 +49,9 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 - 2026-11-03 — Phase 10A docs: TODO Phase 10 split into 10A / 10B; SECURITY §5 (what T4 now is), §9 (bases, accepted advisory), §11 (ZAP); DEPLOYMENT §2–3 (real images and `deploy/`), §5 (CI jobs, deploy workflow, rollback), §6–7 (backups, restore test, maintenance, metrics), §9 (local rehearsal); API_SPEC §1.4 `MAINTENANCE`, §7.3 `cursor:batch`, §8 `/metrics`; ARCHITECTURE §7.3 cursor batching; ENVIRONMENT (Sentry, maintenance, deploy env files); TECH_STACK (Sentry 11, nodemailer 10, k6 / ZAP / gitleaks); TESTING §5.6–5.7, §7 (k6).
 - 2026-11-03 — Phase 9 exit follow-up (decision asked in Decisions (Phase 9)): ARCHITECTURE §4 "Server prefetch" (what is forwarded, the fallback, why `/me` is seeded in the layout) and §6 the 512 px `card.webp`; DEPLOYMENT §4 the per-map image files and adding `card.webp` to an existing bucket.
 
+### Changed
+- 2026-11-04 — **Phase 13: UI refresh — a touch of neobrutalism** (asked; UI_UX_SPEC §2.4, TODO Phase 13). Hard offset block shadows and 2 px borders replace the soft blurred elevation; corners tighten (4 / 6 px). Filled buttons are blocks that lift on hover and sink when pressed (no movement under reduced motion); inputs get an accent block on focus; role badges are solid blocks; active tabs and the active tool are emphasised; the map HUD, style bar and minimap are solid instead of blurred; the landing headline's "together." sits on a tilted accent block. Done through tokens (`--border-strong`, `--block*`, `--shadow-*`) and two utilities (`panel-hard`, `press`), so components change little. Map art, drawings, colours and fonts are unchanged. Also fixed an ambiguous E2E-12 selector (`getByText` also matched the chat's screen-reader announcement, failing intermittently).
+
 ### Added
 - 2026-11-03 — **Phase 12: P2 batch** (TODO Phase 12; FEATURES F3 / F6 / F7, API_SPEC §7.2, DATABASE_SCHEMA §4, SECURITY Z9 / V9, UI_UX_SPEC §3.5 / §10, ARCHITECTURE §6, DEPLOYMENT §4). No new dependencies or services.
   - **Element list for screen readers**: the Phase 9 list (Layers → List) was already built — the backlog entry was stale. It gains a **Location** column (grid ref of the element's anchor; new shared `elementAnchor`) and **Show** for every role, which centres the map through the ping chips' focus request.
@@ -471,6 +474,10 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
   - **Kick + block**: `room_bans`, `DELETE …/members/:userId { ban?: true }`, `GET /rooms/:roomId/bans`, `DELETE /rooms/:roomId/bans/:userId`, invite accept → generic 403 for banned users. UI: "Also block them from rejoining" in the kick dialog; Room settings → Security → Blocked users with Unban.
   - `RoomSummary.primaryMapId` (map of the most recently updated board); dashboard cards show that map's preview.
   - `pnpm test:e2e` now runs against a production build on its own ports (web :3200 with an E2E-only `/api` + `/realtime` proxy baked in, own `.next-e2e` dist dir; API :4200 without watch mode). `pnpm test:e2e:dev` reuses `pnpm dev`. CI uses the production mode too.
+
+### Decisions (Phase 13)
+- **Dark neobrutalism without black shadows.** Classic neobrutalism uses black offset shadows on light backgrounds; on this near-black theme they would be invisible, so blocks are slate (`#2E3A4B`) for panels and dark amber / red for filled buttons. Contrast of text is untouched (same palette); the new solid badges use dark text on accent / info (≥ 7:1). The axe scans (E2E-13) pass.
+- **"A bit"**: kept the map itself, the colours and the fonts; no rotated cards or clashing colours — only the landing headline gets the playful tilt.
 
 ### Decisions (Phase 12)
 - **Scope** (asked): the P2 batch that needs no new services. For the icon item I checked what PUBG's repo actually has: `Assets/Vehicle` is 38 photo-style renders at 5760×3240 (unreadable at 28 px), so real icons exist only for items and care packages — you chose **PUBG item icons** for a new loot marker over drawing our own vehicle glyphs. Vehicle markers keep their current glyph.

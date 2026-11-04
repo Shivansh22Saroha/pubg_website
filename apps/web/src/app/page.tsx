@@ -47,7 +47,11 @@ export default function HomePage() {
             id="hero"
             className="max-w-2xl font-display text-4xl leading-tight font-bold sm:text-5xl"
           >
-            Plan your rotations together.
+            Plan your rotations{' '}
+            {/* Phase 13: a slightly tilted marker block — the one loud element on the page */}
+            <span className="inline-block -rotate-1 rounded-control border-2 border-bg bg-accent px-2 text-accent-fg shadow-[var(--shadow-accent)]">
+              together.
+            </span>
           </h1>
           <p className="mt-4 max-w-xl text-base text-text-muted">
             One shared, live tactical map for your squad — drops, rotations and enemy calls on
@@ -70,7 +74,7 @@ export default function HomePage() {
           </h2>
           <ul className="grid gap-6 md:grid-cols-3">
             {FEATURES.map((f) => (
-              <li key={f.title} className="overflow-hidden rounded-panel border bg-surface">
+              <li key={f.title} className="overflow-hidden rounded-panel panel-hard bg-surface">
                 <Image
                   src={f.image}
                   alt={f.alt}
@@ -78,7 +82,7 @@ export default function HomePage() {
                   height={400}
                   unoptimized // pre-optimised WebP
                   sizes="(min-width: 768px) 33vw, 100vw"
-                  className="aspect-[8/5] w-full border-b bg-surface-2 object-cover"
+                  className="aspect-[8/5] w-full border-b-2 border-border-strong bg-surface-2 object-cover"
                 />
                 <div className="p-4">
                   <h3 className="font-display text-lg font-semibold">{f.title}</h3>

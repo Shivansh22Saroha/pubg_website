@@ -92,7 +92,9 @@ function ToolButton({
       className={cn(
         'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
         'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
-        active ? 'bg-accent text-accent-fg' : 'hover:bg-surface-2 hover:text-text',
+        active
+          ? 'bg-accent text-accent-fg shadow-[var(--shadow-accent)]'
+          : 'hover:bg-surface-2 hover:text-text',
         disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-muted',
       )}
     >
@@ -153,7 +155,7 @@ export function Toolbar({
         'flex shrink-0 items-center gap-1 bg-bg',
         horizontal
           ? 'h-14 w-full flex-row overflow-x-auto overscroll-x-contain border-t px-2 pointer-coarse:h-16'
-          : 'w-14 flex-col overflow-y-auto border-r py-2',
+          : 'w-14 flex-col overflow-y-auto border-r-2 border-border-strong py-2',
       )}
     >
       {TOOLS.filter((t) => allowed.includes(t.id)).map((t) => {
@@ -173,7 +175,7 @@ export function Toolbar({
                     'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
                     'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
                     tool === 'marker'
-                      ? 'bg-accent text-accent-fg'
+                      ? 'bg-accent text-accent-fg shadow-[var(--shadow-accent)]'
                       : 'hover:bg-surface-2 hover:text-text',
                   )}
                   onClick={() => {
@@ -188,7 +190,7 @@ export function Toolbar({
                   side={horizontal ? 'top' : 'right'}
                   align="start"
                   sideOffset={8}
-                  className="z-50 w-52 rounded-panel border bg-surface p-1 shadow-panel"
+                  className="z-50 w-52 rounded-panel panel-hard bg-surface p-1"
                   aria-label="Marker kind"
                 >
                   <ul role="listbox" aria-label="Marker kind" className="flex flex-col">

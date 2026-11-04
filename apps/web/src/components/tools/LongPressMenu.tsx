@@ -79,7 +79,7 @@ export function LongPressMenu({
       data-testid="long-press-menu"
       data-rl-overlay=""
       style={{ left, top, width: MENU_W }}
-      className="fixed z-[2000] rounded-panel border bg-surface p-1 shadow-panel"
+      className="fixed z-[2000] rounded-panel panel-hard bg-surface p-1"
     >
       {labelled && (
         <button

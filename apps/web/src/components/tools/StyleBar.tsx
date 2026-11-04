@@ -547,7 +547,7 @@ function Shell({
         data-testid={testId}
         data-mode={mode}
         data-rl-overlay=""
-        className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 rounded-panel border bg-surface/95 p-1.5 shadow-panel backdrop-blur"
+        className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 rounded-panel panel-hard bg-surface p-1.5"
       >
         {children}
       </div>

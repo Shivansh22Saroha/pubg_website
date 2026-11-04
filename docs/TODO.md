@@ -157,6 +157,13 @@ _Status 2026-11-03: met — unit 121 + 71 + 219, integration 552, E2E 53 (+6 in 
 **Exit:** lint / typecheck / check:deps / unit / integration / E2E green; both authz matrices complete; frame-time A/B no regression; docs + CHANGELOG updated.
 _Status 2026-11-03: met — unit 130 + 71 + 231, integration 556, E2E 57 (+4 in `phase12.spec.ts`); no new routes or socket events (both matrices unchanged and complete); frame time A/B no regression (CHANGELOG, Decisions (Phase 12)). Deploy note: re-run `map-tiles` fetch + build and sync `out/icons` for the loot icons (DEPLOYMENT §4)._
 
+## Phase 13 — UI refresh: a touch of neobrutalism (asked)
+- [x] Design tokens (radius, hard block shadows, strong borders) + `panel-hard` / `press` utilities (UI_UX_SPEC §2.4).
+- [x] Shared components: buttons, inputs, selects, tabs, dialogs, menus.
+- [x] Surfaces: landing (hero highlight, feature cards), auth card, dashboard cards / invite panel / role badges, settings, room chrome (headers, toolbar, side panel), map HUD, style bar, minimap, follow pill, tour, touch sheets.
+
+**Exit:** lint / typecheck / unit / integration / E2E green (incl. axe E2E-13); before / after screenshots reviewed.
+
 ---
 
 ## Backlog (post-v1)

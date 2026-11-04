@@ -106,7 +106,7 @@ export function RoomTour({ enabled }: { enabled: boolean }) {
           }
         }}
         style={pos ?? { top: -9999, left: -9999 }}
-        className="fixed z-[1900] w-72 max-w-[calc(100vw-16px)] rounded-panel border bg-surface p-4 shadow-panel"
+        className="fixed z-[1900] w-72 max-w-[calc(100vw-16px)] rounded-panel panel-hard bg-surface p-4"
       >
         <p className="text-xs text-text-muted">
           Step {state.index + 1} of {state.steps.length}

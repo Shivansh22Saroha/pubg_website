@@ -17,6 +17,13 @@
   /* behind white text: #ef4444 is 3.8:1, below AA; this is 4.8:1 (UI_UX_SPEC §10) */
   --danger-strong: #dc2626;
   --info: #38bdf8;
+  /* Phase 13 — a touch of neobrutalism (UI_UX_SPEC §2.4): hard, offset, unblurred shadows and
+     2 px borders. On this near-black background a black block would vanish, so blocks are slate
+     (panels) or dark amber / red (filled buttons). */
+  --border-strong: #3a4a5e;
+  --block: #2e3a4b;
+  --block-accent: #8a6100;
+  --block-danger: #7f1d1d;
 
   color-scheme: dark;
 }
@@ -72,9 +79,15 @@
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 
   /* Radius & elevation — §2.4 (spacing uses Tailwind's 4 px scale: 1,2,3,4,6,8,12) */
-  --radius-control: 6px;
-  --radius-panel: 10px;
-  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --radius-control: 4px;
+  --radius-panel: 6px;
+  --shadow-panel: 4px 4px 0 0 var(--block);
+  --shadow-hard-sm: 2px 2px 0 0 var(--block);
+  --shadow-hard-lg: 6px 6px 0 0 var(--block);
+  --shadow-accent: 3px 3px 0 0 var(--block-accent);
+  --shadow-accent-lg: 5px 5px 0 0 var(--block-accent);
+  --shadow-danger: 3px 3px 0 0 var(--block-danger);
+  --color-border-strong: var(--border-strong);
 
   /* Motion — §2.4 */
   --ease-hud: cubic-bezier(0, 0, 0.2, 1);
@@ -112,6 +125,34 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Phase 13: a panel with a 2 px border and a hard block shadow */
+@utility panel-hard {
+  border-width: 2px;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-panel);
+}
+
+/* Phase 13: lifts on hover, sinks into its shadow when pressed (reduced motion: no movement,
+   the transition rule above collapses it and the transforms are dropped) */
+@utility press {
+  transition-property: transform, box-shadow, background-color, color, border-color;
+  transition-duration: 120ms;
+  transition-timing-function: var(--ease-hud);
+  &:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+  }
+  &:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:hover:not(:disabled),
+    &:active:not(:disabled) {
+      transform: none;
     }
   }
 }

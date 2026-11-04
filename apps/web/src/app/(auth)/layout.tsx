@@ -28,7 +28,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           <Crosshair className="size-5 text-accent" aria-hidden />
           {PRODUCT_NAME}
         </Link>
-        <div className="rounded-panel border bg-surface p-6 shadow-panel">
+        <div className="rounded-panel panel-hard bg-surface p-6">
           <Providers>{children}</Providers>
         </div>
       </div>

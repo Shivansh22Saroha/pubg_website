@@ -87,7 +87,7 @@ export function Minimap({ map, mapId }: { map: L.Map; mapId: MapId }) {
     <div
       data-testid="minimap"
       data-collapsed={collapsed ? 'true' : 'false'}
-      className="pointer-events-auto absolute right-3 bottom-16 z-20 overflow-hidden rounded-panel border bg-overlay shadow-panel backdrop-blur-[8px]"
+      className="pointer-events-auto absolute right-3 bottom-16 z-20 overflow-hidden rounded-panel panel-hard bg-surface"
     >
       <button
         type="button"

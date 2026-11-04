@@ -95,8 +95,7 @@ export function MapHud({
       ? `${ref.label} · ${formatMetres(cursor[0] / 100)}, ${formatMetres(cursor[1] / 100)}`
       : '—';
 
-  const panel =
-    'pointer-events-auto rounded-panel border bg-overlay shadow-panel backdrop-blur-[8px]';
+  const panel = 'pointer-events-auto rounded-panel panel-hard bg-surface';
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-2 p-3">
       <output

@@ -16,7 +16,7 @@ export function DropdownMenuContent({
     <Menu.Portal>
       <Menu.Content
         sideOffset={sideOffset}
-        className={cn('z-50 min-w-48 rounded-panel border bg-surface p-1 shadow-panel', className)}
+        className={cn('z-50 min-w-48 rounded-panel panel-hard bg-surface p-1', className)}
         {...props}
       />
     </Menu.Portal>

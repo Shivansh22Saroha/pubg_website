@@ -46,7 +46,7 @@ export function ExploreView() {
               className={cn(
                 'h-9 rounded-control px-3 text-[13px] font-medium text-text-muted pointer-coarse:h-11',
                 'hover:bg-surface-2 hover:text-text',
-                i === index && 'bg-surface-2 text-text shadow-[inset_0_-2px_0_var(--accent)]',
+                i === index && 'bg-surface-2 text-text shadow-[inset_0_-3px_0_var(--accent)]',
               )}
             >
               {MAPS[b.mapId].name}
