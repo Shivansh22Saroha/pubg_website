@@ -61,6 +61,16 @@ test('element list: location column and Show — viewers too', async ({ browser 
     .toBe(true);
   // a viewer can look but not edit
   await expect(list.getByRole('button', { name: /^Delete/ })).toHaveCount(0);
+
+  // layout: fits the side panel — no horizontal overflow, actions never cover the text
+  expect(await list.evaluate((t) => t.scrollWidth <= (t.parentElement?.clientWidth ?? 0))).toBe(
+    true,
+  );
+  const row = list.locator('tbody tr').first();
+  const text = await row.locator('td').first().boundingBox();
+  const action = await show.boundingBox();
+  if (!text || !action) throw new Error('no row layout');
+  expect(action.x).toBeGreaterThanOrEqual(text.x + text.width - 1);
   await ctxA.close();
   await ctxB.close();
 });

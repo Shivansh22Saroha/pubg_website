@@ -11,7 +11,8 @@ import {
   type MarkerKind,
   type RoomRole,
 } from '@rotationlab/shared';
-import { useMemo, useState } from 'react';
+import { LocateFixed, MousePointer2, Trash2 } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { editorActions, makeNameOf, type EditSink } from '@/lib/editing';
 import type { ViewElement } from '@/stores/boardModel';
@@ -20,6 +21,7 @@ import { useBoardStore } from '@/stores/boardStore';
 import { usePlayersStore } from '@/stores/playersStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { useToolStore } from '@/stores/toolStore';
+import { cn } from '@/lib/utils';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { deleteChanges } from './scene';
 import { MARKER_LABELS } from './Toolbar';
@@ -54,6 +56,44 @@ export function elementLabel(
 }
 
 const PAGE = 100;
+
+/** a 28 px icon button (44 px on touch); the accessible name says what and where */
+function IconAction({
+  label,
+  title,
+  pressed,
+  disabled,
+  danger,
+  onClick,
+  children,
+}: {
+  label: string;
+  title: string;
+  pressed?: boolean;
+  disabled?: boolean;
+  danger?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={title}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'flex size-7 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text pointer-coarse:size-11',
+        'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40',
+        pressed && 'bg-surface-2 text-accent',
+        danger && 'text-danger hover:text-danger',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 /** "F-M 4,7" for an element, '' when it has no position on the map. */
 export function elementLocation(el: Pick<ViewElement, 'geometry'>, worldSize: number): string {
@@ -112,26 +152,16 @@ export function ElementList({
 
   return (
     <div className="flex flex-col gap-2">
+      {/* two columns so it fits the 300 px side panel: what + where on two lines, then icon
+          actions (their accessible names carry the full description) */}
       <table className="w-full table-fixed text-left text-xs" data-testid="element-list">
         <caption className="sr-only">Elements on this board ({rows.length})</caption>
         <thead className="text-text-muted">
           <tr>
-            <th scope="col" className="w-[17%] px-1 py-1 font-medium">
-              Type
-            </th>
             <th scope="col" className="px-1 py-1 font-medium">
-              Label
+              Element <span className="font-normal">· location · layer · author</span>
             </th>
-            <th scope="col" className="w-[17%] px-1 py-1 font-medium">
-              Location
-            </th>
-            <th scope="col" className="w-[14%] px-1 py-1 font-medium">
-              Layer
-            </th>
-            <th scope="col" className="w-[13%] px-1 py-1 font-medium">
-              Author
-            </th>
-            <th scope="col" className="w-[24%] px-1 py-1 font-medium">
+            <th scope="col" className="w-[6.5rem] px-1 py-1 font-medium pointer-coarse:w-[8.5rem]">
               <span className="sr-only">Actions</span>
             </th>
           </tr>
@@ -145,55 +175,59 @@ export function ElementList({
             const isSelected = selected.includes(el.id);
             const at = elementAnchor(el.geometry);
             const where = worldSize ? elementLocation(el, worldSize) : '';
+            const author = nameOf(el.createdBy);
             return (
-              <tr key={el.id} className="border-t">
-                <td className="truncate px-1 py-1">{TYPE_NAMES[el.type]}</td>
-                <td className="truncate px-1 py-1">{label}</td>
-                <td className="truncate px-1 py-1 font-mono" data-testid="element-location">
-                  {where}
+              <tr key={el.id} className="border-t align-top">
+                <td className="min-w-0 px-1 py-1.5">
+                  <p className="truncate" title={name}>
+                    <span className="font-medium text-text">{TYPE_NAMES[el.type]}</span>
+                    {label !== '—' && <span className="text-text"> {label}</span>}
+                  </p>
+                  <p className="truncate text-text-muted">
+                    {where && (
+                      <span className="font-mono" data-testid="element-location">
+                        {where}
+                      </span>
+                    )}
+                    {where && ' · '}
+                    {layer?.name ?? ''}
+                    {layer?.locked && ' (locked)'}
+                    {' · '}
+                    {author}
+                  </p>
                 </td>
-                <td className="truncate px-1 py-1">
-                  {layer?.name ?? ''}
-                  {layer?.locked && <span className="sr-only"> (locked)</span>}
-                </td>
-                <td className="truncate px-1 py-1">{nameOf(el.createdBy)}</td>
-                <td className="px-1 py-1">
-                  <span className="flex justify-end gap-1">
+                <td className="px-1 py-1.5">
+                  <span className="flex justify-end gap-0.5">
                     {at && boardId && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        aria-label={`Show ${name}${where ? ` at ${where}` : ''} on the map`}
+                      <IconAction
+                        label={`Show ${name}${where ? ` at ${where}` : ''} on the map`}
+                        title="Show on map"
                         onClick={() => {
                           useWorkspaceStore
                             .getState()
                             .requestFocus({ boardId, x: at[0], y: at[1] });
                         }}
                       >
-                        Show
-                      </Button>
+                        <LocateFixed className="size-4" aria-hidden />
+                      </IconAction>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      aria-label={`Select ${name}`}
-                      aria-pressed={isSelected}
+                    <IconAction
+                      label={`Select ${name}`}
+                      title="Select"
+                      pressed={isSelected}
                       disabled={!canDelete}
                       onClick={() => {
                         useToolStore.getState().setTool('select');
                         useSelectionStore.getState().select([el.id]);
                       }}
                     >
-                      Select
-                    </Button>
+                      <MousePointer2 className="size-4" aria-hidden />
+                    </IconAction>
                     {canDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-danger"
-                        aria-label={`Delete ${name}`}
+                      <IconAction
+                        label={`Delete ${name}`}
+                        title="Delete"
+                        danger
                         onClick={() => {
                           const actions = editorActions(session, nameOf);
                           if (actions.commit(deleteChanges(elements, [el.id])))
@@ -204,8 +238,8 @@ export function ElementList({
                               );
                         }}
                       >
-                        Delete
-                      </Button>
+                        <Trash2 className="size-4" aria-hidden />
+                      </IconAction>
                     )}
                   </span>
                 </td>
