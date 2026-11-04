@@ -24,6 +24,49 @@ export interface HitTarget {
   type: 'STROKE' | 'LINE' | 'ARROW' | 'CIRCLE' | 'POLYGON' | 'TEXT' | 'MARKER';
   geometry: AnyGeometry;
   style?: { fillOpacity?: number };
+  /** Phase 12: a curved arrow hits along its curve */
+  props?: { curved?: unknown };
+}
+
+/** samples per bend of a curved arrow (Phase 12) — smooth at any zoom for ≤ 50 points */
+export const CURVE_SAMPLES = 16;
+
+/**
+ * Curved arrows (Phase 12): a Catmull-Rom spline (uniform, the curve passes through every
+ * stored point) sampled into a polyline. Two points stay a straight line. Every consumer —
+ * renderer, hit-testing, thumbnails — draws the same samples, so what you see is what you hit.
+ */
+export function curvePoints(points: readonly Pt[], samples = CURVE_SAMPLES): Pt[] {
+  if (points.length < 3) return points.map(([x, y]) => [x, y]);
+  const out: Pt[] = [];
+  const at = (i: number): Pt => points[Math.max(0, Math.min(points.length - 1, i))] as Pt;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = at(i - 1);
+    const p1 = at(i);
+    const p2 = at(i + 1);
+    const p3 = at(i + 2);
+    for (let k = 0; k < samples; k++) {
+      const t = k / samples;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const c = (a: number, b: number, d: number, e: number) =>
+        0.5 *
+        (2 * b + (-a + d) * t + (2 * a - 5 * b + 4 * d - e) * t2 + (-a + 3 * b - 3 * d + e) * t3);
+      out.push([
+        Math.round(c(p0[0], p1[0], p2[0], p3[0])),
+        Math.round(c(p0[1], p1[1], p2[1], p3[1])),
+      ]);
+    }
+  }
+  const last = at(points.length - 1);
+  out.push([last[0], last[1]]);
+  return out;
+}
+
+/** The path an element is drawn along: a curved arrow's samples, else its stored points. */
+export function drawnPoints(el: Pick<HitTarget, 'type' | 'geometry' | 'props'>): readonly Pt[] {
+  const pts = el.geometry.points ?? [];
+  return el.type === 'ARROW' && el.props?.curved === true ? curvePoints(pts) : pts;
 }
 
 export function distance(a: Pt, b: Pt): number {
@@ -121,7 +164,7 @@ export function hitTest(el: HitTarget, p: Pt, tol: number): boolean {
     case 'STROKE':
     case 'LINE':
     case 'ARROW':
-      return pointToPolylineDistance(p, g.points ?? []) <= tol;
+      return pointToPolylineDistance(p, drawnPoints(el)) <= tol;
     case 'POLYGON': {
       const pts = g.points ?? [];
       return pointToPolylineDistance(p, pts, true) <= tol || (filled && pointInPolygon(p, pts));
@@ -210,6 +253,17 @@ export function anchorBBox(g: AnyGeometry): BBox | null {
   if (g.center) return bboxOfPoints([g.center]);
   if (g.at) return bboxOfPoints([g.at]);
   return null;
+}
+
+/**
+ * One point that stands for an element (Phase 12: element list location, "Show"): a marker /
+ * text's position, a circle's centre, else the centre of its points' box. Integers.
+ */
+export function elementAnchor(g: AnyGeometry): Pt | null {
+  if (g.at) return [Math.round(g.at[0]), Math.round(g.at[1])];
+  if (g.center) return [Math.round(g.center[0]), Math.round(g.center[1])];
+  const b = anchorBBox(g);
+  return b ? [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)] : null;
 }
 
 /**

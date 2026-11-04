@@ -6,7 +6,7 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { MAPS, PKG_DIR, VARIANTS, type MapKey, type Variant } from './lib.js';
+import { ICONS_DIR, ICON_SIZE, MAPS, PKG_DIR, VARIANTS, type MapKey, type Variant } from './lib.js';
 
 const TARGET = path.resolve(PKG_DIR, '../../apps/web/e2e/fixtures/tiles');
 const MAX_ZOOM = 2;
@@ -51,6 +51,30 @@ for (const map of MAPS) {
   await solid(COLORS[map].labels, 96)
     .webp({ quality: 50 })
     .toFile(path.join(TARGET, map, 'card.webp'));
+}
+// Phase 12: two loot icons (a transparent square with a solid centre) — the rest are missing on
+// purpose, so the crate fallback is exercised too
+const FIXTURE_ICONS = { care_package: '#a855f7', awm: '#facc15' } as const;
+mkdirSync(path.join(TARGET, ICONS_DIR), { recursive: true });
+for (const [id, color] of Object.entries(FIXTURE_ICONS)) {
+  await sharp({
+    create: {
+      width: ICON_SIZE,
+      height: ICON_SIZE,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([
+      {
+        input: await solid(color, ICON_SIZE / 2)
+          .png()
+          .toBuffer(),
+        gravity: 'center',
+      },
+    ])
+    .webp({ quality: 50 })
+    .toFile(path.join(TARGET, ICONS_DIR, `${id}.webp`));
 }
 console.log(
   `✓ wrote ${count} fixture tiles + low-res/thumb/card images for ${MAPS.length} maps to ${TARGET}`,

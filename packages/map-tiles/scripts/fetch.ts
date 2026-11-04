@@ -7,6 +7,7 @@
  */
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { LOOT_ITEMS } from '@rotationlab/shared';
 import { fileTypeFromFile } from 'file-type';
 import {
   CACHE_DIR,
@@ -20,6 +21,7 @@ import {
   run,
   sha256File,
   sourceFileName,
+  type IconEntry,
   type SourceEntry,
   type SourceKind,
   type SourcesFile,
@@ -96,7 +98,10 @@ async function main() {
   } else {
     console.log('→ reusing existing clone in .cache/api-assets');
   }
-  run('git', ['sparse-checkout', 'set', '--no-cone', ...wanted.map((w) => `/${w.repoPath}`)], {
+  // Phase 12: the loot item icons (small, plain git blobs) come along in the same checkout
+  const icons = LOOT_ITEMS.map((i) => ({ id: i.id, repoPath: i.source }));
+  const sparse = [...wanted.map((w) => w.repoPath), ...icons.map((i) => i.repoPath)];
+  run('git', ['sparse-checkout', 'set', '--no-cone', ...sparse.map((p) => `/${p}`)], {
     cwd: REPO_DIR,
     env: noSmudge,
   });
@@ -147,12 +152,32 @@ async function main() {
     files.push({ ...w, sha256, bytes, format: type.ext, lfs: pointer !== null });
   }
 
+  const iconEntries: IconEntry[] = [];
+  for (const icon of icons) {
+    const abs = path.join(REPO_DIR, icon.repoPath);
+    if (!existsSync(abs)) fail(`${icon.repoPath} missing after checkout (LOOT_ITEMS out of date?)`);
+    const type = await fileTypeFromFile(abs);
+    if (type?.ext !== 'png') {
+      fail(`${icon.repoPath}: not a PNG by magic bytes (detected: ${type?.mime ?? 'unknown'})`);
+    }
+    // plain git blobs: git verified them against the tree on checkout; we record the hash
+    iconEntries.push({
+      id: icon.id,
+      repoPath: icon.repoPath,
+      sha256: await sha256File(abs),
+      bytes: statSync(abs).size,
+      format: type.ext,
+    });
+  }
+  console.log(`✓ ${iconEntries.length} loot item icons (Assets/Icons)`);
+
   const sources: SourcesFile = {
     repo: REPO_URL,
     ref: REPO_REF,
     commit,
     fetchedAt: new Date().toISOString(),
     files,
+    icons: iconEntries,
   };
   writeFileSync(SOURCES_FILE, `${JSON.stringify(sources, null, 2)}\n`);
   console.log(`✓ wrote .cache/sources.json in ${((Date.now() - started) / 1000).toFixed(1)} s`);

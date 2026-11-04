@@ -57,6 +57,7 @@ export const MARKER_LABELS: Record<MarkerKind, string> = {
   danger: 'Danger',
   hold: 'Hold / compound',
   pin: 'Pin',
+  loot: 'Loot',
 };
 
 function ToolButton({

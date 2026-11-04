@@ -300,7 +300,11 @@ export class ArrowTool extends VertexTool {
       type: 'ARROW',
       geometry: { points: points.map(mutable) },
       style: this.ctx.style(),
-      props: this.ctx.arrowDoubleHeaded() ? { doubleHeaded: true } : {},
+      props: {
+        ...(this.ctx.arrowDoubleHeaded() ? { doubleHeaded: true } : {}),
+        // a straight two-point arrow has nothing to curve
+        ...(this.ctx.arrowCurved() && points.length >= 3 ? { curved: true } : {}),
+      },
     });
   }
 
@@ -496,7 +500,7 @@ export class MarkerTool extends BaseTool {
 
   override onPointerDown(p: ToolPointer) {
     if (p.button !== 0 || !this.ctx.canCreate()) return;
-    const { kind, number, label } = this.ctx.markerProps();
+    const { kind, number, label, item } = this.ctx.markerProps();
     this.ctx.commit({
       type: 'MARKER',
       geometry: { at: mutable(p.world) },
@@ -505,6 +509,7 @@ export class MarkerTool extends BaseTool {
         kind,
         ...(number !== undefined && { number }),
         ...(label && { label: label.slice(0, ELEMENT_LIMITS.markerLabelMax) }),
+        ...(kind === 'loot' && item && { item }),
       },
     });
   }

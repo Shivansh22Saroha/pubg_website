@@ -1,6 +1,6 @@
 import type { DemoBoard } from '@rotationlab/shared';
 import type { PrismaClient } from '@prisma/client';
-import { toElement } from '../elements/service.js';
+import { toPublicElement } from '../elements/service.js';
 import { toBoard, toLayer } from '../rooms/mappers.js';
 
 /**
@@ -36,11 +36,7 @@ export function createPublicService({
           {
             board,
             layers: row.layers.map(toLayer),
-            elements: row.elements.map((e) => ({
-              ...toElement(e),
-              createdBy: null,
-              updatedBy: null,
-            })),
+            elements: row.elements.map(toPublicElement),
           },
         ];
       });

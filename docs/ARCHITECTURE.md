@@ -162,6 +162,7 @@ Note the **`{z}/{y}/{x}`** order — this is what `sharp`'s `layout: 'google'` w
    - `sharp(...).webp({ quality: 82 }).tile({ size: 256, layout: 'google', overlap: 0 }).toFile(out/<map>/<variant>)`.
    - Generate 1024px preview JPEG (auth backdrop), 512px card WebP q72 (dashboard room cards, 34–59 KB vs 151–228 KB for the 1024 px JPEG — the dashboard's LCP image) + 256px thumbnail per map.
    - Write `out/manifest.json`: `{ map, variant, sourceSize, paddedSize, maxNativeZoom, sha256 }`.
+   - Phase 12: the loot item icons listed in `packages/shared/src/loot.ts` (`Assets/Icons/Item/**`, `Assets/Icons/CarePackage/*` — plain git blobs, fetched in the same sparse checkout, PNG checked by magic bytes, SHA-256 recorded) → `out/icons/items/<id>.webp`, each fitted into a transparent 64 px square (2× the marker), ≈ 125 KB for all 80. Deployed with the tiles.
 3. **upload** — `rclone sync out/ r2:rotationlab-tiles/` (or copy into `apps/web/public/tiles` for local dev).
    Tiles are immutable → `Cache-Control: public, max-age=31536000, immutable`; version path (`/tiles/v1/...`) when regenerating.
 

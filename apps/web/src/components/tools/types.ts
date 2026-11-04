@@ -95,11 +95,13 @@ export interface ToolContext {
   closeText(): void;
   textSize(): 'sm' | 'md' | 'lg';
   /** marker tool: kind, number (auto) and label for the next placement */
-  markerProps(): { kind: MarkerKind; number?: number; label?: string };
+  markerProps(): { kind: MarkerKind; number?: number; label?: string; item?: string };
   /** circle tool: a zone preset radius (world units) armed in the style bar, or null */
   presetRadius(): number | null;
   /** arrow tool: the style bar's double-headed toggle (Phase 11) */
   arrowDoubleHeaded(): boolean;
+  /** arrow tool: the style bar's curved toggle (Phase 12) */
+  arrowCurved(): boolean;
 
   // ---- select & eraser (Phase 6B) --------------------------------------------------------
   /** elements, layers and zoom for hit-testing */

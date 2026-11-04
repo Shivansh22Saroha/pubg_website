@@ -173,6 +173,30 @@ describe('GET /public/share/:token', () => {
     expect((await read(token)).json<{ elements: unknown[] }>().elements).toHaveLength(2);
   });
 
+  it('a linked own-player marker reaches the public without its member id (Phase 12)', async () => {
+    const f = await setupRoom(app);
+    const token = tokenOf((await share(f)).json<{ url: string }>().url);
+    const layer = await prisma.layer.findFirstOrThrow({ where: { boardId: f.boardId } });
+    await prisma.element.create({
+      data: {
+        id: newId(),
+        boardId: f.boardId,
+        layerId: layer.id,
+        type: 'MARKER',
+        geometry: { at: [400_000, 400_000] },
+        style: { color: '#38BDF8', width: 4, dashed: false, fillOpacity: 0 },
+        props: { kind: 'own_player', number: 2, memberId: f.viewer.id },
+        seq: 1n,
+      },
+    });
+    const res = await read(token);
+    expect(res.json<{ elements: { props: unknown }[] }>().elements[0]?.props).toEqual({
+      kind: 'own_player',
+      number: 2,
+    });
+    expect(res.body).not.toContain(f.viewer.id);
+  });
+
   it('expired, malformed, unknown and deleted-room tokens all answer the same 404', async () => {
     const f = await setupRoom(app);
     const token = tokenOf((await share(f, '24h')).json<{ url: string }>().url);

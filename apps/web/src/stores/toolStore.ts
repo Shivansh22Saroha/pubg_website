@@ -1,6 +1,8 @@
 'use client';
 
 import {
+  DEFAULT_LOOT_ITEM,
+  lootItem as findLootItem,
   MARKER_DEFAULT_COLORS,
   MARKER_KINDS,
   StyleSchema,
@@ -47,6 +49,11 @@ function loadMarkerKind(): MarkerKind {
     : 'enemy_squad';
 }
 
+function loadLootItem(): string {
+  const raw = typeof window === 'undefined' ? null : readPref(prefKeys.lootItem);
+  return findLootItem(raw) ? (raw as string) : DEFAULT_LOOT_ITEM;
+}
+
 interface ToolState {
   tool: ToolId;
   /** per user, local (FEATURES F5); null = default (first drawable layer) */
@@ -54,9 +61,13 @@ interface ToolState {
   styles: Partial<Record<ToolId, Style>>;
   markerKind: MarkerKind;
   markerLabel: string;
+  /** marker tool, loot kind: the item icon to place (Phase 12, remembered per device) */
+  lootItem: string;
   textSize: TextSize;
   /** arrow tool: new arrows get a head at both ends (Phase 11, remembered per device) */
   arrowDoubleHeaded: boolean;
+  /** arrow tool: new arrows are curved through their bends (Phase 12, remembered per device) */
+  arrowCurved: boolean;
   /** an armed zone preset radius (world units) for the circle tool */
   presetRadius: number | null;
   setTool: (tool: ToolId) => void;
@@ -65,8 +76,10 @@ interface ToolState {
   /** picking a kind resets the marker colour to that kind's default (pin → layer colour) */
   setMarkerKind: (kind: MarkerKind, layerColor: string) => void;
   setMarkerLabel: (label: string) => void;
+  setLootItem: (id: string) => void;
   setTextSize: (size: TextSize) => void;
   setArrowDoubleHeaded: (on: boolean) => void;
+  setArrowCurved: (on: boolean) => void;
   setPresetRadius: (r: number | null) => void;
 }
 
@@ -77,8 +90,10 @@ export const useToolStore = create<ToolState>((set, get) => ({
   styles: loadStyles(),
   markerKind: loadMarkerKind(),
   markerLabel: '',
+  lootItem: loadLootItem(),
   textSize: 'md',
   arrowDoubleHeaded: typeof window !== 'undefined' && readPref(prefKeys.arrowDoubleHeaded) === '1',
+  arrowCurved: typeof window !== 'undefined' && readPref(prefKeys.arrowCurved) === '1',
   presetRadius: null,
   setTool: (tool) => {
     set({ tool, presetRadius: tool === 'circle' ? get().presetRadius : null });
@@ -99,12 +114,21 @@ export const useToolStore = create<ToolState>((set, get) => ({
   setMarkerLabel: (markerLabel) => {
     set({ markerLabel });
   },
+  setLootItem: (lootItem) => {
+    if (!findLootItem(lootItem)) return;
+    set({ lootItem });
+    writePref(prefKeys.lootItem, lootItem);
+  },
   setTextSize: (textSize) => {
     set({ textSize });
   },
   setArrowDoubleHeaded: (arrowDoubleHeaded) => {
     set({ arrowDoubleHeaded });
     writePref(prefKeys.arrowDoubleHeaded, arrowDoubleHeaded ? '1' : '0');
+  },
+  setArrowCurved: (arrowCurved) => {
+    set({ arrowCurved });
+    writePref(prefKeys.arrowCurved, arrowCurved ? '1' : '0');
   },
   setPresetRadius: (presetRadius) => {
     set({ presetRadius });

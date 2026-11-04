@@ -1,3 +1,4 @@
+import { lootItem } from '../loot.js';
 import { z } from 'zod';
 import { HexColorSchema, textField } from '../text.js';
 
@@ -56,6 +57,8 @@ export const MARKER_KINDS = [
   'danger',
   'hold',
   'pin',
+  /** Phase 12: an item / care-package spot, shown with a PUBG item icon (`props.item`) */
+  'loot',
 ] as const;
 
 const empty = z.strictObject({}).default({});
@@ -86,8 +89,10 @@ export const ElementInputSchema = z.discriminatedUnion('type', [
     ...common,
     type: z.literal('ARROW'),
     geometry: z.strictObject({ points: points(2, ELEMENT_LIMITS.arrowPoints) }),
-    /** Phase 11: a head at the start too */
-    props: z.strictObject({ doubleHeaded: z.boolean().optional() }).default({}),
+    /** Phase 11: a head at the start too; Phase 12: drawn as a smooth curve through the bends */
+    props: z
+      .strictObject({ doubleHeaded: z.boolean().optional(), curved: z.boolean().optional() })
+      .default({}),
   }),
   z.strictObject({
     ...common,
@@ -117,11 +122,28 @@ export const ElementInputSchema = z.discriminatedUnion('type', [
     ...common,
     type: z.literal('MARKER'),
     geometry: z.strictObject({ at: PtSchema }),
-    props: z.strictObject({
-      kind: z.enum(MARKER_KINDS),
-      number: z.number().int().min(1).max(ELEMENT_LIMITS.markerNumberMax).optional(),
-      label: textField(0, ELEMENT_LIMITS.markerLabelMax).optional(),
-    }),
+    props: z
+      .strictObject({
+        kind: z.enum(MARKER_KINDS),
+        number: z.number().int().min(1).max(ELEMENT_LIMITS.markerNumberMax).optional(),
+        label: textField(0, ELEMENT_LIMITS.markerLabelMax).optional(),
+        /** Phase 12: an own-player marker linked to a room member (label = their IGN, live) */
+        memberId: z.uuid().optional(),
+        /** Phase 12: a loot marker's item — an id from LOOT_ITEMS, never a path or URL */
+        item: z
+          .string()
+          .max(40)
+          .refine((id) => lootItem(id) !== undefined, { message: 'Unknown item' })
+          .optional(),
+      })
+      .refine((p) => p.memberId === undefined || p.kind === 'own_player', {
+        message: 'Only own-player markers can be linked to a member',
+        path: ['memberId'],
+      })
+      .refine((p) => p.item === undefined || p.kind === 'loot', {
+        message: 'Only loot markers carry an item',
+        path: ['item'],
+      }),
   }),
 ]);
 export type ElementInput = z.output<typeof ElementInputSchema>;

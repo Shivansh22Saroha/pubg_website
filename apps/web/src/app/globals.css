@@ -147,6 +147,16 @@
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 
+/* loot markers (Phase 12): the PUBG item icon over the crate badge */
+.rl-loot-icon {
+  position: absolute;
+  inset: 2px;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .rl-marker-label {
   position: absolute;
   top: 30px;

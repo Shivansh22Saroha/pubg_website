@@ -32,6 +32,10 @@ export const prefKeys = {
   markerKind: 'markerKind',
   /** arrow tool's double-headed toggle (Phase 11) */
   arrowDoubleHeaded: 'arrowDoubleHeaded',
+  /** arrow tool's curved toggle (Phase 12) */
+  arrowCurved: 'arrowCurved',
+  /** marker tool's loot item (Phase 12) */
+  lootItem: 'lootItem',
   /** minimap collapsed (Phase 11) */
   minimapCollapsed: 'minimapCollapsed',
 } as const;

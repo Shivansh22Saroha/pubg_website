@@ -2,6 +2,9 @@
 
 import {
   DRAWING_PALETTE,
+  LOOT_CATEGORIES,
+  LOOT_CATEGORY_NAMES,
+  LOOT_ITEMS,
   ELEMENT_LIMITS,
   ElementInputSchema,
   MAX_FILL_OPACITY,
@@ -30,6 +33,7 @@ import { editorActions, type EditSink } from '@/lib/editing';
 import { measureLines } from '@/lib/measureToLine';
 import { MAX_PENDING } from '@/stores/boardModel';
 import { useMeasureStore } from '@/stores/measureStore';
+import { usePlayersStore } from '@/stores/playersStore';
 import { cn } from '@/lib/utils';
 import type { ViewElement } from '@/stores/boardModel';
 import { useBoardStore } from '@/stores/boardStore';
@@ -43,6 +47,50 @@ const WIDTH_LABEL: Record<number, string> = { 2: 'S', 4: 'M', 7: 'L' };
 const VECTOR = new Set(['STROKE', 'LINE', 'ARROW', 'CIRCLE', 'POLYGON']);
 const CLOSED = new Set(['CIRCLE', 'POLYGON']);
 const EMPTY: readonly string[] = [];
+
+/** an arrow flag on or off, keeping the other props ({} when none is left) */
+function withFlag(props: Record<string, unknown>, key: 'doubleHeaded' | 'curved', on: boolean) {
+  const next: Record<string, unknown> = { ...props };
+  if (on) next[key] = true;
+  else Reflect.deleteProperty(next, key);
+  return next;
+}
+
+const isLoot = (e: ViewElement) =>
+  e.type === 'MARKER' && (e.props as { kind?: unknown }).kind === 'loot';
+
+/** Loot marker item (Phase 12): PUBG's item icons, grouped like the in-game inventory. */
+function LootSelect({ value, onPick }: { value: string; onPick: (id: string) => void }) {
+  return (
+    <select
+      aria-label="Loot item"
+      data-testid="loot-item"
+      value={value}
+      onChange={(e) => {
+        onPick(e.target.value);
+      }}
+      className="h-7 max-w-44 rounded-control border bg-bg px-1 text-xs outline-none focus:ring-2 focus:ring-accent"
+    >
+      {!value && <option value="">Item…</option>}
+      {LOOT_CATEGORIES.map((cat) => (
+        <optgroup key={cat} label={LOOT_CATEGORY_NAMES[cat]}>
+          {LOOT_ITEMS.filter((i) => i.category === cat).map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+const isOwnPlayer = (e: ViewElement) =>
+  e.type === 'MARKER' && (e.props as { kind?: unknown }).kind === 'own_player';
+const linkedId = (e: ViewElement): string | undefined => {
+  const id = (e.props as { memberId?: unknown }).memberId;
+  return typeof id === 'string' ? id : undefined;
+};
 
 /** One change = one batch: parse so a patch can never send something the server rejects. */
 function patched(input: ElementInput, fn: (i: ElementInput) => unknown): ElementInput {
@@ -94,6 +142,10 @@ export function StyleBar({
   const markerLabel = useToolStore((s) => s.markerLabel);
   const presetRadius = useToolStore((s) => s.presetRadius);
   const arrowDoubleHeaded = useToolStore((s) => s.arrowDoubleHeaded);
+  const players = usePlayersStore((s) => s.players);
+  const arrowCurved = useToolStore((s) => s.arrowCurved);
+  const markerKind = useToolStore((s) => s.markerKind);
+  const lootItemId = useToolStore((s) => s.lootItem);
   const selectedIds = useSelectionStore((s) => (tool === 'select' ? s.ids : EMPTY));
   const elements = useBoardStore((s) => s.view.elements);
   const layers = useBoardStore((s) => s.view.layers);
@@ -128,6 +180,7 @@ export function StyleBar({
     const anyVector = selected.some((e) => VECTOR.has(e.type));
     const arrows = selected.filter((e) => e.type === 'ARROW');
     const allDouble = arrows.length > 0 && arrows.every((e) => e.props.doubleHeaded === true);
+    const allCurved = arrows.length > 0 && arrows.every((e) => e.props.curved === true);
     const anyClosed = selected.some((e) => CLOSED.has(e.type));
     const single = selected.length === 1 ? first : undefined;
     const labelOf = (e: ViewElement) => {
@@ -172,15 +225,27 @@ export function StyleBar({
                 onClick={() => {
                   // one batch, one undo step, arrows only
                   edit(
-                    (i) => ({
-                      ...i,
-                      props: allDouble ? {} : { doubleHeaded: true },
-                    }),
+                    (i) => ({ ...i, props: withFlag(i.props, 'doubleHeaded', !allDouble) }),
                     (e) => e.type === 'ARROW',
                   );
                 }}
               >
                 ⟷
+              </Seg>
+            )}
+            {arrows.length > 0 && (
+              <Seg
+                aria-pressed={allCurved}
+                aria-label="Curved"
+                title="Curved arrow (through its bends)"
+                onClick={() => {
+                  edit(
+                    (i) => ({ ...i, props: withFlag(i.props, 'curved', !allCurved) }),
+                    (e) => e.type === 'ARROW',
+                  );
+                }}
+              >
+                ∿
               </Seg>
             )}
           </>
@@ -197,7 +262,51 @@ export function StyleBar({
             />
           </>
         )}
-        {single && (single.type === 'MARKER' || single.type === 'TEXT') && (
+        {single && isLoot(single) && (
+          <>
+            <Divider />
+            <LootSelect
+              value={typeof single.props.item === 'string' ? single.props.item : ''}
+              onPick={(id) => {
+                edit((i) => ({ ...i, props: { ...i.props, item: id } }));
+              }}
+            />
+          </>
+        )}
+        {single && isOwnPlayer(single) && (
+          <>
+            <Divider />
+            <select
+              aria-label="Linked player"
+              data-testid="player-link"
+              value={linkedId(single) ?? ''}
+              onChange={(e) => {
+                const id = e.target.value;
+                // one batch, one undo step; a link replaces a typed label (the IGN is shown)
+                edit((i) => {
+                  const props: Record<string, unknown> = { ...i.props };
+                  Reflect.deleteProperty(props, 'label');
+                  if (id) props.memberId = id;
+                  else Reflect.deleteProperty(props, 'memberId');
+                  return { ...i, props };
+                });
+              }}
+              className="h-7 max-w-40 rounded-control border bg-bg px-1 text-xs outline-none focus:ring-2 focus:ring-accent"
+            >
+              <option value="">Not linked</option>
+              {players.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label === p.displayName ? p.label : `${p.label} (${p.displayName})`}
+                </option>
+              ))}
+              {/* a link to someone who has left the room stays visible until changed */}
+              {linkedId(single) && !players.some((p) => p.id === linkedId(single)) && (
+                <option value={linkedId(single)}>Former member</option>
+              )}
+            </select>
+          </>
+        )}
+        {single && (single.type === 'MARKER' || single.type === 'TEXT') && !linkedId(single) && (
           <>
             <Divider />
             <LabelInput
@@ -318,6 +427,18 @@ export function StyleBar({
               ⟷
             </Seg>
           )}
+          {tool === 'arrow' && (
+            <Seg
+              aria-pressed={arrowCurved}
+              aria-label="Curved"
+              title="Curved arrow (through its bends)"
+              onClick={() => {
+                useToolStore.getState().setArrowCurved(!arrowCurved);
+              }}
+            >
+              ∿
+            </Seg>
+          )}
         </>
       )}
       {closed && (
@@ -347,6 +468,17 @@ export function StyleBar({
               {size.toUpperCase()}
             </Seg>
           ))}
+        </>
+      )}
+      {tool === 'marker' && markerKind === 'loot' && (
+        <>
+          <Divider />
+          <LootSelect
+            value={lootItemId}
+            onPick={(id) => {
+              useToolStore.getState().setLootItem(id);
+            }}
+          />
         </>
       )}
       {tool === 'marker' && (

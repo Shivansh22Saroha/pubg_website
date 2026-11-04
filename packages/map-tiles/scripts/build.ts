@@ -5,7 +5,8 @@
  *   pnpm --filter map-tiles build rondo      # one map (merged into the existing manifest)
  *
  * Output: out/<map>/<labels|clean>/{z}/{y}/{x}.webp, out/<map>/{preview,thumb,lowres}.jpg,
- * out/manifest.json. One image is processed at a time to keep RAM bounded.
+ * out/icons/items/<id>.webp (Phase 12 loot icons), out/manifest.json. One image is processed
+ * at a time to keep RAM bounded.
  */
 import {
   existsSync,
@@ -19,6 +20,8 @@ import {
 import path from 'node:path';
 import sharp from 'sharp';
 import {
+  ICONS_DIR,
+  ICON_SIZE,
   MAPS,
   OUT_DIR,
   REPO_DIR,
@@ -68,6 +71,8 @@ export interface Manifest {
   source: { repo: string; commit: string };
   generatedAt: string;
   maps: Partial<Record<MapKey, MapManifest>>;
+  /** Phase 12: the loot item icons */
+  icons?: { dir: string; count: number; bytes: number };
 }
 
 sharp.cache(false); // don't hold decoded 8k images between steps
@@ -231,6 +236,28 @@ async function buildMap(map: MapKey, sources: SourcesFile): Promise<MapManifest>
   };
 }
 
+/**
+ * Phase 12: each loot icon fitted (aspect kept — weapons are ~3.5:1) into a transparent
+ * ICON_SIZE square, WebP. Inputs are PNG by magic bytes (checked by fetch) and capped in size.
+ */
+async function buildIcons(
+  sources: SourcesFile,
+): Promise<{ dir: string; count: number; bytes: number }> {
+  const dir = path.join(OUT_DIR, ICONS_DIR);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  let bytes = 0;
+  for (const icon of sources.icons ?? []) {
+    const out = path.join(dir, `${icon.id}.webp`);
+    await sharp(path.join(REPO_DIR, icon.repoPath), { limitInputPixels: 2048 * 2048 })
+      .resize(ICON_SIZE, ICON_SIZE, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .webp({ quality: 85, alphaQuality: 90 })
+      .toFile(out);
+    bytes += statSync(out).size;
+  }
+  return { dir: ICONS_DIR, count: sources.icons?.length ?? 0, bytes };
+}
+
 async function main() {
   if (!existsSync(SOURCES_FILE)) {
     console.error(
@@ -260,6 +287,9 @@ async function main() {
     source: { repo: sources.repo, commit: sources.commit },
     generatedAt: new Date().toISOString(),
     maps: previous?.source.commit === sources.commit ? previous.maps : {},
+    ...(previous?.source.commit === sources.commit && previous.icons
+      ? { icons: previous.icons }
+      : {}),
   };
 
   const started = Date.now();
@@ -269,6 +299,16 @@ async function main() {
   for (const map of selected as MapKey[]) {
     manifest.maps[map] = await buildMap(map, sources);
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`); // checkpoint per map
+  }
+  if (sources.icons?.length) {
+    const icons = await buildIcons(sources);
+    manifest.icons = icons;
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    console.log(
+      `  icons    ${icons.count} loot icons → out/${icons.dir} (${formatBytes(icons.bytes)})`,
+    );
+  } else {
+    console.warn('  ⚠ no loot icons in .cache/sources.json — re-run fetch to get them (Phase 12)');
   }
 
   console.log('\nSummary');

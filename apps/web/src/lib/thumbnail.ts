@@ -1,4 +1,4 @@
-import { THUMBNAIL, type Element, type Layer } from '@rotationlab/shared';
+import { THUMBNAIL, drawnPoints, type Element, type Layer } from '@rotationlab/shared';
 
 /**
  * Board thumbnails (Phase 11, FEATURES F4): a 256×256 JPEG of the whole map ("fit view") —
@@ -90,7 +90,11 @@ export function drawThumbnail(
       case 'LINE':
       case 'ARROW':
       case 'POLYGON': {
-        const list = pts(g).map(p);
+        const path: Pt[] =
+          e.type === 'ARROW'
+            ? drawnPoints({ type: 'ARROW', geometry: g, props: e.props }).map(([x, y]) => [x, y])
+            : pts(g);
+        const list = path.map(p);
         const [first, ...rest] = list;
         if (!first) break;
         ctx.beginPath();

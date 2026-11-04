@@ -21,6 +21,7 @@ import {
   register,
   setupRoom,
   sleep,
+  STYLE,
   useCleanState,
   type ClientSocket,
   type RoomFixture,
@@ -209,6 +210,90 @@ describe('element ops (ARCHITECTURE §7.2)', () => {
       element: { ...el, props: { doubleHeaded: 'yes' } },
     });
     expect(bad).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
+  });
+
+  it('curved arrows (Phase 12): stored and broadcast with both flags', async () => {
+    const l = await live();
+    const toOwner = collect(l.owner, 'board:op');
+    const el = {
+      ...arrow(l.f.boardId, l.layerIds[0]!),
+      props: { curved: true, doubleHeaded: true },
+    };
+    const res = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: el,
+    });
+    expect(res).toMatchObject({ ok: true });
+    await sleep(150);
+    expect(toOwner[0]).toMatchObject({
+      op: { element: { props: { curved: true, doubleHeaded: true } } },
+    });
+  });
+
+  it('loot markers (Phase 12): a registry item is stored; anything else is refused', async () => {
+    const l = await live();
+    const base = {
+      boardId: l.f.boardId,
+      layerId: l.layerIds[0]!,
+      type: 'MARKER',
+      geometry: { at: [100_000, 100_000] },
+      style: STYLE,
+      z: 0,
+    };
+    const send = (props: object) =>
+      ack(l.editor, 'element:upsert', {
+        opId: opId(),
+        boardId: l.f.boardId,
+        element: { ...base, id: opId(), props },
+      });
+    expect(await send({ kind: 'loot', item: 'm416' })).toMatchObject({ ok: true });
+    expect(await send({ kind: 'loot', item: '../../package.json' })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION_ERROR',
+    });
+    expect(await send({ kind: 'pin', item: 'm416' })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION_ERROR',
+    });
+  });
+
+  it('linked own-player markers (Phase 12): a member is accepted, anyone else refused', async () => {
+    const l = await live();
+    const base = {
+      boardId: l.f.boardId,
+      layerId: l.layerIds[0]!,
+      type: 'MARKER',
+      geometry: { at: [100_000, 100_000] },
+      style: STYLE,
+      z: 0,
+    };
+    const ok = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: {
+        ...base,
+        id: opId(),
+        props: { kind: 'own_player', number: 1, memberId: l.f.viewer.id },
+      },
+    });
+    expect(ok).toMatchObject({ ok: true });
+    const outsider = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: {
+        ...base,
+        id: opId(),
+        props: { kind: 'own_player', number: 2, memberId: l.f.outsider.id },
+      },
+    });
+    expect(outsider).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
+    const wrongKind = await ack(l.editor, 'element:upsert', {
+      opId: opId(),
+      boardId: l.f.boardId,
+      element: { ...base, id: opId(), props: { kind: 'enemy_squad', memberId: l.f.viewer.id } },
+    });
+    expect(wrongKind).toMatchObject({ ok: false, code: 'VALIDATION_ERROR' });
   });
 
   it('a viewer emitting via the raw socket is rejected: nothing broadcast, DB unchanged', async () => {

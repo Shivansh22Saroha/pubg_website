@@ -232,6 +232,9 @@ importers:
 
   packages/map-tiles:
     devDependencies:
+      '@rotationlab/shared':
+        specifier: workspace:*
+        version: link:../shared
       file-type:
         specifier: ^22.2.0
         version: 22.2.0

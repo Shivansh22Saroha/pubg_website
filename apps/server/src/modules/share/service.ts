@@ -11,7 +11,7 @@ import { randomToken, sha256Hex } from '../../lib/crypto.js';
 import { AppError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
 import type { AuthUser } from '../../lib/policy.js';
-import { toElement } from '../elements/service.js';
+import { toPublicElement } from '../elements/service.js';
 import { toBoard, toLayer } from '../rooms/mappers.js';
 import type { RoomPolicy } from '../rooms/policy.js';
 
@@ -130,11 +130,7 @@ export function createShareService({
       return {
         board,
         layers: row.board.layers.map(toLayer),
-        elements: row.board.elements.map((e) => ({
-          ...toElement(e),
-          createdBy: null,
-          updatedBy: null,
-        })),
+        elements: row.board.elements.map(toPublicElement),
         expiresAt: row.expiresAt?.toISOString() ?? null,
       };
     },

@@ -34,7 +34,15 @@ function svgText(text: string, attrs: Record<string, string | number>) {
 }
 
 export type MarkerKind =
-  'own_squad' | 'own_player' | 'enemy_squad' | 'vehicle' | 'drop' | 'danger' | 'hold' | 'pin';
+  | 'own_squad'
+  | 'own_player'
+  | 'enemy_squad'
+  | 'vehicle'
+  | 'drop'
+  | 'danger'
+  | 'hold'
+  | 'pin'
+  | 'loot';
 
 const STROKE = { stroke: '#0B0F14', 'stroke-width': 1.5, 'stroke-linejoin': 'round' };
 
@@ -116,6 +124,31 @@ function glyph(
       );
       svg.append(svgEl('rect', { x: 11.5, y: 18, width: 5, height: 7, fill: '#0B0F14' }));
       break;
+    case 'loot':
+      // a crate: the fallback when the item icon is missing, and the badge under it
+      svg.append(
+        svgEl('rect', {
+          x: 2,
+          y: 2,
+          width: 24,
+          height: 24,
+          rx: 5,
+          fill: '#0B0F14',
+          stroke: color,
+          'stroke-width': 2,
+        }),
+      );
+      svg.append(
+        svgEl('path', {
+          'data-loot-crate': '',
+          d: 'M8 10 H20 V20 H8 Z M8 14 H20 M14 10 V20',
+          fill: 'none',
+          stroke: color,
+          'stroke-width': 1.5,
+          'stroke-linejoin': 'round',
+        }),
+      );
+      break;
     case 'pin':
       svg.append(
         svgEl('path', {
@@ -131,8 +164,10 @@ function glyph(
 
 /** Marker icon: glyph + optional label pill under it (≤ 24 chars, as text). */
 export function markerElement(
-  props: { kind?: unknown; number?: unknown; label?: unknown },
+  props: { kind?: unknown; number?: unknown; label?: unknown; item?: unknown },
   color: unknown,
+  /** loot markers (Phase 12): the item's icon URL, built from the allow-listed item id */
+  lootIconUrl?: (itemId: string) => string | null,
 ): HTMLElement {
   const kinds: MarkerKind[] = [
     'own_squad',
@@ -143,6 +178,7 @@ export function markerElement(
     'danger',
     'hold',
     'pin',
+    'loot',
   ];
   const kind = kinds.includes(props.kind as MarkerKind) ? (props.kind as MarkerKind) : 'pin';
   const number = typeof props.number === 'number' ? props.number : undefined;
@@ -150,6 +186,27 @@ export function markerElement(
   const root = document.createElement('div');
   root.className = 'rl-marker';
   root.append(glyph(kind, safeColor(color), number, label));
+  const iconUrl =
+    kind === 'loot' && typeof props.item === 'string' ? (lootIconUrl?.(props.item) ?? null) : null;
+  if (iconUrl) {
+    // drawn over the crate badge; if it fails to load, the crate stays
+    const img = document.createElement('img');
+    img.className = 'rl-loot-icon';
+    img.alt = '';
+    img.crossOrigin = 'anonymous'; // CORS-clean, so Export PNG can draw it (DEPLOYMENT §4)
+    img.decoding = 'async';
+    img.draggable = false;
+    img.addEventListener('error', () => {
+      img.remove();
+    });
+    // loaded: drop the crate lines so they don't show through the icon's transparent parts
+    // (removed from the DOM rather than hidden with CSS, so Export PNG's SVG copy agrees)
+    img.addEventListener('load', () => {
+      root.querySelector('[data-loot-crate]')?.remove();
+    });
+    img.src = iconUrl;
+    root.append(img);
+  }
   if (label && kind !== 'own_squad') {
     const pill = document.createElement('span');
     pill.className = 'rl-marker-label';

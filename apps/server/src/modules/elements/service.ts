@@ -65,6 +65,16 @@ export function toElement(e: ElementRow): Element {
   };
 }
 
+/**
+ * An element as anonymous viewers may see it (share links, `/explore`; Phase 9 / 11 / 12): no
+ * author ids, and no linked member id on own-player markers — the marker then shows "P{n}".
+ */
+export function toPublicElement(e: ElementRow): Element & { createdBy: null; updatedBy: null } {
+  const el = toElement(e);
+  const { memberId: _memberId, ...props } = el.props;
+  return { ...el, props, createdBy: null, updatedBy: null };
+}
+
 type Tx = Prisma.TransactionClient;
 
 /**
@@ -140,6 +150,19 @@ export function createBoardOpsService(d: {
         if (existing && existing.layerId !== el.layerId) {
           const from = await tx.layer.findUnique({ where: { id: existing.layerId } });
           if (from?.locked) throw new AppError('FORBIDDEN', 'Layer is locked');
+        }
+        // Phase 12: a linked own-player marker must point at a current member of this room
+        const memberId = (el.props as { memberId?: string }).memberId;
+        if (memberId) {
+          const member = await tx.roomMember.findFirst({
+            where: { userId: memberId, room: { boards: { some: { id: boardId } } } },
+            select: { userId: true },
+          });
+          if (!member) {
+            throw new AppError('VALIDATION_ERROR', 'The linked player is not in this room', [
+              { path: 'element.props.memberId', issue: 'not_a_member' },
+            ]);
+          }
         }
         if (!existing && elementCount + 1 > ELEMENT_LIMITS.maxElementsPerBoard) {
           throw new AppError(

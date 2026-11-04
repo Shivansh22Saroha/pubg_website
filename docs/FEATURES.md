@@ -86,7 +86,7 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 | **Select (V)** | click to select, Shift+click multi, drag on empty map = pan, Shift+drag = marquee select; drag selected to move; circle shows radius handle; text double-click to edit | – | moving many elements → single `element:batch` on drop (chunked ≤ 50 ops) |
 | **Pen (P)** | press-drag-release | STROKE | points sampled every ≥ 4 px screen distance, simplified (simplify-js, tolerance = 1.5 px in world units at current zoom), max 2 000 points (auto-commit and start a new stroke when exceeded) |
 | **Line (L)** | press-drag-release | LINE | Shift snaps to 15° |
-| **Arrow (A)** | click start, click bends, double-click / Enter to finish; or press-drag-release for a straight arrow | ARROW | max 50 points; head at last point; **double-headed** toggle (⟷) in the style bar (Phase 11): remembered per device for new arrows, and on a selection of arrows it flips them as one undoable edit — stored as `props.doubleHeaded: true` |
+| **Arrow (A)** | click start, click bends, double-click / Enter to finish; or press-drag-release for a straight arrow | ARROW | max 50 points; head at last point; **double-headed** toggle (⟷) in the style bar (Phase 11): remembered per device for new arrows, and on a selection of arrows it flips them as one undoable edit — stored as `props.doubleHeaded: true`; **curved** toggle (∿, Phase 12, same two modes): a smooth curve through every bend (Catmull-Rom, 16 samples per bend), stored as `props.curved: true`; a straight two-point arrow is never marked curved. Rendering, heads, select / eraser hit-testing and thumbnails all use the same sampled curve |
 | **Circle (C)** | press at center, drag radius, release; radius label in m | CIRCLE | Zone preset dropdown places a circle of that radius on click; Shift = draw from edge |
 | **Polygon (G)** | click vertices, click first point or Enter to close; Backspace removes last vertex | POLYGON | min 3, max 200 vertices |
 | **Text (T)** | click → inline input → Enter commits, Esc cancels | TEXT | 1–120 chars, sizes sm/md/lg |
@@ -135,8 +135,10 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 | danger | `#F97316` | – | optional |
 | hold | `#22C55E` | – | optional |
 | pin | layer color | – | optional |
+| loot (Phase 12) | `#A855F7` | – | optional; plus an **item**: one of 80 PUBG item / care-package icons (style bar "Loot item", grouped Care packages / Weapons / Handguns / Throwables / Equipment / Melee; remembered for the next placement; changeable on a selected marker as one undoable edit) |
+- Loot markers (Phase 12): a dark rounded badge in the marker colour with the item icon (24 px) on it; until the icon loads — or if it never does — a crate glyph shows instead. `props.item` is an id from `LOOT_ITEMS` (`packages/shared/src/loot.ts`), never a path or URL; the icon is `{tiles base}/icons/items/<id>.webp`. Export PNG draws the icon too. Names are the in-game ones (PUBG's file `HK416` → "M416").
 - Hover tooltip: label + "placed by {user} · {time ago}".
-- Own player markers can be linked to a member (dropdown) so the IGN label auto-updates (P2).
+- Own player markers can be linked to a member (P2, Phase 12): select one own-player marker → "Linked player" in the style bar (members by IGN, else display name; "Not linked"). The link is stored as `props.memberId` (one undoable edit; it replaces a typed label). The marker's label is resolved when drawn — that member's IGN, else display name — so it follows renames as soon as the room's member list refreshes; nothing name-like is stored. The server accepts only a current member of the room. A link to someone who left shows no label (the glyph still reads "P{n}") and the picker shows "Former member". Share links and `/explore` never receive the member id, so those viewers see "P{n}" only.
 
 ---
 

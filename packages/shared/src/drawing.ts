@@ -27,6 +27,7 @@ export const MARKER_DEFAULT_COLORS: Record<MarkerKind, string | null> = {
   danger: '#F97316',
   hold: '#22C55E',
   pin: null,
+  loot: '#A855F7',
 };
 
 export const STROKE_WIDTHS = [2, 4, 7] as const;

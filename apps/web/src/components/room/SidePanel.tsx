@@ -97,7 +97,13 @@ export function SidePanel({
         {layersView === 'layers' ? (
           <LayersPanel role={role} session={session} />
         ) : (
-          <ElementList role={role} session={session} members={members} meId={meId} />
+          <ElementList
+            role={role}
+            session={session}
+            members={members}
+            meId={meId}
+            boards={boards}
+          />
         )}
       </TabsContent>
       <TabsContent value="members" className="overflow-y-auto p-2">

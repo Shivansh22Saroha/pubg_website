@@ -61,6 +61,7 @@ import {
 } from './TouchChrome';
 import { useChatStore } from '@/stores/chatStore';
 import { useFollowStore } from '@/stores/followStore';
+import { setPlayers } from '@/stores/playersStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 
@@ -181,6 +182,10 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       Object.fromEntries((query.data?.members ?? []).map((m) => [m.user.id, m.user.displayName])),
     [query.data],
   );
+  // linked own-player markers (Phase 12) read members' IGNs from here
+  useEffect(() => {
+    setPlayers(query.data?.members ?? []);
+  }, [query.data]);
   const meId = me.data?.id;
   const nameOf = useMemo(() => makeNameOf(meId ?? '', names), [meId, names]);
   const nameOfRef = useRef(nameOf);
