@@ -47,7 +47,7 @@ function Section({
     <section
       aria-labelledby={`s-${title}`}
       className={cn(
-        'flex flex-col gap-4 rounded-panel border bg-surface p-5',
+        'flex flex-col gap-4 rounded-panel panel-hard bg-surface p-5',
         danger && 'border-danger/60',
       )}
     >

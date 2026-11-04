@@ -27,7 +27,7 @@ export function HalfSheet({ onClose, children }: { onClose: () => void; children
     <aside
       aria-label="Room panel"
       data-testid="panel-sheet"
-      className="fixed inset-x-0 bottom-14 z-[1200] flex h-[50dvh] flex-col rounded-t-panel border-t bg-surface shadow-panel pointer-coarse:bottom-16"
+      className="fixed inset-x-0 bottom-14 z-[1200] flex h-[50dvh] flex-col rounded-t-panel border-t-2 border-border-strong bg-surface pointer-coarse:bottom-16"
     >
       <SheetClose onClose={onClose} />
       <div className="min-h-0 flex-1">{children}</div>
@@ -102,7 +102,7 @@ export function ChatButton({ unread, onClick }: { unread: number; onClick: () =>
       data-testid="chat-fab"
       aria-label={unread > 0 ? `Open chat, ${unread} unread` : 'Open chat'}
       onClick={onClick}
-      className="fixed top-15 right-3 z-[1100] flex size-12 items-center justify-center rounded-full border bg-surface text-text shadow-panel hover:bg-surface-2"
+      className="fixed top-15 right-3 z-[1100] flex size-12 items-center justify-center rounded-full panel-hard bg-surface text-text hover:bg-surface-2"
     >
       <MessageSquare className="size-5" aria-hidden />
       {unread > 0 && (
@@ -191,7 +191,7 @@ export function PhoneBanner() {
         role="note"
         data-testid="phone-banner"
         className={cn(
-          'pointer-events-auto flex items-center gap-1 rounded-full border bg-overlay py-1 pr-1 pl-3 text-xs shadow-panel backdrop-blur',
+          'pointer-events-auto flex items-center gap-1 rounded-full panel-hard bg-surface py-1 pr-1 pl-3 text-xs',
         )}
       >
         Use a larger screen for full drawing tools

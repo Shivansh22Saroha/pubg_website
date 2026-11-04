@@ -12,7 +12,7 @@ export function FollowPill({ names }: { names: Record<string, string> }) {
       <p
         role="status"
         data-testid="follow-pill"
-        className="pointer-events-auto flex items-center gap-2 rounded-full border border-accent bg-surface/95 px-3 py-1 text-sm shadow-panel"
+        className="pointer-events-auto flex items-center gap-2 rounded-full border-2 border-accent bg-surface px-3 py-1 text-sm shadow-[var(--shadow-accent)]"
       >
         <Eye className="size-4 text-accent" aria-hidden />
         Following {names[leaderId] ?? 'a teammate'}

@@ -58,17 +58,21 @@ export function MapThumb({
   );
 }
 
+// Phase 13: solid blocks (dark text on the fill: ≥ 7:1 for owner / editor)
 const ROLE_STYLE: Record<RoomRole, string> = {
-  OWNER: 'border-accent/50 text-accent',
-  EDITOR: 'border-info/50 text-info',
-  VIEWER: 'border-border text-text-muted',
+  OWNER: 'border-bg bg-accent text-accent-fg',
+  EDITOR: 'border-bg bg-info text-accent-fg',
+  VIEWER: 'border-border-strong bg-surface-2 text-text',
 };
 const ROLE_LABEL: Record<RoomRole, string> = { OWNER: 'Owner', EDITOR: 'Editor', VIEWER: 'Viewer' };
 
 export function RoleBadge({ role }: { role: RoomRole }) {
   return (
     <span
-      className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', ROLE_STYLE[role])}
+      className={cn(
+        'rounded-control border-2 px-1.5 py-0.5 text-[11px] font-bold tracking-wide uppercase',
+        ROLE_STYLE[role],
+      )}
     >
       {ROLE_LABEL[role]}
     </span>

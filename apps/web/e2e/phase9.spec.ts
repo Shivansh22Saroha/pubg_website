@@ -96,10 +96,11 @@ test('E2E-12: phone — view + chat mode, limited tools, chat sheet both ways, a
   expect(box?.height).toBeGreaterThan(600); // full screen
   await sheet.getByRole('textbox', { name: 'Message' }).fill('rotating north');
   await sheet.getByRole('button', { name: 'Send' }).tap();
-  await expect(b.getByText('rotating north')).toBeVisible();
+  // the message itself, not the screen-reader announcement of it (also contains the text)
+  await expect(b.getByTestId('chat-body').filter({ hasText: 'rotating north' })).toBeVisible();
   await b.getByRole('textbox', { name: 'Message' }).fill('copy that');
   await b.keyboard.press('Enter');
-  await expect(sheet.getByText('copy that')).toBeVisible();
+  await expect(sheet.getByTestId('chat-body').filter({ hasText: 'copy that' })).toBeVisible();
   await expect(sheet.getByText(nameB).first()).toBeVisible();
   await sheet.getByRole('button', { name: 'Close panel' }).tap();
   await expect(sheet).toHaveCount(0);

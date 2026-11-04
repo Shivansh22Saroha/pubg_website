@@ -35,7 +35,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
   };
 
   return (
-    <article className="group relative overflow-hidden rounded-panel border bg-surface transition-colors hover:border-accent/60">
+    <article className="group relative overflow-hidden rounded-panel panel-hard bg-surface transition-[transform,box-shadow,border-color] duration-150 ease-hud hover:-translate-x-0.5 hover:-translate-y-0.5 hover:border-accent hover:shadow-[var(--shadow-accent-lg)] motion-reduce:hover:translate-0">
       {/* named by its content (room name first): an aria-label would hide the visible text
           from voice-control users (WCAG 2.5.3 label in name) */}
       <Link href={`/rooms/${room.id}`} className="block">

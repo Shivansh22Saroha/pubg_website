@@ -15,7 +15,7 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
     <TabsPrimitive.Trigger
       className={cn(
         'section-label flex-1 px-3 py-2 text-xs text-text-muted hover:text-text pointer-coarse:min-h-11',
-        'data-[state=active]:text-text data-[state=active]:shadow-[inset_0_-2px_0_var(--accent)]',
+        'data-[state=active]:bg-surface-2 data-[state=active]:text-text data-[state=active]:shadow-[inset_0_-3px_0_var(--accent)]',
         className,
       )}
       {...props}

@@ -386,7 +386,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   return (
     <div className="flex h-dvh flex-col" data-layout={breakpoint}>
       {phone ? (
-        <header className="flex h-12 shrink-0 items-center gap-1 border-b bg-bg pr-1">
+        <header className="flex h-12 shrink-0 items-center gap-1 border-b-2 border-border-strong bg-bg pr-1">
           <Link
             href="/dashboard"
             aria-label="Back to dashboard"
@@ -402,7 +402,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           <PhoneRoomMenu items={phoneMenu} />
         </header>
       ) : (
-        <header className="flex h-12 shrink-0 items-stretch border-b bg-bg">
+        <header className="flex h-12 shrink-0 items-stretch border-b-2 border-border-strong bg-bg">
           <Link
             href="/dashboard"
             aria-label="Back to dashboard"
@@ -569,7 +569,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
         </main>
         {panelOpen && !touch && (
           <aside
-            className="w-[340px] shrink-0 border-l bg-surface max-xl:w-[300px]"
+            className="w-[340px] shrink-0 border-l-2 border-border-strong bg-surface max-xl:w-[300px]"
             aria-label="Room panel"
           >
             {sidePanel}

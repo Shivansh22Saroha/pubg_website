@@ -86,7 +86,7 @@ export function BoardTabs({
                 key={b.id}
                 className={cn(
                   'group flex shrink-0 items-center border-r',
-                  active ? 'bg-surface shadow-[inset_0_-2px_0_var(--accent)]' : 'hover:bg-surface',
+                  active ? 'bg-surface shadow-[inset_0_-3px_0_var(--accent)]' : 'hover:bg-surface',
                   dragId && dragId !== b.id && 'data-[over=true]:bg-surface-2',
                 )}
                 draggable={canManage}

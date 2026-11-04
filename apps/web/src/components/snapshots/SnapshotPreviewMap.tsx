@@ -35,7 +35,7 @@ export default function SnapshotPreviewMap({
   const view = useMemo(() => snapshotView(boardId, data), [boardId, data]);
   return (
     <div
-      className="h-[60dvh] min-h-80 overflow-hidden rounded-panel border"
+      className="h-[60dvh] min-h-80 overflow-hidden rounded-panel border-2 border-border-strong"
       data-testid="snapshot-preview"
     >
       <MapCanvas mapId={mapId}>

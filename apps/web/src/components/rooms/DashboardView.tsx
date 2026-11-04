@@ -66,7 +66,7 @@ export function DashboardView() {
               Could not load your rooms.
             </p>
           ) : rooms.data.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-panel border border-dashed p-10 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-panel border-2 border-dashed border-border-strong p-10 text-center">
               <Map className="size-10 text-text-muted" aria-hidden />
               <p className="font-display text-xl font-bold">No rooms yet</p>
               <p className="max-w-sm text-sm text-text-muted">
@@ -84,7 +84,7 @@ export function DashboardView() {
             </div>
           )}
         </section>
-        <aside className="rounded-panel border bg-surface p-4">
+        <aside className="rounded-panel panel-hard bg-surface p-4">
           <JoinWithCode />
         </aside>
       </div>

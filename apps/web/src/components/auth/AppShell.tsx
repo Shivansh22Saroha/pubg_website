@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-4 border-b px-4">
+      <header className="flex h-12 shrink-0 items-center gap-4 border-b-2 border-border-strong px-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-display text-lg font-bold">
           <Crosshair className="size-[18px] text-accent" aria-hidden />
           {PRODUCT_NAME}

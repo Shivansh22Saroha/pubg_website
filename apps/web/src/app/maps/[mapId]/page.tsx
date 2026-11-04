@@ -33,7 +33,7 @@ export default async function MapDevPage({ params }: { params: Promise<{ mapId: 
               aria-current={id === mapId ? 'page' : undefined}
               className={cn(
                 'rounded-control px-3 py-1.5 text-[13px] font-medium text-text-muted hover:bg-surface-2 hover:text-text',
-                id === mapId && 'bg-surface-2 text-text shadow-[inset_0_-2px_0_var(--accent)]',
+                id === mapId && 'bg-surface-2 text-text shadow-[inset_0_-3px_0_var(--accent)]',
               )}
             >
               {MAPS[id].name}

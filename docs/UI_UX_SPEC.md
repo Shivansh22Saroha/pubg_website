@@ -45,8 +45,15 @@ User presence colors: assigned from a separate 12-color list, never the same as 
 
 ### 2.4 Spacing, radius, elevation
 - Spacing scale (px): 4, 8, 12, 16, 24, 32, 48.
-- Radius: 6 px controls, 10 px panels/cards, full for avatars/pills.
-- Shadows: only on floating panels — `0 8px 24px rgba(0,0,0,0.45)`.
+- Radius: 4 px controls, 6 px panels/cards, full for avatars/pills (Phase 13; was 6 / 10).
+- **A touch of neobrutalism (Phase 13):** hard, offset, unblurred shadows and 2 px borders instead of soft blurred elevation. A black block would vanish on the near-black background, so blocks are coloured:
+  - panels / cards / menus / dialogs / map HUD: 2 px `--border-strong` (`#3A4A5E`) border + `4px 4px 0 --block` (`#2E3A4B`), dialogs `6px 6px`; the map HUD, style bar and minimap are solid `--surface` (no backdrop blur);
+  - filled buttons: 2 px edge in `--bg` + `3px 3px 0 --block-accent` (`#8A6100`) on accent, `--block-danger` (`#7F1D1D`) on destructive; outline buttons `2px 2px 0 --block`; the active tool carries the accent block too;
+  - press feedback (`press` utility): hover lifts 1 px, press sinks 2 px into the shadow; none under reduced motion;
+  - inputs / selects: 2 px border on `--bg`, focus = accent border + accent block;
+  - role badges are solid blocks (OWNER accent, EDITOR info, both with dark text); active tabs get a `--surface-2` fill and a 3 px accent underline;
+  - one loud element per page at most: the landing headline's "together." sits on a slightly tilted accent block.
+  Map art, drawings, colours and fonts are unchanged.
 - Motion: 150 ms ease-out for hovers/panels; 300 ms for map fly-to; respect `prefers-reduced-motion` (disable pulses, use instant jumps).
 
 ### 2.5 Icons

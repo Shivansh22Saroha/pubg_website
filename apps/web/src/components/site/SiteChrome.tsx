@@ -7,7 +7,7 @@ import { NavAuth } from './NavAuth';
 /** Top nav of the public pages (UI_UX_SPEC §3.1): logo left, auth actions right. */
 export function SiteHeader({ children }: { children?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-10 border-b bg-bg/95 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b-2 border-border-strong bg-bg">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
         <Link
           href="/"
