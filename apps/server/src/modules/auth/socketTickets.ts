@@ -22,7 +22,7 @@ export interface SocketTickets {
 
 /**
  * Socket tickets (SECURITY A11, API_SPEC §7.1). When the web app and the API live on different
- * sites (Vercel + Railway), the access cookie is first-party to the web origin only — REST
+ * sites (e.g. Vercel + Render), the access cookie is first-party to the web origin only — REST
  * reaches the API through the web origin's rewrite, but a websocket can't be rewritten there.
  * The client asks for a ticket over that same-origin REST path and hands it to the handshake.
  * 256-bit random, stored only as a SHA-256 hash, 60 s, single use.

@@ -190,7 +190,7 @@ export function createRealtime(d: RealtimeDeps): {
       }
       try {
         // the access cookie when it reaches us (same site); otherwise a single-use ticket
-        // fetched over the web origin's REST rewrite (Vercel + Railway, SECURITY A11)
+        // fetched over the web origin's REST rewrite (e.g. Vercel + Render, SECURITY A11)
         let claims: { sub: string; sid: string; exp: number };
         if (token) {
           claims = await d.tokens.verify(token);

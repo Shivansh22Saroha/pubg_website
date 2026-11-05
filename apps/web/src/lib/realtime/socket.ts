@@ -38,7 +38,7 @@ function socketUrl(): string {
 }
 
 /**
- * Socket on another origin (dev, E2E, and Vercel + Railway where it is another *site*): the
+ * Socket on another origin (dev, E2E, and Vercel + Render where it is another *site*): the
  * access cookie may not reach it, so every (re)connect carries a fresh single-use ticket fetched
  * over the same-origin REST path (SECURITY A11). Same origin (Caddy): the cookie is enough.
  * socket.io calls this before each attempt; a failed fetch sends no ticket and the handshake's

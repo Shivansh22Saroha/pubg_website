@@ -12,7 +12,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 const e2eProxy = process.env.E2E_API_PROXY === 'true';
 const internalApiUrl = process.env.INTERNAL_API_URL ?? 'http://localhost:4000';
 /**
- * Vercel + Railway (DEPLOYMENT §10): the API lives on another site. REST goes through this
+ * Vercel + Render (DEPLOYMENT §10): the API lives on another site. REST goes through this
  * rewrite so the browser only ever talks to the web origin and the auth cookies stay
  * first-party; the websocket goes straight to the API with a ticket (SECURITY A11).
  */
