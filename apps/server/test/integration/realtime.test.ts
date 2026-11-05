@@ -26,7 +26,7 @@ import {
   type ClientSocket,
   type RoomFixture,
 } from './harness.js';
-import { cookieHeader, listen } from './harness.js';
+import { cookieHeader, Jar, listen } from './harness.js';
 import { APP_ORIGIN } from '../helpers.js';
 import { io as ioClient } from 'socket.io-client';
 
@@ -121,6 +121,75 @@ describe('handshake (API_SPEC §7.1, SECURITY T2)', () => {
     expect(Object.keys(jar.cookies)).toContain('__Host-rl_at');
     const socket = await connect(prodUrl, jar);
     expect(socket.connected).toBe(true);
+  });
+});
+
+describe('socket tickets (SECURITY A11: web and API on different sites)', () => {
+  const getTicket = async (jar: Parameters<typeof call>[1]) => {
+    const res = await call(app, jar, 'POST', '/api/v1/auth/socket-ticket');
+    expect(res.statusCode).toBe(200);
+    return res.json<{ ticket: string }>().ticket;
+  };
+
+  it('a ticket alone (no cookie) opens a socket for that user', async () => {
+    const f = await setupRoom(app);
+    const ticket = await getTicket(f.owner.jar);
+    expect(ticket).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const socket = await connect(url, null, { auth: { ticket } });
+    const res = await ack(socket, 'room:join', { roomId: f.roomId });
+    expect(res.ok).toBe(true);
+  });
+
+  it('is single use', async () => {
+    const { jar } = await register(app);
+    const ticket = await getTicket(jar);
+    await connect(url, null, { auth: { ticket } });
+    const err = await connect(url, null, { auth: { ticket } }).catch(
+      (e: { data?: { code?: string } }) => e,
+    );
+    expect(err).toMatchObject({ data: { code: 'UNAUTHENTICATED' } });
+  });
+
+  it('rejects unknown, malformed and non-string tickets', async () => {
+    for (const ticket of ['x'.repeat(43), 'short', 42, { a: 1 }]) {
+      const err = await connect(url, null, { auth: { ticket } }).catch(
+        (e: { data?: { code?: string } }) => e,
+      );
+      expect(err).toMatchObject({ data: { code: 'UNAUTHENTICATED' } });
+    }
+  });
+
+  it('still checks the Origin', async () => {
+    const { jar } = await register(app);
+    const ticket = await getTicket(jar);
+    const err = await connect(url, null, {
+      origin: 'https://evil.example',
+      auth: { ticket },
+    }).catch((e: { data?: { code?: string } }) => e);
+    expect(err).toMatchObject({ data: { code: 'FORBIDDEN' } });
+  });
+
+  it('a ticket from a logged-out session is refused', async () => {
+    const { jar } = await register(app);
+    const ticket = await getTicket(jar);
+    expect((await call(app, jar, 'POST', '/api/v1/auth/logout')).statusCode).toBe(204);
+    const err = await connect(url, null, { auth: { ticket } }).catch(
+      (e: { data?: { code?: string } }) => e,
+    );
+    expect(err).toMatchObject({ data: { code: 'UNAUTHENTICATED' } });
+  });
+
+  it('is stored hashed, expires within 60 s, and needs a session', async () => {
+    const { jar } = await register(app);
+    const ticket = await getTicket(jar);
+    expect(await redis.exists(`rt:ticket:${ticket}`)).toBe(0);
+    const keys = await redis.keys('rt:ticket:*');
+    expect(keys.length).toBeGreaterThan(0);
+    const ttl = await redis.ttl(keys[0]!);
+    expect(ttl).toBeGreaterThan(0);
+    expect(ttl).toBeLessThanOrEqual(60);
+    const anon = await call(app, new Jar(), 'POST', '/api/v1/auth/socket-ticket');
+    expect(anon.statusCode).toBe(401);
   });
 });
 

@@ -131,3 +131,95 @@ cd deploy   # env/*.env filled from the templates; .env: REGISTRY= APP_DOMAIN=lo
 COMPOSE_PROJECT=rl-prodtest SKIP_PULL=1 CURL_INSECURE=1 ./deploy.sh local
 ```
 Checked: headers and CSP per response type, `__Host-` / `__Secure-` cookies, `wss://…/realtime` through Caddy, zero CSP violations, rollback from a broken release, an encrypted backup restored into a scratch database, the demo seed from the image, ZAP baseline and the k6 load test (TESTING §7). Scanners on a dotless host send no SNI, which Caddy's internal-CA `localhost` policy rejects; serve a second name (`APP_DOMAIN="localhost, rl.localhost"`) and scan that.
+
+## 10. Free deployment: Vercel + Render + Neon + GitHub Pages
+
+The alternative to §3–§7 for running RotationLab at no cost on free URLs.
+
+| Part | Host (free plan) | Why there |
+|---|---|---|
+| Web app (Next.js) | **Vercel** Hobby | built for Next.js |
+| API + realtime (Fastify + Socket.IO) | **Render** free web service (`render.yaml`) | runs a long-lived Docker process with websockets; Vercel's serverless functions can't hold websockets |
+| Redis | **Render** Key Value, free | same region as the API, internal network |
+| Postgres | **Neon** free | doesn't expire (Render's free Postgres is deleted after 30 days) |
+| Map tiles | **GitHub Pages** (repo `rotationlab-tiles`) | static files on a CDN, `Access-Control-Allow-Origin: *`, no card needed |
+
+```
+browser ──https──► <project>.vercel.app (Next.js on Vercel)
+   │                    │  /api/*  ── rewrite (API_PROXY_URL) ──►┐
+   │                                                              ▼
+   └──wss + ticket──────────────────────────────► rotationlab-api.onrender.com (Fastify + Socket.IO)
+                                                        ├─► Neon Postgres (TLS)
+                                                        └─► Render Key Value (internal)
+   tiles ◄── https://<user>.github.io/rotationlab-tiles/v1
+```
+
+How auth works across the two sites:
+- **REST** goes through the Vercel rewrite. The browser only talks to `*.vercel.app`, so the `__Host-` cookies stay first-party there, and CSRF, `SameSite` and Origin checks work unchanged.
+- **The websocket** connects straight to Render, because Vercel can't proxy websockets. Before every (re)connect the client fetches a 60 s single-use ticket from `POST /api/v1/auth/socket-ticket` over the rewrite, and passes it in the handshake (SECURITY A11). The handshake still checks `Origin` against `APP_ORIGIN`.
+
+### 10.1 What "free" costs you
+- **Render free web services sleep** after 15 minutes without traffic, and an open websocket counts as traffic. The next visitor waits about a minute while it wakes. Vercel waits up to two minutes for the API, so that first request is slow, not failed. 750 free instance hours a month cover one service running all month.
+- **Render Key Value (free) is in memory only.** A restart drops presence, rate-limit counters, open socket tickets and the access-token revocation list; access tokens expire within 15 min anyway. Accounts, rooms and boards live in Postgres and are not affected.
+- **Neon free:** 1 GB storage, 100 compute-hours a month; it sleeps after 5 minutes idle and wakes in under a second. Don't add an uptime pinger that hits `/api/health` every few minutes: it would keep Neon awake all month and use up its compute hours.
+- **No shell on Render free:** one-off tasks (the demo seed) run from your own computer against Neon.
+- **Thumbnails** go to the server's local disk, which resets on every deploy and sleep, so the dashboard falls back to the map image. **Email** stays off. Render free blocks outbound SMTP ports anyway.
+- **Vercel Hobby** is for non-commercial use.
+
+### 10.2 Map tiles → GitHub Pages
+1. Create a public repo `rotationlab-tiles`.
+2. Build the tiles (`pnpm --filter map-tiles run fetch && pnpm --filter map-tiles run build`). Copy `packages/map-tiles/out/` into the repo as `v1/` (so `v1/erangel/…`, `v1/icons/…`, `v1/manifest.json`). Add an empty `.nojekyll` file at the root, then commit and push.
+3. Repo → **Settings → Pages → Source: Deploy from a branch → `main` / root**.
+4. After a minute, `https://<user>.github.io/rotationlab-tiles/v1/erangel/preview.jpg` should open. That base, `https://<user>.github.io/rotationlab-tiles/v1`, is `NEXT_PUBLIC_TILES_BASE_URL`.
+
+GitHub Pages sends `Access-Control-Allow-Origin: *`, so Export PNG works without any CORS setup. New tile build → push it as `v2/` and switch the env var.
+
+### 10.3 Postgres → Neon
+1. neon.com → sign up (GitHub login) → **New project**: Postgres 17, region **AWS Asia Pacific (Singapore)**, the same region as Render below.
+2. **Connect** → turn **Connection pooling off** and copy the *direct* connection string (`postgresql://…neon.tech/neondb?sslmode=require`). Prisma migrations need the direct connection.
+
+### 10.4 API + Redis → Render
+1. render.com → sign up (GitHub login) → **New → Blueprint** → pick `pubg_website`. Render reads `render.yaml`: a free Docker web service `rotationlab-api` and a free Key Value `rotationlab-redis`, both in Singapore.
+2. It asks for the two `sync: false` values:
+   - `APP_ORIGIN` = `https://<your-project>.vercel.app` (pick the Vercel project name now; you can fix it later)
+   - `DATABASE_URL` = the Neon direct string
+   `JWT_SECRET` and `IP_HASH_SALT` are generated; `REDIS_URL` is wired to the Key Value.
+3. **Apply**. The container runs `prisma migrate deploy` and then starts the API. The first build takes a few minutes. `https://rotationlab-api.onrender.com/api/health` should answer `{"status":"ok","db":"ok","redis":"ok",…}` (the URL is shown on the service page).
+
+### 10.5 Web → Vercel
+1. vercel.com → sign up (GitHub login) → **Add New → Project** → import `pubg_website`.
+2. **Root Directory**: `apps/web` (framework: Next.js; Vercel installs from the monorepo root with pnpm).
+3. **Build Command** (override): `cd ../.. && pnpm turbo run build --filter=web`. Turbo builds `@rotationlab/shared` first.
+4. **Environment Variables**:
+   ```
+   NEXT_PUBLIC_APP_ORIGIN=https://<your-project>.vercel.app
+   NEXT_PUBLIC_API_BASE=/api/v1
+   NEXT_PUBLIC_SOCKET_PATH=/realtime
+   NEXT_PUBLIC_SOCKET_URL=https://rotationlab-api.onrender.com
+   NEXT_PUBLIC_TILES_BASE_URL=https://<user>.github.io/rotationlab-tiles/v1
+   API_PROXY_URL=https://rotationlab-api.onrender.com
+   INTERNAL_API_URL=https://rotationlab-api.onrender.com
+   SECURITY_CONTACT=mailto:<you>@example.com
+   ```
+   `NEXT_PUBLIC_*` and `API_PROXY_URL` are baked in at build time: redeploy after changing them.
+5. Project → **Settings → Functions → Region: Singapore (sin1)**. Server-side page renders then run next to the API instead of in the US.
+6. Deploy. If the real domain differs from what you entered, set it in `NEXT_PUBLIC_APP_ORIGIN` (Vercel) and `APP_ORIGIN` (Render → service → Environment), then redeploy both. **Login fails until these match.**
+
+### 10.6 Demo boards for `/explore` (optional)
+From your computer, in the repo, with the Neon direct string:
+```bash
+# PowerShell: $env:DATABASE_URL="postgresql://…?sslmode=require"; $env:NODE_ENV="production"; pnpm --filter server seed --demo-only
+DATABASE_URL="postgresql://…?sslmode=require" NODE_ENV=production pnpm --filter server seed --demo-only
+```
+Copy the printed `DEMO_BOARD_IDS=…` into Render → `rotationlab-api` → Environment (it redeploys). Until then `/explore` shows bare maps.
+
+### 10.7 Check it
+- [ ] The Vercel URL loads the landing page; register and log in work (the first request after a sleep can take about a minute).
+- [ ] Create a room: the sync indicator shows **Synced** (websocket + ticket OK).
+- [ ] A second browser joins with the invite link; drawings and chat appear live on both.
+- [ ] All three maps show tiles (no 404s from `github.io` in the network tab); Export PNG works.
+
+### 10.8 Notes
+- **Previews:** Vercel preview deployments have other URLs than `APP_ORIGIN`, so login works only on the production URL.
+- **Custom domain later:** add it in Vercel, then update `NEXT_PUBLIC_APP_ORIGIN` and `APP_ORIGIN`. Nothing else depends on the domains.
+- **Outgrowing free:** Render's Starter plan removes the sleep; Railway runs the same Docker image (set `RAILWAY_DOCKERFILE_PATH=docker/server.Dockerfile`, the pre-deploy command `./node_modules/.bin/prisma migrate deploy` and healthcheck `/api/health`). The Docker/Caddy VM (§3) needs no ticket at all.

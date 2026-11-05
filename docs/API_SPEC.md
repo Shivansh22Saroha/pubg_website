@@ -66,6 +66,7 @@ Snapshot   = { id, boardId, name, isAuto, elementCount, createdBy: PublicUser|nu
 | `POST /auth/refresh` | refresh cookie | – | `204` + new cookies (rotation) |
 | `POST /auth/logout` | ✓ | – | `204`, clears cookies, revokes refresh token |
 | `POST /auth/logout-all` | ✓ | – | `204`, revokes all user's refresh tokens |
+| `POST /auth/socket-ticket` | ✓ | – | `200 { ticket }`: 43-char single-use ticket for the socket handshake, valid 60 s (SECURITY A11). Rate limit 60 / min / user |
 | `GET  /auth/username-available?u=` | – | – | `200 { available: boolean }` (rate-limited) |
 | `POST /auth/verify-email` | – | `{ token }` | `204` (P1) |
 | `POST /auth/forgot-password` | – | `{ email }` | `202` always (no enumeration) (P1) |
@@ -176,6 +177,7 @@ Implementation notes (Phase 5A/5B):
 - **`summon`** uses the `board.edit` permission (OWNER/EDITOR).
 - **Session expiry:** on connect the server emits `session { expiresAt }` (epoch ms of the access token's `exp`); clients refresh ~60 s before it and reconnect. A socket still open 60 s after `exp` gets `error { code: 'TOKEN_EXPIRED' }` and is disconnected (`io server disconnect`); the client refreshes and reconnects with a delta resync.
 - `connect_error` codes: `UNAUTHENTICATED`, `TOKEN_EXPIRED`, `FORBIDDEN` (Origin ≠ `APP_ORIGIN`), `LIMIT_REACHED` (> 5 sockets per user). In production the cookie is `__Host-rl_at`.
+- **Socket tickets:** when the socket URL's origin differs from the page's (dev, E2E, Vercel + Railway), the client passes `auth: { ticket }` from `POST /auth/socket-ticket`, fetched before every connection attempt. Without the cookie the handshake redeems the ticket instead; an unknown, used or malformed ticket → `UNAUTHENTICATED`, and a ticket whose session token has already expired → `TOKEN_EXPIRED`.
 - Logout, logout-all, password change, session revoke and refresh-token theft disconnect the affected sessions' sockets on every instance (Redis adapter). Kick sends `member:kicked` to the target, then disconnects their sockets for that room.
 - `board:subscribe` / durable ops require a prior `room:join` on that socket (`FORBIDDEN` otherwise); boards of rooms you aren't a member of are `NOT_FOUND`.
 - `element:batch` broadcasts one `board:op` per op (consecutive seqs). Deleting an element that is already gone still gets a seq (no-op) so every client converges.

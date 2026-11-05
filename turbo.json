@@ -7,7 +7,7 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx", ".env*", "!e2e/**"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
-      "env": ["NEXT_PUBLIC_*", "INTERNAL_API_URL"]
+      "env": ["NEXT_PUBLIC_*", "INTERNAL_API_URL", "API_PROXY_URL"]
     },
     "dev": {
       "dependsOn": ["^build"],
@@ -53,6 +53,7 @@
     "RATE_LIMITS_ENABLED",
     "NEXT_PUBLIC_*",
     "INTERNAL_API_URL",
+    "API_PROXY_URL",
     "NEXT_TELEMETRY_DISABLED",
     "REFRESH_REUSE_GRACE_SEC"
   ]

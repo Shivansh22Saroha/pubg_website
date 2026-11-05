@@ -13,6 +13,20 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 
 ## [Unreleased]
 
+### Added
+- 2026-11-05 — **Free deployment: Vercel + Render + Neon + GitHub Pages** (DEPLOYMENT §10, `render.yaml`, SECURITY A11, API_SPEC §2 / §7.1, ENVIRONMENT).
+  - **Socket tickets:** `POST /api/v1/auth/socket-ticket` returns a 60 s single-use ticket (256-bit, stored only as a SHA-256 hash in Redis, `GETDEL` on redeem, 60 / min / user). The handshake accepts `auth: { ticket }` when no access cookie arrives; it keeps the Origin check, the revocation check, the 5-socket cap and the session-expiry timer (from the ticket's stored `exp`). The web client sends a fresh ticket on every (re)connect whenever the socket's origin differs from the page's (dev, E2E and Vercel + Render); same-origin (Docker/Caddy) stays cookie-only.
+  - **`API_PROXY_URL`** (web, build time): production builds rewrite `/api/*` to the API, so REST and its cookies stay first-party on the Vercel origin. Added to `turbo.json` env.
+  - **Redis** connects with `family: 0` (IPv4 + IPv6), for hosts whose private network is IPv6-only (Railway).
+  - **`render.yaml`** Blueprint: a free Docker web service (migrations run on start, as free instances have no pre-deploy step) and a free Key Value, both in Singapore.
+  - Tests: integration +6 (ticket opens a socket alone, single use, malformed / unknown / non-string tickets, Origin still checked, logged-out session refused, hashed storage + TTL + 401 without a session) and an authz-matrix row; E2E now runs the ticket path (its socket is cross-origin).
+
+### Decisions (deployment)
+- Vercel serves only the web app: its serverless functions can't hold the long-lived websockets that live sync needs. Free hosts for the rest: Render (API, Redis), Neon (Postgres; Render's free Postgres is deleted after 30 days), GitHub Pages (tiles; R2 needs a card on file).
+- Tickets rather than a shared cookie domain: the free `vercel.app` and `onrender.com` URLs are different sites (public-suffix domains), so no cookie can be shared. Tickets also keep the `__Host-` cookie (no `Domain`) unchanged.
+- No keep-alive pinger: `/api/health` touches Postgres, so pinging it every few minutes would keep Neon awake all month and use up its 100 free compute-hours. The ~1 min wake-up is within Vercel's 2-minute origin timeout.
+- Verified in a cloud VM: a production web build serving `localhost` with the API on `127.0.0.1`, which the browser treats as different sites. The browser held no cookie for the API host, two users reached **Synced**, and chat crossed the socket. Integration 567/567, E2E 57/57, unit 432/432.
+
 ### Changed
 - 2026-11-04 — **Premium UI pass** (UI_UX_SPEC §2–3; no behaviour, API or data changes).
   - **Tokens** (`globals.css`, UI_UX_SPEC §2.1 updated): deeper graphite base, a third surface step, `--border-strong`, a 1 px inset top highlight on raised surfaces, an accent gradient (`--accent-hi` → `--accent`) with a soft glow. New utilities: `surface-raised`, `glass` (HUD chrome over the map), `app-backdrop` (faint map grid behind non-map pages). Radius 8 / 12 / 18 px. `section-label` is sentence case now.

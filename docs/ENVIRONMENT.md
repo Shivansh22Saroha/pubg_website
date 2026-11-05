@@ -86,6 +86,7 @@ Server-only web settings (Phase 9; `src/lib/serverEnv.ts`) — read per request 
 | `ENABLE_DEV_PAGES` | – | *(unset)* | `true` \| `false`. The `/maps/[mapId]` dev map viewer. Unset: on in development, **off (404) in production**. The E2E build sets `true` for the Phase 2 map test |
 | `MAINTENANCE` | – | `false` | `true` → maintenance banner on every page (pair with the server's `MAINTENANCE`) |
 | `INTERNAL_API_URL` | ✓ | `http://server:4000` | also read per request by the server-side prefetch (dashboard) |
+| `API_PROXY_URL` | Vercel | `https://rotationlab-api.onrender.com` | build time. Production builds rewrite `/api/*` to this API origin (DEPLOYMENT §10). Unset (Docker/Caddy): no rewrite, because Caddy routes `/api` |
 | `SECURITY_CONTACT` | prod | `mailto:security@example.com` | `Contact:` of `/.well-known/security.txt` (SECURITY §13); `mailto:` or `https:` URL. Unset → the file is a 404 |
 | `PUBLIC_ASSETS_BASE_URL` | with S3 | `https://assets.example.com` | the API's thumbnail origin, added to the pages' CSP `img-src` (read per request by `src/proxy.ts`; Phase 11). Same value as the server's |
 

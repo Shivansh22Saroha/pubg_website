@@ -1,0 +1,54 @@
+# Render Blueprint (DEPLOYMENT §10): the API + realtime server and its Redis, on Render's free plan.
+# Render → New → Blueprint → this repo. Postgres is Neon (free, doesn't expire); the web app is Vercel.
+services:
+  - type: web
+    name: rotationlab-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./docker/server.Dockerfile
+    dockerContext: ./
+    # free instances have no pre-deploy step: migrate on start (fast no-op when up to date)
+    dockerCommand: sh -c "./node_modules/.bin/prisma migrate deploy && node dist/index.js"
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '10000'
+      - key: APP_ORIGIN # https://<your-project>.vercel.app
+        sync: false
+      - key: DATABASE_URL # Neon *direct* connection string (pooling off), ends ?sslmode=require
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: rotationlab-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: IP_HASH_SALT
+        generateValue: true
+      - key: JWT_ISSUER
+        value: rotationlab
+      - key: JWT_AUDIENCE
+        value: rotationlab-web
+      - key: COOKIE_SECURE
+        value: 'true'
+      - key: TRUST_PROXY
+        value: 'true'
+      - key: LOG_LEVEL
+        value: info
+      - key: EMAIL_ENABLED
+        value: 'false'
+      - key: MAINTENANCE
+        value: 'false'
+
+  - type: keyvalue
+    name: rotationlab-redis
+    plan: free
+    region: singapore
+    ipAllowList: [] # internal connections only
+    # every key the API writes has a TTL (presence, rate limits, tickets, caches)
+    maxmemoryPolicy: volatile-lru

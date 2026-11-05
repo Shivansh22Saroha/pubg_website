@@ -18,6 +18,7 @@ import { createLockout } from './modules/auth/lockout.js';
 import { createPasswordHasher } from './modules/auth/passwords.js';
 import { createRevocationList } from './modules/auth/revocation.js';
 import { authRoutes } from './modules/auth/routes.js';
+import { createSocketTickets } from './modules/auth/socketTickets.js';
 import { createAuthService } from './modules/auth/service.js';
 import { createPrismaRefreshTokenStore } from './modules/auth/sessionStore.js';
 import { createSessionService } from './modules/auth/sessions.js';
@@ -173,6 +174,7 @@ export async function buildApp({
   });
   // late-bound: realtime is created after the services that revoke sessions
   let dropSessions: (sids: string[]) => void = () => undefined;
+  const tickets = createSocketTickets(redis);
   const revocations = createRevocationList(redis, config.ACCESS_TOKEN_TTL_SEC, (sids) => {
     dropSessions(sids);
   });
@@ -284,6 +286,8 @@ export async function buildApp({
     rateLimits: config.RATE_LIMITS_ENABLED,
     ipHashSalt: config.IP_HASH_SALT,
     email,
+    tokens,
+    tickets,
   });
   await app.register(userRoutes, { prefix: '/api/v1', auth, account, cookies });
   app.get(
@@ -319,6 +323,7 @@ export async function buildApp({
       appOrigin: config.APP_ORIGIN,
       accessCookieName: cookies.accessName,
       tokens,
+      tickets,
       revocations,
       policy,
       rooms,
