@@ -184,7 +184,7 @@ GitHub Pages sends `Access-Control-Allow-Origin: *`, so Export PNG works without
    - `APP_ORIGIN` = `https://<your-project>.vercel.app` (pick the Vercel project name now; you can fix it later)
    - `DATABASE_URL` = the Neon direct string
    `JWT_SECRET` and `IP_HASH_SALT` are generated; `REDIS_URL` is wired to the Key Value.
-3. **Apply**. The container runs `prisma migrate deploy` and then starts the API. The first build takes a few minutes. `https://rotationlab-api.onrender.com/api/health` should answer `{"status":"ok","db":"ok","redis":"ok",…}` (the URL is shown on the service page).
+3. **Apply**. The container runs `scripts/start.sh` (`prisma migrate deploy`, then the API). The first build takes a few minutes. `https://rotationlab-api.onrender.com/api/health` should answer `{"status":"ok","db":"ok","redis":"ok",…}` (the URL is shown on the service page).
 
 ### 10.5 Web → Vercel
 1. vercel.com → sign up (GitHub login) → **Add New → Project** → import `pubg_website`.

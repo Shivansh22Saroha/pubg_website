@@ -8,8 +8,9 @@ services:
     region: singapore
     dockerfilePath: ./docker/server.Dockerfile
     dockerContext: ./
-    # free instances have no pre-deploy step: migrate on start (fast no-op when up to date)
-    dockerCommand: sh -c "./node_modules/.bin/prisma migrate deploy && node dist/index.js"
+    # free instances have no pre-deploy step: migrate on start (fast no-op when up to date).
+    # Render runs this without a shell, hence a script rather than `sh -c "… && …"`.
+    dockerCommand: sh scripts/start.sh
     healthCheckPath: /api/health
     autoDeployTrigger: commit
     envVars:
