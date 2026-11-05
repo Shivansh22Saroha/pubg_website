@@ -118,7 +118,7 @@ export function RegisterForm({ redirectTo }: { redirectTo: string }) {
       noValidate
       className="flex flex-col gap-4"
     >
-      <h1 className="font-display text-2xl font-bold">Create your account</h1>
+      <h1 className="font-display text-[30px] leading-none font-bold">Create your account</h1>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">Email</Label>
@@ -211,7 +211,7 @@ export function RegisterForm({ redirectTo }: { redirectTo: string }) {
         Already have an account?{' '}
         <Link
           href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
-          className="text-info underline underline-offset-2 hover:no-underline"
+          className="font-medium text-accent underline-offset-4 hover:underline"
         >
           Log in
         </Link>

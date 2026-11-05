@@ -86,7 +86,9 @@ export function BoardTabs({
                 key={b.id}
                 className={cn(
                   'group flex shrink-0 items-center border-r',
-                  active ? 'bg-surface shadow-[inset_0_-2px_0_var(--accent)]' : 'hover:bg-surface',
+                  active
+                    ? 'bg-[linear-gradient(180deg,rgba(245,179,1,0.1),rgba(245,179,1,0.02))] shadow-[inset_0_-2px_0_var(--accent)]'
+                    : 'hover:bg-surface-2/60',
                   dragId && dragId !== b.id && 'data-[over=true]:bg-surface-2',
                 )}
                 draggable={canManage}
@@ -117,8 +119,8 @@ export function BoardTabs({
                     onSelect(b.id);
                   }}
                   className={cn(
-                    'flex h-12 items-center gap-1.5 px-3 text-[13px]',
-                    active ? 'text-text' : 'text-text-muted',
+                    'flex h-12 items-center gap-2 px-3.5 text-[13px] font-medium transition-colors',
+                    active ? 'text-text [&>svg]:text-accent' : 'text-text-muted hover:text-text',
                   )}
                 >
                   <MapIcon className="size-3.5" aria-hidden />

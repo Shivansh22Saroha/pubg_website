@@ -22,10 +22,10 @@ export function DashboardView() {
   if (!user) return null;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8">
+    <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10">
       <div className="flex flex-wrap items-center gap-3">
         <h1
-          className="mr-auto font-display text-[32px] leading-tight font-bold"
+          className="mr-auto font-display text-[40px] leading-none font-bold"
           data-testid="dashboard-greeting"
         >
           Welcome, {user.displayName}
@@ -50,9 +50,9 @@ export function DashboardView() {
         <NewRoomDialog />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
+      <div className="grid items-start gap-8 lg:grid-cols-[1fr_280px]">
         <section aria-labelledby="rooms-heading" className="flex flex-col gap-3">
-          <h2 id="rooms-heading" className="section-label text-sm text-text-muted">
+          <h2 id="rooms-heading" className="section-label text-base text-text-muted">
             Your rooms
           </h2>
           {rooms.isPending ? (
@@ -66,7 +66,7 @@ export function DashboardView() {
               Could not load your rooms.
             </p>
           ) : rooms.data.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-panel border border-dashed p-10 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-hero border border-dashed border-border-strong bg-surface/50 p-12 text-center">
               <Map className="size-10 text-text-muted" aria-hidden />
               <p className="font-display text-xl font-bold">No rooms yet</p>
               <p className="max-w-sm text-sm text-text-muted">
@@ -84,7 +84,7 @@ export function DashboardView() {
             </div>
           )}
         </section>
-        <aside className="rounded-panel border bg-surface p-4">
+        <aside className="surface-raised rounded-panel p-5 lg:sticky lg:top-20">
           <JoinWithCode />
         </aside>
       </div>

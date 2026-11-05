@@ -26,7 +26,7 @@ export function JoinWithCode() {
         router.push(`/join/${parsed.data}`);
       }}
     >
-      <label htmlFor="join-code" className="section-label text-xs text-text-muted">
+      <label htmlFor="join-code" className="section-label text-sm text-text-muted">
         Have an invite code?
       </label>
       <div className="flex gap-2">

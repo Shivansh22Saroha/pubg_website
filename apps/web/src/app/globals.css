@@ -2,14 +2,21 @@
 
 /* Design tokens — UI_UX_SPEC §2. Dark theme is the only theme in v1. */
 :root {
-  --bg: #0b0f14;
-  --surface: #121821;
-  --surface-2: #18202b;
-  --overlay: rgba(18, 24, 33, 0.88);
-  --border: #263241;
-  --text: #e6edf3;
-  --text-muted: #8b98a9;
-  --accent: #f2a900;
+  /* Premium pass (2026-11): deeper graphite base, layered surfaces, a hairline highlight on
+     raised edges. Same roles as UI_UX_SPEC §2.1; contrast re-checked (muted ≥ 6:1 on surface). */
+  --bg: #090c11;
+  --surface: #10151c;
+  --surface-2: #161d26;
+  --surface-3: #1c2531;
+  --overlay: rgba(13, 18, 25, 0.78);
+  --border: #222c39;
+  --border-strong: #324154;
+  --highlight: rgba(255, 255, 255, 0.06);
+  --text: #e8edf2;
+  --text-muted: #8e9aab;
+  --accent: #f5b301;
+  --accent-hi: #ffcb3d;
+  --accent-glow: rgba(245, 179, 1, 0.28);
   --accent-fg: #111111;
   --success: #22c55e;
   --warning: #f59e0b;
@@ -25,8 +32,11 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-overlay: var(--overlay);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent-hi: var(--accent-hi);
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent);
@@ -72,9 +82,13 @@
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 
   /* Radius & elevation — §2.4 (spacing uses Tailwind's 4 px scale: 1,2,3,4,6,8,12) */
-  --radius-control: 6px;
-  --radius-panel: 10px;
-  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --radius-hero: 18px;
+  --shadow-panel:
+    inset 0 1px 0 var(--highlight), 0 16px 40px -12px rgba(0, 0, 0, 0.7),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-raise: inset 0 1px 0 var(--highlight), 0 1px 2px rgba(0, 0, 0, 0.4);
 
   /* Motion — §2.4 */
   --ease-hud: cubic-bezier(0, 0, 0.2, 1);
@@ -119,8 +133,85 @@
 @utility section-label {
   font-family: var(--font-display);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+}
+
+/* Raised surface: hairline top highlight + soft depth. Used for cards and side panels. */
+@utility surface-raised {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-raise);
+}
+
+/* HUD glass: chrome that floats over the map (toolbars, HUD, minimap, tabs bar). */
+@utility glass {
+  background-color: var(--overlay);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* App backdrop for non-map pages: the map grid, very faint, fading out from the top. */
+@utility app-backdrop {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 179, 1, 0.07), transparent 70%),
+    linear-gradient(to bottom, transparent, var(--bg) 70%),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    96px 96px,
+    96px 96px;
+}
+
+/* ---- landing hero: the one animated moment (a rotation drawn across Erangel) ---------------- */
+@keyframes rl-route-draw {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes rl-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.rl-route {
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation: rl-route-draw 1.6s cubic-bezier(0.65, 0, 0.35, 1) 0.5s forwards;
+}
+.rl-pop {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rl-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rl-route {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .rl-pop {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* the sea beyond the art reads as the page, not Leaflet's grey */
+.leaflet-container {
+  background-color: var(--bg);
+  font-family: var(--font-sans);
 }
 
 /* ---- touch (UI_UX_SPEC §7) ------------------------------------------------------------------ */
@@ -163,9 +254,12 @@
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(9, 12, 17, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.45);
   color: var(--text);
   font: 600 11px/1.4 var(--font-sans);
 }
@@ -174,9 +268,12 @@
   display: inline-block;
   transform: translate(-50%, -50%) scale(var(--rl-text-scale, 1));
   white-space: pre;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(9, 12, 17, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.45);
   font-family: var(--font-sans);
   font-weight: 600;
   line-height: 1.4;

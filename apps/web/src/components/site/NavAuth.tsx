@@ -52,13 +52,19 @@ export function NavAuth() {
 }
 
 /** Hero CTA: a new room needs an account — register, or straight to the dashboard. */
-export function CreateRoomCta({ className }: { className?: string }) {
+export function CreateRoomCta({
+  className,
+  label = 'Create a room',
+}: {
+  className?: string;
+  label?: string;
+}) {
   return (
     <Link
       href={useSignedIn() ? '/dashboard' : '/register'}
       className={buttonVariants({ variant: 'accent', className })}
     >
-      Create a room
+      {label}
     </Link>
   );
 }

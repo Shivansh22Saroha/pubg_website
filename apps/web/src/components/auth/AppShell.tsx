@@ -1,12 +1,12 @@
 'use client';
 
-import { PRODUCT_NAME } from '@rotationlab/shared';
-import { Crosshair, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { useMe } from '@/hooks/useMe';
 import { ApiError } from '@/lib/api';
+import { Wordmark } from '@/components/site/SiteChrome';
 import { VerifyBanner } from './EmailFlows';
 import { UserMenu } from './UserMenu';
 
@@ -29,11 +29,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (pathname.startsWith('/rooms/')) return children;
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-4 border-b px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 font-display text-lg font-bold">
-          <Crosshair className="size-[18px] text-accent" aria-hidden />
-          {PRODUCT_NAME}
+    <div className="app-backdrop flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b bg-bg/75 px-4 backdrop-blur-md">
+        <Link href="/dashboard" className="rounded-control">
+          <Wordmark />
         </Link>
         <div className="ml-auto">{me.data && <UserMenu user={me.data} />}</div>
       </header>

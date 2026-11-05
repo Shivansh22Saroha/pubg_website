@@ -172,7 +172,18 @@ export function ChatPanel({
         data-testid="chat-list"
       >
         <div ref={top} aria-hidden className="h-1" />
-        {loaded && !nextCursor && (
+        {loaded && !nextCursor && groups.length === 0 && (
+          <div className="mx-auto mt-10 flex max-w-60 flex-col items-center gap-2 text-center">
+            <span className="flex size-10 items-center justify-center rounded-full border border-border-strong bg-surface-2">
+              <MapPin className="size-4 text-accent" aria-hidden />
+            </span>
+            <p className="font-display text-base font-bold">Start of the room chat</p>
+            <p className="text-xs leading-relaxed text-text-muted">
+              Call rotations here. Alt+click the map to drop a ping the squad can jump to.
+            </p>
+          </div>
+        )}
+        {loaded && !nextCursor && groups.length > 0 && (
           <p className="py-2 text-center text-xs text-text-muted">Start of the room chat</p>
         )}
         {!loaded && <p className="py-4 text-center text-sm text-text-muted">Loading chat…</p>}
@@ -495,7 +506,7 @@ function Composer({ boards, session }: { boards: Board[]; session: RoomSession |
             }
             if (e.key === 'Escape') e.currentTarget.blur();
           }}
-          className="max-h-28 min-h-9 flex-1 resize-none rounded-control border bg-bg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-accent [field-sizing:content]"
+          className="max-h-28 min-h-10 flex-1 resize-none rounded-control border bg-bg/70 px-3 py-2 text-sm shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] outline-none hover:border-border-strong focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)] [field-sizing:content]"
         />
         <button
           type="button"

@@ -386,7 +386,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   return (
     <div className="flex h-dvh flex-col" data-layout={breakpoint}>
       {phone ? (
-        <header className="flex h-12 shrink-0 items-center gap-1 border-b bg-bg pr-1">
+        <header className="relative z-30 flex h-12 shrink-0 items-center gap-1 border-b bg-[linear-gradient(180deg,var(--surface),var(--bg))] pr-1">
           <Link
             href="/dashboard"
             aria-label="Back to dashboard"
@@ -402,7 +402,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           <PhoneRoomMenu items={phoneMenu} />
         </header>
       ) : (
-        <header className="flex h-12 shrink-0 items-stretch border-b bg-bg">
+        <header className="relative z-30 flex h-12 shrink-0 items-stretch border-b bg-[linear-gradient(180deg,var(--surface),var(--bg))] shadow-[0_1px_0_rgba(0,0,0,0.4)]">
           <Link
             href="/dashboard"
             aria-label="Back to dashboard"
@@ -411,7 +411,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             <ArrowLeft className="size-4" />
           </Link>
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex max-w-56 shrink-0 items-center gap-1 border-r px-3 font-display text-base font-bold hover:bg-surface">
+            <DropdownMenuTrigger className="flex max-w-56 shrink-0 items-center gap-1.5 border-r px-4 font-display text-[17px] font-bold tracking-[0.01em] hover:bg-surface-2">
               <span className="truncate" data-testid="room-name">
                 {room.name}
               </span>
@@ -569,7 +569,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
         </main>
         {panelOpen && !touch && (
           <aside
-            className="w-[340px] shrink-0 border-l bg-surface max-xl:w-[300px]"
+            className="w-[340px] shrink-0 border-l bg-surface shadow-[-12px_0_32px_-24px_rgba(0,0,0,0.8)] max-xl:w-[300px]"
             aria-label="Room panel"
           >
             {sidePanel}

@@ -1,7 +1,7 @@
 'use client';
 
 import { MAPS, type RoomSummary } from '@rotationlab/shared';
-import { Lock, MoreVertical, Users } from 'lucide-react';
+import { Clock, Lock, MoreVertical, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
   };
 
   return (
-    <article className="group relative overflow-hidden rounded-panel border bg-surface transition-colors hover:border-accent/60">
+    <article className="group surface-raised relative overflow-hidden rounded-panel transition-[border-color,box-shadow] duration-200 hover:border-accent/50 hover:shadow-[inset_0_1px_0_var(--highlight),0_18px_40px_-18px_rgba(0,0,0,0.9),0_0_0_1px_rgba(245,179,1,0.12)]">
       {/* named by its content (room name first): an aria-label would hide the visible text
           from voice-control users (WCAG 2.5.3 label in name) */}
       <Link href={`/rooms/${room.id}`} className="block">
@@ -45,34 +45,44 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
             variant="card"
             src={room.thumbnailUrl}
             priority={priority}
-            className="size-full opacity-80"
+            className="size-full opacity-85 transition-[opacity,transform] duration-300 group-hover:scale-[1.03] group-hover:opacity-100"
           />
-          <span className="absolute bottom-2 left-2 rounded-full bg-overlay px-2 py-0.5 text-[11px] font-medium">
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-[linear-gradient(180deg,transparent_45%,rgba(9,12,17,0.75))]"
+          />
+          <span className="absolute bottom-2.5 left-3 rounded-full border border-white/10 bg-black/45 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
             {MAPS[room.primaryMapId].name}
           </span>
         </div>
-        <div className="flex flex-col gap-1.5 p-4">
-          <h3 className="flex items-center gap-1.5 truncate font-display text-lg font-bold">
+        <div className="flex flex-col gap-2 p-4">
+          <h3 className="flex items-center gap-1.5 truncate font-display text-xl leading-tight font-bold">
             {room.name}
             {room.hasPassword && (
               <Lock className="size-3.5 text-text-muted" aria-label="Password protected" />
             )}
           </h3>
-          <p className="flex items-center gap-2 text-xs text-text-muted">
-            <span className="flex items-center gap-1">
+          <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-text-muted">
+            <span className="flex items-center gap-1.5">
               <span
                 aria-hidden
                 className={
                   room.onlineCount > 0
-                    ? 'size-2 rounded-full bg-success'
-                    : 'size-2 rounded-full bg-border'
+                    ? 'size-2 rounded-full bg-success shadow-[0_0_0_3px_rgba(34,197,94,0.18)]'
+                    : 'size-2 rounded-full bg-border-strong'
                 }
               />
               {room.onlineCount} online
             </span>
-            · <Users className="size-3" aria-hidden /> {room.memberCount} ·{' '}
-            {/* server-rendered: the server's clock may sit on the other side of a minute */}
-            <span suppressHydrationWarning>{timeAgo(room.lastActivityAt)}</span>
+            <span className="flex items-center gap-1.5">
+              <Users className="size-3.5" aria-hidden />
+              {room.memberCount} {room.memberCount === 1 ? 'member' : 'members'}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="size-3.5" aria-hidden />
+              {/* server-rendered: the server's clock may sit on the other side of a minute */}
+              <span suppressHydrationWarning>{timeAgo(room.lastActivityAt)}</span>
+            </span>
           </p>
           <p className="flex items-center gap-2 text-xs text-text-muted">
             <RoleBadge role={room.role} /> {room.boardCount} board{room.boardCount === 1 ? '' : 's'}
@@ -83,7 +93,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`Actions for ${room.name}`}
-          className="absolute top-2 right-2 rounded-control bg-overlay p-1.5 text-text-muted hover:text-text"
+          className="absolute top-2.5 right-2.5 rounded-control border border-white/10 bg-black/45 p-1.5 text-text/80 backdrop-blur hover:text-text"
         >
           <MoreVertical className="size-4" />
         </DropdownMenuTrigger>
