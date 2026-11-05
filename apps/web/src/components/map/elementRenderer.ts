@@ -39,6 +39,31 @@ export interface SyncStats {
   replaced: number;
   removed: number;
   reordered: boolean;
+  /** vector elements that just appeared and should play their entrance (motion library) */
+  entered: { el: ViewElement; layer: Leaflet.Layer }[];
+}
+
+/** Entrance animations (motion library): off for the first load, bulk changes and own edits. */
+export interface EnterOptions {
+  /** animate this sync at all (board ready, not the initial load, motion allowed) */
+  animate: boolean;
+  /** the viewer: their own new vectors were just drawn by hand, so they don't replay */
+  meId?: string;
+}
+
+/** more new elements than this in one sync is a load / restore / paste, not someone drawing */
+export const MAX_ENTERING = 12;
+
+/** true when two versions of an element draw identically (only seq/timestamps/authors differ) */
+export function sameLook(a: ViewElement, b: ViewElement): boolean {
+  return (
+    a.type === b.type &&
+    a.layerId === b.layerId &&
+    a.z === b.z &&
+    JSON.stringify(a.geometry) === JSON.stringify(b.geometry) &&
+    JSON.stringify(a.style) === JSON.stringify(b.style) &&
+    JSON.stringify(a.props) === JSON.stringify(b.props)
+  );
 }
 
 const ll = ([x, y]: Pt): LatLngTuple => [y, x]; // LatLng == world units: lat = y, lng = x
@@ -99,7 +124,7 @@ export class ElementRenderer {
     return [ll(tip), ll([bx - uy * half, by + ux * half]), ll([bx + uy * half, by - ux * half])];
   }
 
-  private create(el: ViewElement): { layer: Leaflet.Layer; vector: boolean } {
+  private create(el: ViewElement, enter = false): { layer: Leaflet.Layer; vector: boolean } {
     const { L, renderer } = this;
     const color = safeColor(el.style.color);
     const width = el.style.width;
@@ -175,9 +200,13 @@ export class ElementRenderer {
         };
       }
       case 'MARKER': {
+        const kind = typeof el.props.kind === 'string' ? el.props.kind : 'pin';
         const icon = L.divIcon({
           html: markerElement(el.props, color, this.lootIconUrl),
-          className: 'rl-marker-icon',
+          // motion library: drop markers parachute in, enemy squads flash, the rest pop in
+          className: enter
+            ? `rl-marker-icon rl-enter ${kind === 'drop' ? 'rl-enter-drop' : kind === 'enemy_squad' ? 'rl-enter-alert' : 'rl-enter-pop'}`
+            : 'rl-marker-icon',
           iconSize: [28, 28],
           iconAnchor: [14, 14],
         });
@@ -206,8 +235,12 @@ export class ElementRenderer {
   // ---- sync -------------------------------------------------------------------------------
 
   /** Diff the store view against what's on the map. */
-  sync(elements: Readonly<Record<string, ViewElement>>, layers: readonly BoardLayer[]): SyncStats {
-    const stats: SyncStats = { created: 0, replaced: 0, removed: 0, reordered: false };
+  sync(
+    elements: Readonly<Record<string, ViewElement>>,
+    layers: readonly BoardLayer[],
+    enter: EnterOptions = { animate: false },
+  ): SyncStats {
+    const stats: SyncStats = { created: 0, replaced: 0, removed: 0, reordered: false, entered: [] };
     let layersChanged = false;
     for (const l of layers) {
       if (this.layerPos.get(l.id) !== l.position || this.layerVisible.get(l.id) !== l.visible)
@@ -224,17 +257,32 @@ export class ElementRenderer {
         stats.removed++;
       }
     }
+    let fresh = 0;
+    if (enter.animate) for (const id in elements) if (!this.entries.has(id)) fresh++;
+    const animate = enter.animate && fresh > 0 && fresh <= MAX_ENTERING;
+    const entering = new Set<string>();
     for (const el of Object.values(elements)) {
       const entry = this.entries.get(el.id);
-      if (entry && entry.el === el && !(layersChanged && !entry.vector)) continue;
+      if (entry && !(layersChanged && !entry.vector)) {
+        if (entry.el === el) continue;
+        // a server ack (new seq / timestamps, same drawing) keeps the layer: no rebuild, and a
+        // marker's entrance animation isn't cut off and restarted mid-flight
+        if (sameLook(entry.el, el)) {
+          entry.el = el;
+          continue;
+        }
+      }
       if (entry) {
         if (entry.onMap) this.map.removeLayer(entry.layer);
         stats.replaced++;
       } else {
         stats.created++;
       }
-      const made = this.create(el);
+      // markers animate for everyone (the placer sees it land too); vectors only for others
+      const isNew = animate && !entry;
+      const made = this.create(el, isNew && el.type === 'MARKER');
       this.entries.set(el.id, { el, ...made, onMap: false });
+      if (isNew && made.vector && el.createdBy !== enter.meId) entering.add(el.id);
     }
 
     // visibility: layers that are hidden (or unknown) keep their elements off the map
@@ -245,6 +293,7 @@ export class ElementRenderer {
         this.map.addLayer(entry.layer);
         entry.onMap = true;
         if (entry.vector) added.add(entry.el.id);
+        if (entering.has(entry.el.id)) stats.entered.push({ el: entry.el, layer: entry.layer });
       } else if (!visible && entry.onMap) {
         this.map.removeLayer(entry.layer);
         entry.onMap = false;

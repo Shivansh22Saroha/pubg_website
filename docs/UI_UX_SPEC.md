@@ -233,6 +233,18 @@ Shortcuts disabled while focus is in an input, a dialog or a menu. On macOS the 
 - **Reconnecting**: sync indicator amber, drawing still allowed (queued).
 - Toasts bottom-left, max 3, auto-dismiss 4 s.
 
+### 9.1 Motion library (2026-11)
+Every animation answers something a person did; nothing loops while the tab is idle. All of it is off under `prefers-reduced-motion`.
+- **Teammates' drawings arrive with an entrance** (only things someone *else* drew; never on the board's first load, a board switch, a reset, or a batch of more than 12): lines, strokes and arrows trace themselves along their path (650 ms); circles close in from 1.35× like a shrinking zone (750 ms); polygons fade in (450 ms). The canvas can't animate, so a short-lived SVG copy plays on the `elements-fx` pane while the real element is hidden, then hands back.
+- **Markers land** for everyone, the placer included: drop markers parachute in with a dust ring, enemy squads pop and shake with a red ring, every other kind pops. A server ack that changes nothing visible keeps the layer, so the entrance isn't cut off.
+- **Cursors glide** between their 20 Hz updates (110 ms linear).
+- **Pings** have a third ring.
+- **Sync indicator**: one green pulse each time changes land (the dot), a spinner while reconnecting; saving and offline keep their glyphs. Text labels are unchanged.
+- **Board switch**: the new board wipes in from the left (420 ms clip-path).
+- **Snapshot restore**: a rewind mark spins once over the map, alongside the existing toast.
+- **Waking the server**: any request pending for over 2.5 s shows a bottom-centre card with a radar sweep — "Waking the server… It naps when nobody is planning. Up to 30 s." (free hosting sleeps when idle). It never takes clicks.
+- E2E runs with reduced motion (the animations cost real CPU in software-rendered headless Chrome and move marker boxes while tests measure them); `motion.spec.ts` and the ping fly-to test opt back in.
+
 ## 10. Accessibility
 - All toolbar buttons have `aria-label` + `aria-pressed`.
 - Panels are landmark regions; tab order: top bar → toolbar → map → right panel.
