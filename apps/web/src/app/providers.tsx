@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { Toaster } from 'sonner';
+import { WakingServer } from '@/components/motion/WakingServer';
 import { ApiError } from '@/lib/api';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -21,6 +22,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       {children}
+      <WakingServer />
       {/* UI_UX_SPEC §9: bottom-left, max 3, 4 s */}
       <Toaster position="bottom-left" visibleToasts={3} duration={4000} theme="dark" />
     </QueryClientProvider>

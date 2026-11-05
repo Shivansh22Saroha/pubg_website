@@ -6,6 +6,7 @@ import {
   type ErrorCode,
 } from '@rotationlab/shared';
 import type { z } from 'zod';
+import { trackSlow } from './slowRequests';
 
 const API_BASE = '/api/v1'; // same origin in every environment (ARCHITECTURE §1)
 
@@ -43,17 +44,23 @@ function send(
   raw?: { data: Blob; type: string },
 ) {
   const json = body !== undefined && !raw;
-  return fetch(`${API_BASE}${path}`, {
-    method,
-    credentials: 'include', // httpOnly cookies only — no tokens in JS, storage or URLs
-    cache: 'no-store',
-    headers: {
-      [CSRF_HEADER]: CSRF_HEADER_VALUE,
-      ...(raw ? { 'content-type': raw.type } : json ? { 'content-type': 'application/json' } : {}),
-    },
-    ...(raw ? { body: raw.data } : json ? { body: JSON.stringify(body) } : {}),
-    ...(signal ? { signal } : {}),
-  });
+  return trackSlow(
+    fetch(`${API_BASE}${path}`, {
+      method,
+      credentials: 'include', // httpOnly cookies only — no tokens in JS, storage or URLs
+      cache: 'no-store',
+      headers: {
+        [CSRF_HEADER]: CSRF_HEADER_VALUE,
+        ...(raw
+          ? { 'content-type': raw.type }
+          : json
+            ? { 'content-type': 'application/json' }
+            : {}),
+      },
+      ...(raw ? { body: raw.data } : json ? { body: JSON.stringify(body) } : {}),
+      ...(signal ? { signal } : {}),
+    }),
+  );
 }
 
 async function toError(res: Response): Promise<ApiError> {

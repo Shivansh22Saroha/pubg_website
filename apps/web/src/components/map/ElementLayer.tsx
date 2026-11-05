@@ -11,6 +11,8 @@ import { useBoardStore } from '@/stores/boardStore';
 import type { ViewElement } from '@/stores/boardModel';
 import { usePlayersStore } from '@/stores/playersStore';
 import { useSelectionStore } from '@/stores/selectionStore';
+import { prefersReducedMotion } from '@/lib/motion';
+import { FX_PANE, playEntrance } from './elementFx';
 import { ElementRenderer } from './elementRenderer';
 
 export const ELEMENTS_PANE = 'elements';
@@ -28,13 +30,19 @@ export function textScale(zoom: number, maxNativeZoom: number) {
  * a remote op never re-renders React. An in-progress move / resize drag is drawn from the
  * selection store's transform, and layers hidden in this tab only (Alt+click) stay off.
  */
-export function ElementLayer({ config }: { config: MapConfig }) {
+export function ElementLayer({ config, meId }: { config: MapConfig; meId?: string }) {
   const map = useMap();
 
   useEffect(() => {
     if (!map.getPane(ELEMENTS_PANE)) map.createPane(ELEMENTS_PANE).style.zIndex = '400';
     const canvas = L.canvas({ pane: ELEMENTS_PANE, padding: 0.5 });
     const renderer = new ElementRenderer(L, map, canvas, tileWorldSize(config), ICON_BASE);
+    // motion library: entrance ghosts on an SVG pane right above the canvas
+    if (!map.getPane(FX_PANE)) map.createPane(FX_PANE).style.zIndex = '401';
+    const fxRenderer = L.svg({ pane: FX_PANE });
+    const running = new Set<() => void>();
+    // no entrances on the first ready render (the board loading), nor after a reset
+    let primed = false;
     const container = map.getContainer();
     const applyScale = () => {
       container.style.setProperty(
@@ -55,7 +63,17 @@ export function ElementLayer({ config }: { config: MapConfig }) {
           : view.layers;
         // linked own-player markers show their member's IGN (Phase 12)
         const named = withPlayerLabels(view.elements, usePlayersStore.getState().byId, labelCache);
-        renderer.sync(withTransform(named, transform), layers);
+        const { ready } = useBoardStore.getState();
+        const stats = renderer.sync(withTransform(named, transform), layers, {
+          animate: ready && primed && !prefersReducedMotion(),
+          meId,
+        });
+        primed = ready;
+        for (const { el, layer } of stats.entered) {
+          const cancel = playEntrance(L, map, fxRenderer, el, layer);
+          running.add(cancel);
+          setTimeout(() => running.delete(cancel), 1500);
+        }
       });
     };
     const onZoom = () => {
@@ -67,7 +85,8 @@ export function ElementLayer({ config }: { config: MapConfig }) {
     applyScale();
     sync();
     const unsubscribe = useBoardStore.subscribe((s, prev) => {
-      if (s.view !== prev.view) sync();
+      if (!s.ready) primed = false;
+      if (s.view !== prev.view || s.ready !== prev.ready) sync();
     });
     const offSelection = useSelectionStore.subscribe((s, prev) => {
       if (s.transform !== prev.transform || s.hiddenLayers !== prev.hiddenLayers) sync();
@@ -82,10 +101,12 @@ export function ElementLayer({ config }: { config: MapConfig }) {
       offSelection();
       offPlayers();
       map.off('zoomend', onZoom);
+      for (const cancel of running) cancel();
       renderer.destroy();
       canvas.remove();
+      fxRenderer.remove();
     };
-  }, [map, config]);
+  }, [map, config, meId]);
 
   return null;
 }

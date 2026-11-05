@@ -381,3 +381,272 @@
   font-size: 12px;
   border: 1px solid rgba(248, 250, 252, 0.4);
 }
+
+/* ---- motion library (2026-11) ------------------------------------------------------------- */
+/* Every animation below answers something a teammate did; all stop under reduced motion. */
+
+/* marker entrances: the inner .rl-marker animates (Leaflet owns the icon's own transform) */
+.rl-enter .rl-marker {
+  transform-origin: 50% 50%;
+}
+.rl-enter-pop .rl-marker {
+  animation: rl-pop-in 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.35) backwards;
+}
+.rl-enter-drop .rl-marker {
+  animation: rl-drop-in 0.9s cubic-bezier(0.35, 0.9, 0.4, 1) backwards;
+}
+.rl-enter-drop::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  bottom: -4px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(245, 179, 1, 0.75);
+  opacity: 0;
+  animation: rl-dust 0.6s ease-out 0.75s backwards;
+  pointer-events: none;
+}
+.rl-enter-alert .rl-marker {
+  animation:
+    rl-pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.35) backwards,
+    rl-alert-shake 0.42s ease-out 0.3s backwards;
+}
+.rl-enter-alert::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(239, 68, 68, 0.85);
+  opacity: 0;
+  animation: rl-alert-ring 0.9s ease-out 0.25s backwards;
+  pointer-events: none;
+}
+@keyframes rl-pop-in {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes rl-drop-in {
+  0% {
+    transform: translate(-14px, -70px) rotate(-12deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  45% {
+    transform: translate(8px, -34px) rotate(9deg);
+  }
+  75% {
+    transform: translate(-3px, -6px) rotate(-4deg);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes rl-dust {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+@keyframes rl-alert-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+@keyframes rl-alert-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* teammates' cursors glide between their 20 Hz updates instead of jumping */
+.leaflet-marker-icon.rl-cursor-icon {
+  transition: transform 110ms linear;
+}
+.leaflet-zoom-anim .leaflet-marker-icon.rl-cursor-icon {
+  transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1);
+}
+
+/* a third ping ring so the eye finds the spot */
+.rl-pulse span:nth-child(3) {
+  animation-delay: 0.3s;
+  opacity: 0.35;
+}
+
+/* sync heartbeat: one green pulse each time changes land (an idle tab stays idle),
+   a spinner while reconnecting */
+.rl-sync-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* compositor-only ring (transform + opacity): the top bar is backdrop-blurred, and painting
+   inside it (box-shadow) would re-blur the map under it every frame */
+.rl-sync-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: rl-sync-ring 1.2s ease-out;
+}
+.rl-sync-spin {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  will-change: transform;
+  animation: rl-spin 0.9s linear infinite;
+}
+@keyframes rl-sync-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@keyframes rl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* switching boards: the new map wipes in from the left, like the tab underline moves */
+.rl-board-enter {
+  animation: rl-board-wipe 0.42s cubic-bezier(0.7, 0, 0.2, 1) both;
+}
+@keyframes rl-board-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* snapshot restore: a rewind mark spins once over the map */
+.rl-rewind {
+  animation: rl-rewind 1s cubic-bezier(0.7, 0, 0.2, 1) both;
+}
+.rl-rewind svg {
+  animation: rl-rewind-spin 1s cubic-bezier(0.7, 0, 0.2, 1) both;
+}
+@keyframes rl-rewind {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  20%,
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+@keyframes rl-rewind-spin {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* the API waking up (free hosting sleeps when idle): a radar instead of a dead page */
+.rl-radar {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: repeating-radial-gradient(circle, transparent 0 7px, rgba(245, 179, 1, 0.16) 7px 8px);
+  overflow: hidden;
+  flex: none;
+}
+.rl-radar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(245, 179, 1, 0.6),
+    rgba(245, 179, 1, 0) 80deg,
+    transparent
+  );
+  animation: rl-spin 2.4s linear infinite;
+}
+.rl-waking {
+  animation: rl-rise 0.35s ease-out both;
+}
+@keyframes rl-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-enter .rl-marker,
+  .rl-enter-drop::after,
+  .rl-enter-alert::before,
+  .rl-sync-dot::after,
+  .rl-sync-spin,
+  .rl-board-enter,
+  .rl-rewind,
+  .rl-rewind svg,
+  .rl-radar::after,
+  .rl-waking {
+    animation: none;
+  }
+  .leaflet-marker-icon.rl-cursor-icon,
+  .leaflet-zoom-anim .leaflet-marker-icon.rl-cursor-icon {
+    transition: none;
+  }
+}

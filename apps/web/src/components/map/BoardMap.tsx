@@ -11,6 +11,7 @@ import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useBoardStore } from '@/stores/boardStore';
 import { CursorLayer } from './CursorLayer';
 import { ExportController } from './ExportController';
+import { BoardTransition, RewindFlash } from './BoardFx';
 import { ElementLayer } from './ElementLayer';
 import { FollowController } from './FollowController';
 import { LaserLayer } from './LaserLayer';
@@ -71,11 +72,13 @@ export default function BoardMap({
         <>
           {role !== 'VIEWER' && <EmptyHint />}
           <FollowPill names={names} />
+          <RewindFlash />
           <StyleBar role={role} mapId={mapId} session={session} nameOf={nameOf} />
         </>
       }
     >
-      <ElementLayer config={config} />
+      <BoardTransition boardId={boardId} />
+      <ElementLayer config={config} meId={meId} />
       <ToolLayer
         config={config}
         session={session}

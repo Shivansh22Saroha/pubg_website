@@ -37,6 +37,7 @@ const STYLE: Record<SyncState, string> = {
   reconnecting: 'text-warning',
   offline: 'text-danger',
 };
+/** static glyph, used for offline (synced pulses, saving/reconnecting spin) */
 const GLYPH: Record<SyncState, string> = {
   synced: '●',
   saving: '◌',
@@ -65,7 +66,13 @@ export function SyncIndicator() {
         full ? 'Too many unsynced changes — editing is paused until you are back online' : undefined
       }
     >
-      <span aria-hidden>{GLYPH[state]}</span>
+      {state === 'synced' ? (
+        <span aria-hidden className="rl-sync-dot" />
+      ) : state === 'reconnecting' ? (
+        <span aria-hidden className="rl-sync-spin" />
+      ) : (
+        <span aria-hidden>{GLYPH[state]}</span>
+      )}
       <span className="hidden lg:inline">{full ? 'Offline — edit queue full' : LABEL[state]}</span>
     </span>
   );

@@ -1,6 +1,11 @@
 import type { Layer } from '@rotationlab/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ElementRenderer, type LeafletApi, type MapLike } from '@/components/map/elementRenderer';
+import {
+  ElementRenderer,
+  MAX_ENTERING,
+  type LeafletApi,
+  type MapLike,
+} from '@/components/map/elementRenderer';
 import { cursorElement, markerElement, safeColor, textElement } from '@/components/map/markerDom';
 import type { ViewElement } from '@/stores/boardModel';
 
@@ -236,7 +241,7 @@ describe('ElementRenderer diffing', () => {
     const a = el('a', 'LINE');
     const b = el('b', 'LINE');
     r.sync({ a, b }, layers());
-    const stats = r.sync({ a, b: { ...b, seq: 2 } }, layers());
+    const stats = r.sync({ a, b: { ...b, seq: 2, style: { ...b.style, width: 7 } } }, layers());
     expect(stats).toMatchObject({ created: 0, replaced: 1, removed: 0 });
     const gone = r.sync({ a }, layers());
     expect(gone.removed).toBe(1);
@@ -299,5 +304,70 @@ describe('marker DOM (SECURITY V4/V5)', () => {
     const m = markerElement({ kind: 'nuke', label: 'x'.repeat(40) }, '#EF4444');
     expect(m.querySelector('svg path')).not.toBeNull();
     expect(m.querySelector('.rl-marker-label')?.textContent).toHaveLength(24);
+  });
+});
+
+describe('entrance motion (motion library)', () => {
+  const on = { animate: true, meId: 'me' };
+  const iconClass = (l: FakeLayer) =>
+    (l.args[1] as { icon: { divIcon: { className: string } } }).icon.divIcon.className;
+
+  it("animates other people's new vectors; never my own, never with animate off", () => {
+    r.sync({}, layers(), on);
+    const s = r.sync(
+      {
+        theirs: el('theirs', 'LINE', L1, { createdBy: 'rudra' }),
+        mine: el('mine', 'CIRCLE', L1, { createdBy: 'me' }),
+      },
+      layers(),
+      on,
+    );
+    expect(s.entered.map((e) => e.el.id)).toEqual(['theirs']);
+    const off = r.sync({ x: el('x', 'POLYGON', L1, { createdBy: 'rudra' }) }, layers());
+    expect(off.entered).toEqual([]);
+  });
+
+  it('skips bulk loads above MAX_ENTERING and replaced (edited) elements', () => {
+    const many: Record<string, ViewElement> = {};
+    for (let i = 0; i <= MAX_ENTERING; i++) many[`e${i}`] = el(`e${i}`, 'LINE');
+    expect(r.sync(many, layers(), on).entered).toEqual([]);
+    const edited = { ...many, e0: el('e0', 'LINE', L1, { seq: 2, z: 5 }) };
+    expect(r.sync(edited, layers(), on).entered).toEqual([]);
+  });
+
+  it('a server ack that only bumps seq keeps the layer (the entrance plays on)', () => {
+    r.sync({}, layers(), on);
+    r.sync({ m: el('m', 'MARKER') }, layers(), on);
+    const before = [...map.onMap];
+    const s = r.sync(
+      { m: el('m', 'MARKER', L1, { seq: 9, updatedAt: '2026-11-05T00:00:00.000Z' }) },
+      layers(),
+      on,
+    );
+    expect(s).toMatchObject({ created: 0, replaced: 0 });
+    expect([...map.onMap]).toEqual(before);
+    expect(iconClass(before[0] as FakeLayer)).toContain('rl-enter-alert');
+  });
+
+  it('does not report elements that land on a hidden layer', () => {
+    expect(r.sync({ h: el('h', 'LINE', L2) }, layers(false), on).entered).toEqual([]);
+  });
+
+  it('gives new markers an entrance class by kind (drop, enemy alert, pop)', () => {
+    r.sync(
+      {
+        d: el('d', 'MARKER', L1, { props: { kind: 'drop' } }),
+        e: el('e', 'MARKER', L1, { props: { kind: 'enemy_squad', number: 2 } }),
+        v: el('v', 'MARKER', L1, { props: { kind: 'vehicle' } }),
+      },
+      layers(),
+      on,
+    );
+    const classes = ([...map.onMap] as FakeLayer[]).map(iconClass).sort();
+    expect(classes).toEqual([
+      'rl-marker-icon rl-enter rl-enter-alert',
+      'rl-marker-icon rl-enter rl-enter-drop',
+      'rl-marker-icon rl-enter rl-enter-pop',
+    ]);
   });
 });

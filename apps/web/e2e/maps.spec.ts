@@ -39,9 +39,14 @@ for (const mapId of MAPS) {
     await page.locator('.leaflet-container').click({ position: { x: 20, y: 20 } });
     await page.keyboard.press('n');
     await expect(canvas).toHaveAttribute('data-variant', 'clean');
-    const after = await visibleTileSources(page);
-    expect(after.length).toBeGreaterThan(0);
-    expect(after.every((src) => src.includes(`/tiles/${mapId}/clean/`))).toBe(true);
+    // the attribute is React state; Leaflet applies the opacity swap in an effect right after
+    // (with reduced motion — the E2E default — there's no fade to hide that one frame)
+    await expect
+      .poll(async () => {
+        const after = await visibleTileSources(page);
+        return after.length > 0 && after.every((src) => src.includes(`/tiles/${mapId}/clean/`));
+      })
+      .toBe(true);
 
     // ...and back via the HUD button
     await page.getByRole('button', { name: 'Map labels' }).click();

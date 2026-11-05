@@ -45,6 +45,10 @@ export function makeConfig(mode: 'prod' | 'dev') {
     use: {
       baseURL: origin,
       trace: 'retain-on-failure',
+      // motion library animations are decoration: they cost real CPU in software-rendered
+      // headless Chrome (worst on a 2-core box running 6 browsers) and they move marker boxes
+      // while a test measures them. Every test runs reduced-motion; motion.spec.ts opts back in.
+      reducedMotion: 'reduce',
     },
     projects: [
       { name: 'chromium', use: { ...devices['Desktop Chrome'] }, grepInvert: /@api-restart/ },

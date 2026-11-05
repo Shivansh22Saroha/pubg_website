@@ -91,7 +91,11 @@ export function PingLayer({ config, boardId }: { config: MapConfig; boardId: str
         const el = document.createElement('div');
         el.className = `rl-pulse rl-pulse-${p.kind}`;
         el.dataset.testid = 'map-pulse';
-        el.append(document.createElement('span'), document.createElement('span'));
+        el.append(
+          document.createElement('span'),
+          document.createElement('span'),
+          document.createElement('span'),
+        );
         shown.set(
           p.id,
           L.marker(toLatLng([p.x, p.y]), {

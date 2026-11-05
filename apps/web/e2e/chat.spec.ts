@@ -113,7 +113,10 @@ test('unread badge appears while the panel is collapsed and clears when the chat
 test('E2E-4: B pings a spot on another board; A clicks the chip, switches board, flies there and sees the pulse', async ({
   browser,
 }) => {
-  const { ctxA, ctxB, a, b, roomId } = await twoUsersInRoom(browser);
+  // the focus ring after the fly-to is motion (reduced motion jumps without it): A opts in
+  const { ctxA, ctxB, a, b, roomId } = await twoUsersInRoom(browser, {
+    a: { reducedMotion: 'no-preference' },
+  });
   await pageApi(a, 'POST', `/rooms/${roomId}/boards`, {
     name: 'Miramar – Drop B',
     mapId: 'miramar',

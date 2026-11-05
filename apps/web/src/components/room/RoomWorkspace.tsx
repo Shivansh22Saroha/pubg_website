@@ -60,6 +60,7 @@ import {
   type PhoneMenuItem,
 } from './TouchChrome';
 import { useChatStore } from '@/stores/chatStore';
+import { useFxStore } from '@/stores/fxStore';
 import { useFollowStore } from '@/stores/followStore';
 import { setPlayers } from '@/stores/playersStore';
 import { usePresenceStore } from '@/stores/presenceStore';
@@ -141,8 +142,10 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       toast.error(message);
     },
     onBoardReset: (reason, actorId) => {
-      if (reason === 'snapshot_restore')
+      if (reason === 'snapshot_restore') {
+        useFxStore.getState().playRewind();
         toast(`Board was restored by ${nameOfRef.current(actorId)}`, { id: 'board-reset' });
+      }
     },
     onSummon: (userId, boardId) => {
       const follow = useFollowStore.getState();
