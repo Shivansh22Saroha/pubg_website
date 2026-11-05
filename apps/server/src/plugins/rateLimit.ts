@@ -23,6 +23,8 @@ export const LIMITS = {
   verifyResendHourly: { max: 3, windowSec: 3600 },
   /** verify / reset token submissions */
   emailToken: { max: 10, timeWindow: '1 minute' },
+  /** socket tickets: one per (re)connect; generous for reconnect storms, per user */
+  socketTicket: { max: 60, windowSec: 60 },
 } as const;
 
 /** Keys a fixed window by the authenticated user (falls back to IP). */

@@ -35,6 +35,7 @@ import type { z } from 'zod';
 import { AppError } from '../lib/errors.js';
 import type { AuthUser } from '../lib/policy.js';
 import type { RevocationList } from '../modules/auth/revocation.js';
+import type { SocketTickets } from '../modules/auth/socketTickets.js';
 import type { TokenService } from '../modules/auth/tokens.js';
 import type { ChatService } from '../modules/chat/service.js';
 import type { BoardOpsService, OpRequest } from '../modules/elements/service.js';
@@ -106,6 +107,8 @@ export interface RealtimeDeps {
   appOrigin: string;
   accessCookieName: string;
   tokens: TokenService;
+  /** cross-site deployments: single-use tickets instead of the access cookie (SECURITY A11) */
+  tickets: SocketTickets;
   revocations: RevocationList;
   policy: RoomPolicy;
   rooms: RoomService;
@@ -180,12 +183,23 @@ export function createRealtime(d: RealtimeDeps): {
         return;
       }
       const token = d.app.parseCookie(socket.handshake.headers.cookie ?? '')[d.accessCookieName];
-      if (!token) {
+      const ticket = (socket.handshake.auth as { ticket?: unknown } | undefined)?.ticket;
+      if (!token && ticket === undefined) {
         next(connectError('UNAUTHENTICATED', 'Log in to continue'));
         return;
       }
       try {
-        const claims = await d.tokens.verify(token);
+        // the access cookie when it reaches us (same site); otherwise a single-use ticket
+        // fetched over the web origin's REST rewrite (Vercel + Railway, SECURITY A11)
+        let claims: { sub: string; sid: string; exp: number };
+        if (token) {
+          claims = await d.tokens.verify(token);
+        } else {
+          const t = await d.tickets.redeem(ticket);
+          if (!t) throw new AppError('UNAUTHENTICATED', 'Invalid or used socket ticket');
+          if (t.exp * 1000 <= Date.now()) throw new AppError('TOKEN_EXPIRED', 'Session expired');
+          claims = { sub: t.userId, sid: t.sid, exp: t.exp };
+        }
         if (await d.revocations.isRevoked(claims.sid))
           throw new AppError('UNAUTHENTICATED', 'Session ended');
         const existing = await io.in(ch.user(claims.sub)).fetchSockets();

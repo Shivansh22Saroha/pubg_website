@@ -3,6 +3,7 @@ import {
   LoginBodySchema,
   RegisterBodySchema,
   ResetPasswordBodySchema,
+  SocketTicketResponseSchema,
   VerifyEmailBodySchema,
   UserResponseSchema,
   UsernameAvailableQuerySchema,
@@ -17,6 +18,8 @@ import { LIMITS, byUser, fixedWindowLimit } from '../../plugins/rateLimit.js';
 import type { AuthCookies } from './cookies.js';
 import type { EmailFlows } from './emailFlows.js';
 import type { AuthService } from './service.js';
+import type { SocketTickets } from './socketTickets.js';
+import type { TokenService } from './tokens.js';
 
 export interface AuthRouteDeps {
   auth: AuthService;
@@ -25,6 +28,8 @@ export interface AuthRouteDeps {
   rateLimits: boolean;
   ipHashSalt: string;
   email: EmailFlows;
+  tokens: TokenService;
+  tickets: SocketTickets;
 }
 
 /**
@@ -99,6 +104,30 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteDeps> = (app, deps, d
     cookies.clear(reply);
     return reply.status(204).send();
   });
+
+  // ---- socket ticket (SECURITY A11): the handshake's credential when the API is cross-site ----
+  app.post(
+    '/socket-ticket',
+    {
+      config: { access: 'user' },
+      preHandler: fixedWindowLimit(
+        deps.redis,
+        deps.rateLimits,
+        'socket-ticket',
+        LIMITS.socketTicket,
+        byUser,
+      ),
+      schema: { response: { 200: SocketTicketResponseSchema } },
+    },
+    async (req) => {
+      const user = req.user;
+      const token = cookies.readAccess(req);
+      if (!user || !token) throw new AppError('UNAUTHENTICATED', 'Log in to continue');
+      // the access token was verified by the preHandler; read its exp for the socket's timer
+      const { exp } = await deps.tokens.verify(token);
+      return { ticket: await deps.tickets.issue({ userId: user.id, sid: user.sid, exp }) };
+    },
+  );
 
   // ---- email flows (SECURITY A9) -------------------------------------------------------
   app.post(

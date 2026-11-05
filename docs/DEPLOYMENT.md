@@ -131,3 +131,111 @@ cd deploy   # env/*.env filled from the templates; .env: REGISTRY= APP_DOMAIN=lo
 COMPOSE_PROJECT=rl-prodtest SKIP_PULL=1 CURL_INSECURE=1 ./deploy.sh local
 ```
 Checked: headers and CSP per response type, `__Host-` / `__Secure-` cookies, `wss://…/realtime` through Caddy, zero CSP violations, rollback from a broken release, an encrypted backup restored into a scratch database, the demo seed from the image, ZAP baseline and the k6 load test (TESTING §7). Scanners on a dotless host send no SNI, which Caddy's internal-CA `localhost` policy rejects; serve a second name (`APP_DOMAIN="localhost, rl.localhost"`) and scan that.
+
+## 10. Vercel + Railway (free URLs, no VM)
+
+The alternative to §3–§7 when you don't want to run a VM. The web app runs on **Vercel**. The API, the realtime server, Postgres and Redis run on **Railway**. Tiles live on **Cloudflare R2**. Vercel can't host the API: its functions are serverless and can't hold the long-lived websockets that live sync needs.
+
+```
+browser ──https──► rotationlab.vercel.app (Next.js on Vercel)
+   │                    │  /api/*  ── rewrite (API_PROXY_URL) ──►┐
+   │                                                              ▼
+   └──wss + ticket──────────────────────────────► rotationlab-api.up.railway.app (Fastify + Socket.IO)
+                                                        │ private network
+                                                        ├─► Postgres (Railway)
+                                                        └─► Redis (Railway)
+   tiles ◄── https://pub-….r2.dev/v1 (R2 public bucket)
+```
+
+How auth works across the two sites:
+- **REST** goes through the Vercel rewrite. The browser only talks to `*.vercel.app`, so the `__Host-` auth cookies stay first-party there, and CSRF, `SameSite` and Origin checks work unchanged.
+- **The websocket** can't be rewritten by Vercel, so it connects straight to Railway. The cookie isn't sent to that other site. Before every (re)connect, the client fetches a 60 s single-use ticket from `POST /api/v1/auth/socket-ticket` over the rewrite, and passes it in the handshake (SECURITY A11). The handshake still checks `Origin` against `APP_ORIGIN`.
+
+### 10.1 Accounts and cost
+| Service | Plan | Notes |
+|---|---|---|
+| Vercel | Hobby (free) | Hobby is for non-commercial use; log in with GitHub |
+| Railway | Hobby (about US$5/month after the trial) | API + Postgres + Redis in one project; log in with GitHub |
+| Cloudflare R2 | Free tier (10 GB) | needs a payment method on file to turn on R2 |
+
+Merge the open PRs to `main` first: both services deploy from `main`.
+
+### 10.2 Map tiles → R2 (once)
+1. Build the tiles locally (needs `git-lfs`): `pnpm --filter map-tiles run fetch && pnpm --filter map-tiles run build` → `packages/map-tiles/out/`.
+2. Cloudflare → R2 → **Create bucket** `rotationlab-tiles` → Settings → **Public access: R2.dev subdomain → Allow**. Note the `https://pub-<id>.r2.dev` URL.
+3. Settings → **CORS policy**: the JSON in §4, with `"AllowedOrigins": ["https://<your-project>.vercel.app"]`.
+4. R2 → **Manage API tokens** → create an *Object Read & Write* token for that bucket. Configure rclone (`rclone config` → new remote `r2`, type `s3`, provider `Cloudflare`, the token's access key, secret and endpoint), then upload:
+   ```bash
+   rclone sync packages/map-tiles/out r2:rotationlab-tiles/v1 \
+     --header-upload "Cache-Control: public, max-age=31536000, immutable" --transfers 32
+   ```
+5. Check `https://pub-<id>.r2.dev/v1/erangel/preview.jpg` opens in the browser.
+
+### 10.3 API, Postgres and Redis → Railway
+1. railway.com → **New project → Deploy from GitHub repo** → `pubg_website`. Name the service `api`.
+2. In the project: **+ Create → Database → PostgreSQL**, then **+ Create → Database → Redis**.
+3. `api` → **Settings**:
+   - *Build*: leave the root directory empty (repo root). The Dockerfile comes from a variable (next step).
+   - *Deploy → Pre-deploy command*: `./node_modules/.bin/prisma migrate deploy`
+   - *Deploy → Healthcheck path*: `/api/health`
+   - *Networking → Generate domain* on port `4000`. Note the URL, e.g. `https://rotationlab-api.up.railway.app`.
+4. `api` → **Variables** (use *Raw editor*; `${{…}}` are Railway references):
+   ```
+   RAILWAY_DOCKERFILE_PATH=docker/server.Dockerfile
+   NODE_ENV=production
+   PORT=4000
+   APP_ORIGIN=https://<your-project>.vercel.app
+   DATABASE_URL=${{Postgres.DATABASE_URL}}
+   REDIS_URL=${{Redis.REDIS_URL}}
+   JWT_SECRET=<openssl rand -base64 48>
+   JWT_ISSUER=rotationlab
+   JWT_AUDIENCE=rotationlab-web
+   COOKIE_SECURE=true
+   IP_HASH_SALT=<openssl rand -hex 32>
+   TRUST_PROXY=true
+   LOG_LEVEL=info
+   EMAIL_ENABLED=false
+   DEMO_BOARD_IDS=
+   MAINTENANCE=false
+   ```
+   The Redis client resolves IPv4 and IPv6 (`family: 0`), which Railway's IPv6-only private network (`redis.railway.internal`) needs.
+5. Deploy. The pre-deploy step runs the migrations; `https://<api>.up.railway.app/api/health` should answer `{"status":"ok","db":"ok","redis":"ok",…}`.
+
+### 10.4 Web → Vercel
+1. vercel.com → **Add New → Project** → import `pubg_website`.
+2. **Root Directory**: `apps/web` (framework: Next.js; Vercel installs from the monorepo root with pnpm).
+3. **Build Command** (override): `cd ../.. && pnpm turbo run build --filter=web`. Turbo builds `@rotationlab/shared` first, which the web app imports from `dist/`.
+4. **Environment Variables** (Production):
+   ```
+   NEXT_PUBLIC_APP_ORIGIN=https://<your-project>.vercel.app
+   NEXT_PUBLIC_API_BASE=/api/v1
+   NEXT_PUBLIC_SOCKET_PATH=/realtime
+   NEXT_PUBLIC_SOCKET_URL=https://<api>.up.railway.app
+   NEXT_PUBLIC_TILES_BASE_URL=https://pub-<id>.r2.dev/v1
+   API_PROXY_URL=https://<api>.up.railway.app
+   INTERNAL_API_URL=https://<api>.up.railway.app
+   SECURITY_CONTACT=mailto:<you>@example.com
+   ```
+   `NEXT_PUBLIC_*` and `API_PROXY_URL` are read at build time: redeploy after changing them.
+5. Deploy. If Vercel picked a different domain than you guessed, update `NEXT_PUBLIC_APP_ORIGIN` (Vercel), `APP_ORIGIN` (Railway) and the R2 CORS origin to the real one, then redeploy both.
+
+### 10.5 Demo boards for `/explore` (optional)
+With the Railway CLI (`npm i -g @railway/cli`, `railway login`, `railway link` in the repo):
+```bash
+railway ssh -s api -- ./node_modules/.bin/tsx scripts/seed.ts --demo-only
+```
+Copy the printed `DEMO_BOARD_IDS=…` into the `api` variables (Railway redeploys). Until then `/explore` shows the bare maps.
+
+### 10.6 Check it
+- [ ] `https://<project>.vercel.app` loads the landing page; register and log in work.
+- [ ] Create a room: the sync indicator shows **Synced** (websocket + ticket OK).
+- [ ] A second browser joins with the invite link; drawings and chat appear live on both.
+- [ ] All three maps show tiles (no 404s from `r2.dev` in the browser's network tab); Export PNG works (CORS OK).
+- [ ] `https://<api>.up.railway.app/api/v1/me` from the browser address bar answers 401 (cookies are not on the API's site, as designed).
+
+### 10.7 Known limits of this setup
+- **Board thumbnails** go to the server's local disk unless the `S3_*` variables point at an R2 bucket (§4 "Board thumbnails"). Railway's disk resets on every deploy, and the dashboard then falls back to the map image.
+- **Email** (verification, password reset) stays off until `EMAIL_ENABLED=true` and SMTP variables are set.
+- **Previews:** Vercel preview deployments get their own URLs, which don't match `APP_ORIGIN`, so login works only on the production URL. Point a second Railway environment at the preview URL if you need previews.
+- **Custom domain later:** add it in Vercel, then update `NEXT_PUBLIC_APP_ORIGIN`, `APP_ORIGIN` and the R2 CORS origin. The ticket flow doesn't depend on the domains.
+- The Docker/Caddy deployment (§3) keeps working unchanged: there the socket is same-origin, so the cookie authenticates it and no ticket is fetched.

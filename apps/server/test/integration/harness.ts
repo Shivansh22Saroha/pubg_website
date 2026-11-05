@@ -255,7 +255,7 @@ export function cookieHeader(jar: Jar): string {
 export function connect(
   url: string,
   jar: Jar | null,
-  opts: { origin?: string; cookie?: string } = {},
+  opts: { origin?: string; cookie?: string; auth?: Record<string, unknown> } = {},
 ): Promise<ClientSocket> {
   const headers: Record<string, string> = { origin: opts.origin ?? APP_ORIGIN };
   const cookie = opts.cookie ?? (jar ? cookieHeader(jar) : '');
@@ -266,6 +266,7 @@ export function connect(
     forceNew: true,
     reconnection: false,
     extraHeaders: headers,
+    ...(opts.auth ? { auth: opts.auth } : {}),
   });
   openSockets.push(socket);
   return new Promise((resolve, reject) => {

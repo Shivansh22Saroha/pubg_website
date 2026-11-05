@@ -136,6 +136,12 @@ const MATRIX: Row[] = [
     expect: authed(204),
   },
   {
+    method: 'POST',
+    url: '/api/v1/auth/socket-ticket',
+    request: () => ({ url: '/api/v1/auth/socket-ticket' }),
+    expect: authed(200),
+  },
+  {
     method: 'GET',
     url: '/api/v1/auth/username-available',
     request: () => ({ url: '/api/v1/auth/username-available?u=zed' }),

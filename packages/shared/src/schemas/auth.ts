@@ -64,6 +64,10 @@ export const UsernameAvailableQuerySchema = z.strictObject({ u: z.string().max(6
 export const UsernameAvailableResponseSchema = z.object({ available: z.boolean() });
 export type UsernameAvailableResponse = z.infer<typeof UsernameAvailableResponseSchema>;
 
+/** POST /auth/socket-ticket (API_SPEC §7.1): a 60 s single-use ticket for the socket handshake */
+export const SocketTicketResponseSchema = z.object({ ticket: z.string().length(43) });
+export type SocketTicketResponse = z.infer<typeof SocketTicketResponseSchema>;
+
 // ---- users ----------------------------------------------------------------------------
 
 export const PublicUserSchema = z.object({

@@ -25,6 +25,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | A8 | Password change / reset revokes all other sessions. |
 | A9 | Email verification & reset tokens: 256-bit, single-use, hashed at rest, 30 min (reset) / 24 h (verify). `forgot-password` always returns 202. |
 | A10 | Username availability endpoint rate-limited 20 / min / IP. |
+| A11 | **Socket tickets** (cross-site deployments, DEPLOYMENT §10). When the websocket goes to another origin than the page, the client fetches `POST /api/v1/auth/socket-ticket` (cookie-authenticated, CSRF-checked, 60 / min / user) before each (re)connect and sends `{ ticket }` in the handshake `auth`. Tickets are 256-bit random, stored only as a SHA-256 hash in Redis with the user id, session id and access-token `exp`, expire after 60 s and are deleted on first use (`GETDEL`). The handshake still checks `Origin`, the revocation list and the per-user socket cap, and starts the usual session-expiry timer from the stored `exp`. A cookie, when present, wins. |
 
 ## 3. Authorization
 | # | Control |
