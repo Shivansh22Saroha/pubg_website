@@ -61,6 +61,8 @@ import {
 } from './TouchChrome';
 import { useChatStore } from '@/stores/chatStore';
 import { useFxStore } from '@/stores/fxStore';
+import { useSpotter } from '@/stores/spotterStore';
+import { SpotterIcon } from '@/components/spotter/SpotterIcon';
 import { useFollowStore } from '@/stores/followStore';
 import { setPlayers } from '@/stores/playersStore';
 import { usePresenceStore } from '@/stores/presenceStore';
@@ -371,6 +373,12 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           },
         ]
       : []),
+    {
+      label: 'Ask Spotter',
+      onSelect: () => {
+        useSpotter.getState().setOpen(true);
+      },
+    },
     ...(can(role, 'room.manage')
       ? [
           {
@@ -511,6 +519,20 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              aria-label="Ask Spotter"
+              title="Ask Spotter — site help & BGMI tactics"
+              data-testid="spotter-room-button"
+              onClick={() => {
+                const s = useSpotter.getState();
+                s.setOpen(!s.open);
+              }}
+            >
+              <SpotterIcon className="size-[18px]" />
+            </Button>
             {can(role, 'room.manage') && (
               <Button
                 variant="ghost"

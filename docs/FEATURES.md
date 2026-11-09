@@ -210,3 +210,10 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 ## F14. Notifications & toasts
 - Toasts for: role changed, kicked, board deleted (you were on it), snapshot restored, op rejected (with reason), offline/online.
 - No email/push notifications in v1.
+
+---
+
+## F15. Spotter — built-in help bot (2026-11)
+- A free FAQ bot on every page (UI_UX_SPEC §3.10): site help and BGMI tactics from a bundled knowledge base. No backend, no AI model, no API key, nothing sent anywhere — questions never leave the browser.
+- Unknown questions get "I don't know that one yet" plus suggestions; it never guesses below the match threshold.
+- AC: every suggestion chip answers its own intent (unit test over the whole knowledge base); free-text paraphrases reach the right answer; the room opens it from the top bar and Esc on the map doesn't close it (E2E `spotter.spec.ts`).

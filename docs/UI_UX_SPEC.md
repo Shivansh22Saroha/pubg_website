@@ -35,6 +35,8 @@ Principles
 
 Contrast: text on `--surface` ≥ 7:1; muted text ≥ 4.5:1 (≈ 6.4:1 after the 2026-11 premium pass). Focus ring: 2 px `--accent` + 2 px offset; text inputs use a 3 px `--accent-glow` ring instead.
 
+**BGMI theme (2026-11, supersedes the values above where they differ):** true-black base `--bg #050505`, neutral greys `--surface #0E0E0E` / `--surface-2 #161616` / `--surface-3 #1F1F1F`, borders `#262626` / `#3B3B3B`, text `#F5F5F5`, muted `#A3A3A3` (7.6:1 on surface), accent = BGMI gold `#FFB400` (hi `#FFC933`), `--accent-fg #0A0A0A` (11:1 on gold). The game site's look, with RotationLab's own name and mark — never the BGMI / KRAFTON logos or wordmark. Utilities: `bgmi-cut` (bottom-right corner clipped off; focus is an inset double ring because clip-path cuts outlines), `bgmi-halftone` (flat gold with a halftone fade into the right edge), `bgmi-dots` (halftone texture for black bands).
+
 Surfaces (premium pass): `surface-raised` (cards, side panels: surface + border + inset highlight) and `glass` (anything floating over the map). Section labels are sentence case, not all caps. Radius: 8 px controls, 12 px panels, 18 px hero surfaces (dialogs, landing frames).
 
 ### 2.2 Drawing palette (10 swatches, in order)
@@ -46,7 +48,7 @@ User presence colors: assigned from a separate 12-color list, never the same as 
 ### 2.3 Typography
 | Role | Font | Size / weight |
 |---|---|---|
-| Display / headings | **Rajdhani** (Google Fonts) | H1 32/700, H2 24/700, H3 18/600, uppercase letter-spacing 0.04em for section labels |
+| Display / headings | **Teko** (Google Fonts; was Rajdhani until the 2026-11 BGMI theme) | always uppercase (`.font-display`), letter-spacing 0.02em; condensed, so sizes run larger: landing H1 124/700, section H2 64/700, nav 21/600, buttons 17–26/600; section labels uppercase 0.04em |
 | Body / UI | **Inter** | 14/400 body, 13/500 controls, 12/500 captions |
 | Numbers / coords | **JetBrains Mono** | 12/500 |
 
@@ -56,14 +58,15 @@ User presence colors: assigned from a separate 12-color list, never the same as 
 - Shadows: only on floating panels — `0 8px 24px rgba(0,0,0,0.45)`.
 - Motion: 150 ms ease-out for hovers/panels; 300 ms for map fly-to; respect `prefers-reduced-motion` (disable pulses, use instant jumps).
 
-### 2.5 Icons
+### 2.5 Icons & buttons
 `lucide-react`, 18 px in toolbars, 16 px inline. Custom SVG marker set (see §6.4).
+Buttons (BGMI theme): **accent** = gold plate — `bgmi-cut` + `bgmi-halftone`, square corners, Teko caps; **outline** = store-badge style — black, 1.5 px light border, 8 px radius, Teko caps, gold on hover; **ghost** / **destructive** unchanged.
 
 ## 3. Screens
 
 ### 3.1 Landing `/`
-- Top nav: logo (left), "Log in" ghost button, "Get started" accent button.
-- Hero: H1 "Plan your rotations together.", subtitle one line, primary CTA "Create a room", secondary "Explore maps" (opens a read-only demo board, no login).
+- Top nav: logo (left), "Log in" ghost button, "Get started" accent button. *BGMI theme:* a solid black 64 px bar — wordmark, caps nav links (Explore · Erangel · Miramar · Rondo, ≥ 1024 px), "Log in" as a caps link, and "Get started" / "Go to dashboard" as a full-height gold block flush with the right edge.
+- Hero: H1 "Plan your rotations together.", subtitle one line, primary CTA "Create a room", secondary "Explore maps" (opens a read-only demo board, no login). *BGMI theme:* centred like a game title card — the H1 in three caps lines inside a heavy white frame over the darkened Erangel art (radial vignette), the two CTAs below it (gold plate + black badge), the legend in caps.
 - Below: 3 feature cards (Live drawing · Map pings in chat · Erangel, Miramar, Rondo) with a short looping screen recording or static screenshot each.
 - Footer: attribution line (PUBG/KRAFTON notice), Privacy, Terms, GitHub.
 
@@ -149,6 +152,11 @@ Right-side drawer: list (name, author, time, element count), preview thumbnail o
 
 ### 3.9 Settings `/settings`
 Profile (display name, IGN, avatar color), Account (email, change password), Sessions (list devices, log out all), Danger (delete account).
+
+### 3.10 Spotter — built-in help bot (2026-11)
+A free FAQ bot on every page: no server, no AI, no key. It answers how to use RotationLab and BGMI basics (drops per map, rotations, zone play, vehicles, bridges, compounds, final circles, utility, loot, scrim prep) from `lib/spotter/knowledge.ts` (~45 intents) matched by `lib/spotter/match.ts` (normalise → synonyms + light stemming → weighted keywords: map names 5, an intent's two subject keywords 2, others 1; verbatim phrases +4; below 2 it says "I don't know that one yet" and offers suggestions).
+- Launcher: gold "Ask Spotter" plate bottom-right (map pages `/explore`, `/maps/*`, `/s/*`: top-right below the header, icon-only on phones). In the room, a binoculars button in the top bar (and "Ask Spotter" in the phone menu) — the map's corners are taken.
+- Panel: non-modal `role="dialog"`, 380 px (full width on phones), gold header, a `role="log"` conversation on black halftone, suggestion chips under each answer, optional internal link, input "Your question" (max 200 chars). Answers render as plain text only. A 420 ms typing beat (none under reduced motion). Esc closes only while focus is inside (on the map Esc belongs to the tools); focus returns to the opener. The conversation survives close / reopen until a reload. The panel and knowledge base load on first open (`next/dynamic`).
 
 ## 4. Components (shadcn/ui based)
 Button (variants: accent, outline, ghost, destructive; sizes sm/md/icon), Input, Textarea, Select, Dialog, Drawer/Sheet, DropdownMenu, Tabs, Tooltip, Toast (sonner), Avatar, Badge, Switch, Slider, Popover, Separator, ScrollArea, Skeleton.

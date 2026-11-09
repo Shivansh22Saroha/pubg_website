@@ -2,22 +2,22 @@
 
 /* Design tokens — UI_UX_SPEC §2. Dark theme is the only theme in v1. */
 :root {
-  /* Premium pass (2026-11): deeper graphite base, layered surfaces, a hairline highlight on
-     raised edges. Same roles as UI_UX_SPEC §2.1; contrast re-checked (muted ≥ 6:1 on surface). */
-  --bg: #090c11;
-  --surface: #10151c;
-  --surface-2: #161d26;
-  --surface-3: #1c2531;
-  --overlay: rgba(13, 18, 25, 0.78);
-  --border: #222c39;
-  --border-strong: #324154;
-  --highlight: rgba(255, 255, 255, 0.06);
-  --text: #e8edf2;
-  --text-muted: #8e9aab;
-  --accent: #f5b301;
-  --accent-hi: #ffcb3d;
-  --accent-glow: rgba(245, 179, 1, 0.28);
-  --accent-fg: #111111;
+  /* BGMI theme (2026-11, UI_UX_SPEC §2.1): true black, neutral (not blue) greys, the BGMI gold.
+     Contrast: text 18:1, muted 7.6:1 on surface; accent-fg on accent 11:1. */
+  --bg: #050505;
+  --surface: #0e0e0e;
+  --surface-2: #161616;
+  --surface-3: #1f1f1f;
+  --overlay: rgba(8, 8, 8, 0.86);
+  --border: #262626;
+  --border-strong: #3b3b3b;
+  --highlight: rgba(255, 255, 255, 0.05);
+  --text: #f5f5f5;
+  --text-muted: #a3a3a3;
+  --accent: #ffb400;
+  --accent-hi: #ffc933;
+  --accent-glow: rgba(255, 180, 0, 0.3);
+  --accent-fg: #0a0a0a;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -77,7 +77,7 @@
   --color-draw-white: #f8fafc;
 
   /* Typography — §2.3 (font variables come from next/font in layout.tsx) */
-  --font-display: var(--font-rajdhani), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-teko), 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 
@@ -132,38 +132,47 @@
 
 @utility section-label {
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 500;
+  font-size: 1.15em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-/* Raised surface: hairline top highlight + soft depth. Used for cards and side panels. */
-@utility surface-raised {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-raise);
+/* BGMI type: the display face is a condensed caps face — always set in capitals */
+@layer base {
+  .font-display {
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+  }
 }
 
-/* HUD glass: chrome that floats over the map (toolbars, HUD, minimap, tabs bar). */
-@utility glass {
-  background-color: var(--overlay);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
-  box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(14px) saturate(140%);
+/* BGMI button cut: the bottom-right corner clipped off, like the game's UI plates. Focus can't
+   use an outline (clip-path would cut it), so it's an inset double ring instead. */
+@utility bgmi-cut {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 2px var(--accent-fg),
+      inset 0 0 0 4px #fff;
+  }
 }
 
-/* App backdrop for non-map pages: the map grid, very faint, fading out from the top. */
-@utility app-backdrop {
-  background-color: var(--bg);
+/* halftone dots — the printed-poster texture of the game's site bands */
+@utility bgmi-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1.4px);
+  background-size: 6px 6px;
+}
+/* gold plate: flat BGMI gold with a halftone fade into the right-hand edge */
+@utility bgmi-halftone {
+  background-color: var(--accent);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 179, 1, 0.07), transparent 70%),
-    linear-gradient(to bottom, transparent, var(--bg) 70%),
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    linear-gradient(100deg, var(--accent) 68%, transparent 96%),
+    radial-gradient(rgba(0, 0, 0, 0.3) 1px, transparent 1.5px);
   background-size:
-    auto,
-    auto,
-    96px 96px,
-    96px 96px;
+    100% 100%,
+    5px 5px;
 }
 
 /* ---- landing hero: the one animated moment (a rotation drawn across Erangel) ---------------- */
@@ -648,5 +657,44 @@
   .leaflet-marker-icon.rl-cursor-icon,
   .leaflet-zoom-anim .leaflet-marker-icon.rl-cursor-icon {
     transition: none;
+  }
+}
+
+/* ---- Spotter (built-in help bot) -------------------------------------------------------- */
+.rl-spotter-in {
+  animation: rl-spotter-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes rl-spotter-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rl-typing {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  animation: rl-typing 0.9s ease-in-out infinite;
+}
+@keyframes rl-typing {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rl-spotter-in,
+  .rl-typing {
+    animation: none;
   }
 }

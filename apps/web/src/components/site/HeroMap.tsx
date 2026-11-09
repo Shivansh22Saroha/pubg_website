@@ -30,10 +30,10 @@ export function HeroMap() {
         priority
         unoptimized // pre-optimised WebP (1920×1080, ~300 KB)
         sizes="100vw"
-        className="object-cover object-center opacity-90 saturate-[0.85]"
+        className="object-cover object-center opacity-80 saturate-[0.8]"
       />
-      {/* legibility: dark from the left (where the headline sits) and into the page below */}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--bg)_0%,rgba(9,12,17,0.92)_30%,rgba(9,12,17,0.45)_58%,rgba(9,12,17,0.1)_100%)] max-md:bg-[linear-gradient(180deg,rgba(9,12,17,0.55)_0%,rgba(9,12,17,0.82)_55%,var(--bg)_100%)]" />
+      {/* legibility: a vignette darkest at the edges, so the centred title card reads */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_65%_at_50%_45%,rgba(0,0,0,0.35)_0%,rgba(0,0,0,0.78)_70%,rgba(0,0,0,0.95)_100%)] max-md:bg-[linear-gradient(180deg,rgba(0,0,0,0.6)_0%,rgba(0,0,0,0.85)_55%,var(--bg)_100%)]" />
       <div className="absolute inset-x-0 bottom-0 h-40 bg-[linear-gradient(180deg,transparent,var(--bg))]" />
       <svg
         viewBox="0 0 1920 1080"

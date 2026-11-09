@@ -1,16 +1,18 @@
 import { PRODUCT_NAME } from '@rotationlab/shared';
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono, Rajdhani } from 'next/font/google';
+import { Inter, JetBrains_Mono, Teko } from 'next/font/google';
 import { connection } from 'next/server';
 import type { ReactNode } from 'react';
 import '@/env';
+import { Spotter } from '@/components/spotter/Spotter';
 import { serverEnv } from '@/lib/serverEnv';
 import './globals.css';
 
-const rajdhani = Rajdhani({
+// BGMI theme: a condensed caps display face for headings, nav and buttons (UI_UX_SPEC §2.3)
+const teko = Teko({
   subsets: ['latin'],
-  weight: ['600', '700'],
-  variable: '--font-rajdhani',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-teko',
   display: 'swap',
 });
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0B0F14',
+  themeColor: '#000000',
   colorScheme: 'dark',
 };
 
@@ -38,10 +40,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // dynamically rendered page (a prerendered one would carry no nonce and be blocked)
   await connection();
   return (
-    <html
-      lang="en"
-      className={`dark ${rajdhani.variable} ${inter.variable} ${jetbrainsMono.variable}`}
-    >
+    <html lang="en" className={`dark ${teko.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-dvh bg-bg text-text">
         {serverEnv().MAINTENANCE && (
           <p
@@ -53,6 +52,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           </p>
         )}
         {children}
+        <Spotter />
       </body>
     </html>
   );
