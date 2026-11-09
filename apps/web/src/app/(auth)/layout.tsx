@@ -22,7 +22,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       />
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(9,12,17,0.55)_0%,var(--bg)_72%)]"
+        className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.55)_0%,var(--bg)_72%)]"
       />
       <div className="relative w-full max-w-[400px]">
         <Link href="/" className="mx-auto mb-7 flex w-fit rounded-control">

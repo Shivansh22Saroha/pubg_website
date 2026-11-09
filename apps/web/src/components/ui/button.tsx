@@ -7,10 +7,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // BGMI gold plate: caps display face, clipped corner, halftone edge (UI_UX_SPEC §2.5)
         accent:
-          'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.5),0_6px_18px_-8px_var(--accent-glow)] hover:brightness-[1.06] active:brightness-95 disabled:bg-none disabled:bg-surface-3 disabled:text-text-muted disabled:opacity-100 disabled:shadow-[inset_0_1px_0_var(--highlight)]',
+          'bgmi-cut bgmi-halftone rounded-none pt-[3px] font-display text-[17px] leading-none font-semibold tracking-[0.03em] text-accent-fg uppercase hover:brightness-110 active:brightness-95 disabled:bg-surface-3 disabled:bg-none disabled:text-text-muted disabled:opacity-100',
+        // BGMI store-badge style: black, light hairline, caps
         outline:
-          'border border-accent/50 bg-accent/[0.04] text-accent hover:border-accent hover:bg-accent/10',
+          'rounded-[8px] border-[1.5px] border-white/70 bg-black pt-[3px] font-display text-[17px] leading-none font-semibold tracking-[0.03em] text-text uppercase hover:border-accent hover:text-accent',
         ghost: 'text-text hover:bg-surface-2 hover:shadow-[inset_0_1px_0_var(--highlight)]',
         destructive: 'bg-danger-strong text-white hover:bg-danger-strong/90',
       },

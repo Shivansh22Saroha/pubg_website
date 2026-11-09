@@ -60,24 +60,29 @@ export default function HomePage() {
           className="relative isolate -mt-16 flex min-h-[640px] items-center overflow-hidden pt-16 md:h-[min(92svh,880px)]"
         >
           <HeroMap />
-          <div className="relative mx-auto w-full max-w-6xl px-4 py-16 md:py-0">
-            <h1
-              id="hero"
-              className="max-w-[11ch] font-display text-[52px] leading-[0.92] font-bold tracking-[-0.01em] text-balance sm:text-[76px] lg:text-[92px]"
-            >
-              Plan your rotations together.
-            </h1>
-            <p className="mt-6 max-w-md text-[17px] leading-relaxed text-text/80">
+          <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-16 text-center md:py-0">
+            {/* the lockup: a heavy white frame around the line, like a game title card */}
+            <div className="w-fit max-w-full border-[6px] border-white bg-black/55 px-6 pt-5 pb-3 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] backdrop-blur-[2px] sm:border-8 sm:px-12">
+              <h1
+                id="hero"
+                className="font-display text-[60px] leading-[0.82] font-bold tracking-[0.01em] sm:text-[96px] lg:text-[124px]"
+              >
+                <span className="block">Plan your </span>
+                <span className="block">rotations </span>
+                <span className="block">together.</span>
+              </h1>
+            </div>
+            <p className="mt-7 max-w-lg text-[17px] leading-relaxed text-text/85">
               One shared, live tactical map for your squad — drops, rotations and enemy calls on
               Erangel, Miramar and Rondo.
             </p>
-            <div className="mt-9 flex flex-wrap gap-3">
-              <CreateRoomCta className="h-12 px-6 text-[15px]" />
+            <div className="mt-9 flex flex-wrap justify-center gap-3">
+              <CreateRoomCta className="h-14 px-8 text-[26px]" />
               <Link
                 href="/explore"
                 className={buttonVariants({
                   variant: 'outline',
-                  className: 'h-12 bg-bg/40 px-6 text-[15px] backdrop-blur',
+                  className: 'h-14 px-8 text-[26px]',
                 })}
               >
                 Explore maps
@@ -85,12 +90,12 @@ export default function HomePage() {
             </div>
             <ul
               aria-label="What the map shows"
-              className="mt-12 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-text/70"
+              className="mt-12 flex flex-wrap justify-center gap-x-6 gap-y-2 font-display text-[19px] leading-none tracking-[0.03em] text-text/80 uppercase"
             >
               {LEGEND.map((l) => (
                 <li key={l.label} className="flex items-center gap-2">
                   <span aria-hidden className={`inline-block shrink-0 ${l.swatch}`} />
-                  {l.label}
+                  <span className="pt-[3px]">{l.label}</span>
                 </li>
               ))}
             </ul>
@@ -100,7 +105,7 @@ export default function HomePage() {
         <section aria-labelledby="features" className="mx-auto max-w-6xl px-4 pt-10 pb-24">
           <h2
             id="features"
-            className="max-w-xl font-display text-3xl leading-tight font-bold sm:text-[40px]"
+            className="max-w-2xl font-display text-[44px] leading-[0.9] font-bold sm:text-[64px]"
           >
             Everything your squad says on comms, on one map.
           </h2>
@@ -111,7 +116,7 @@ export default function HomePage() {
                 className={`grid items-center gap-8 md:gap-14 ${i % 2 ? 'md:grid-cols-[1fr_1.35fr]' : 'md:grid-cols-[1.35fr_1fr]'}`}
               >
                 <div
-                  className={`overflow-hidden rounded-hero border border-border-strong/60 shadow-panel ${i % 2 ? 'md:order-2' : ''}`}
+                  className={`overflow-hidden border border-white/15 shadow-panel ${i % 2 ? 'md:order-2' : ''}`}
                 >
                   <Image
                     src={f.image}
@@ -124,7 +129,9 @@ export default function HomePage() {
                   />
                 </div>
                 <div className={i % 2 ? 'md:order-1' : ''}>
-                  <h3 className="font-display text-2xl font-bold sm:text-[28px]">{f.title}</h3>
+                  <h3 className="border-l-4 border-accent pl-3 font-display text-[34px] leading-[0.95] font-bold sm:text-[42px]">
+                    <span className="block pt-[4px]">{f.title}</span>
+                  </h3>
                   <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-text-muted">
                     {f.body}
                   </p>
@@ -135,14 +142,14 @@ export default function HomePage() {
         </section>
 
         <section aria-labelledby="cta" className="mx-auto w-full max-w-6xl px-4 pb-24">
-          <div className="relative overflow-hidden rounded-hero border border-border-strong/60 bg-surface px-6 py-12 shadow-panel sm:px-12">
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_100%_0%,rgba(245,179,1,0.12),transparent_70%)]"
-            />
+          <div className="bgmi-dots relative overflow-hidden border border-white/15 bg-black px-6 py-12 sm:px-12">
+            <div aria-hidden className="absolute inset-y-0 left-0 w-2 bg-accent" />
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 id="cta" className="font-display text-3xl leading-tight font-bold">
+                <h2
+                  id="cta"
+                  className="font-display text-[44px] leading-[0.9] font-bold sm:text-[56px]"
+                >
                   Next scrim, plan it here.
                 </h2>
                 <p className="mt-2 max-w-md text-[15px] text-text-muted">
@@ -151,7 +158,7 @@ export default function HomePage() {
               </div>
               <CreateRoomCta
                 label="Open a room"
-                className="h-12 self-start px-6 text-[15px] sm:self-auto"
+                className="h-14 self-start px-8 text-[26px] sm:self-auto"
               />
             </div>
           </div>

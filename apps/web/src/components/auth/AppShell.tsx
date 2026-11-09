@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-backdrop flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b bg-bg/75 px-4 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-white/10 bg-black px-4">
         <Link href="/dashboard" className="rounded-control">
           <Wordmark />
         </Link>

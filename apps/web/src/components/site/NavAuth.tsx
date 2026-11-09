@@ -31,20 +31,26 @@ function useSignedIn(): boolean {
 }
 
 /** Logged in: "Go to dashboard"; otherwise (and while checking) Log in / Get started. */
+/** the header's call to action: a full-height gold block flush with the right edge */
+const BLOCK =
+  'bgmi-halftone flex items-center px-4 pt-[4px] font-display text-[20px] leading-none tracking-[0.03em] whitespace-nowrap text-accent-fg uppercase hover:brightness-110 sm:px-9 sm:text-[26px]';
+const LINK =
+  'flex items-center px-3 pt-[4px] font-display text-[20px] leading-none tracking-[0.03em] whitespace-nowrap text-text uppercase hover:text-accent sm:px-5 sm:text-[21px]';
+
 export function NavAuth() {
   if (useSignedIn()) {
     return (
-      <Link href="/dashboard" className={buttonVariants({ variant: 'accent', size: 'sm' })}>
+      <Link href="/dashboard" className={BLOCK}>
         Go to dashboard
       </Link>
     );
   }
   return (
     <>
-      <Link href="/login" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+      <Link href="/login" className={LINK}>
         Log in
       </Link>
-      <Link href="/register" className={buttonVariants({ variant: 'accent', size: 'sm' })}>
+      <Link href="/register" className={BLOCK}>
         Get started
       </Link>
     </>
