@@ -19,7 +19,7 @@ test('Spotter on the landing page: free text, a suggestion chip, the fallback, E
   await expect(log).toContainText('Pochinki');
   await expect(panel.getByRole('link', { name: /open erangel/i })).toHaveAttribute(
     'href',
-    '/maps/erangel',
+    '/explore?map=erangel',
   );
 
   await panel.getByRole('button', { name: 'How do we cross the Erangel bridges?' }).click();
@@ -56,4 +56,16 @@ test('Spotter in the room: the top-bar button opens it; Esc on the map is left a
   await expect(panel).toHaveCount(0);
   await ctxA.close();
   await ctxB.close();
+});
+
+test('map links (header, Spotter) open Explore on that map — /maps/* is a dev-only page', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Miramar' })
+    .click();
+  await expect(page).toHaveURL(/\/explore\?map=miramar$/);
+  await expect(page.getByTestId('explore-map-miramar')).toHaveAttribute('aria-pressed', 'true');
 });

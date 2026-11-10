@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { ExploreView } from '@/components/explore/ExploreView';
 import { SiteHeader } from '@/components/site/SiteChrome';
 import { Providers } from '../providers';
@@ -14,7 +15,9 @@ export default function ExplorePage() {
     <div className="flex h-dvh flex-col">
       <SiteHeader wide />
       <Providers>
-        <ExploreView />
+        <Suspense>
+          <ExploreView />
+        </Suspense>
       </Providers>
     </div>
   );
