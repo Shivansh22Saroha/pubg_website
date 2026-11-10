@@ -306,7 +306,7 @@ export const INTENTS: Intent[] = [
     phrases: ['drops on erangel', 'erangel drop', 'land on erangel'],
     answer:
       'Erangel:\n• Hot: Pochinki (central, many buildings), School & Apartments, Georgopol (containers + city), Military Base on Sosnovka island, Mylta Power and Yasnaya Polyana.\n• Calmer: Severny, Stalber, Kameshki, Zharki, Primorsk, Gatka, Lipovka.\nRemember Military Base only connects to the mainland by two bridges — plan your exit early.',
-    link: { label: 'Open Erangel', href: '/maps/erangel' },
+    link: { label: 'Open Erangel', href: '/explore?map=erangel' },
     next: ['bridges', 'rotation-basics'],
   },
   {
@@ -327,7 +327,7 @@ export const INTENTS: Intent[] = [
     phrases: ['drops on miramar', 'miramar drop'],
     answer:
       'Miramar:\n• Hot: Pecado (central, arena and casino), Hacienda del Patrón, Los Leones (huge city in the south-east), El Pozo, San Martín.\n• Miramar is big and open — whatever you drop, secure vehicles straight away, and expect long rotations over ridges.',
-    link: { label: 'Open Miramar', href: '/maps/miramar' },
+    link: { label: 'Open Miramar', href: '/explore?map=miramar' },
     next: ['vehicles', 'rotation-basics'],
   },
   {
@@ -338,7 +338,7 @@ export const INTENTS: Intent[] = [
     phrases: ['drops on rondo', 'rondo tips'],
     answer:
       'Rondo is an 8×8 km map that mixes dense city blocks with open countryside and water. Turn on map labels (N) to see the place names, measure the gaps between cover before you commit to a rotation, and keep a vehicle — the open stretches punish late walkers.',
-    link: { label: 'Open Rondo', href: '/maps/rondo' },
+    link: { label: 'Open Rondo', href: '/explore?map=rondo' },
     next: ['rotation-basics', 'vehicles'],
   },
   {

@@ -37,9 +37,9 @@ export function Wordmark({ className }: { className?: string }) {
 /** primary nav of the public pages: caps links like the game site's top bar */
 const NAV = [
   { href: '/explore', label: 'Explore' },
-  { href: '/maps/erangel', label: 'Erangel' },
-  { href: '/maps/miramar', label: 'Miramar' },
-  { href: '/maps/rondo', label: 'Rondo' },
+  { href: '/explore?map=erangel', label: 'Erangel' },
+  { href: '/explore?map=miramar', label: 'Miramar' },
+  { href: '/explore?map=rondo', label: 'Rondo' },
 ] as const;
 
 /**

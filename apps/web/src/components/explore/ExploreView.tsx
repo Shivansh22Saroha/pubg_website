@@ -3,6 +3,7 @@
 import { MAPS } from '@rotationlab/shared';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { exploreBoards, useDemoBoards } from '@/lib/explore';
@@ -25,7 +26,18 @@ const ExploreMap = dynamic(() => import('./ExploreMap'), {
 export function ExploreView() {
   const demo = useDemoBoards();
   const boards = useMemo(() => exploreBoards(demo.data ?? []), [demo.data]);
-  const [index, setIndex] = useState(0);
+  // `/explore?map=miramar` (the site header's map links, Spotter's links) opens that map; a
+  // click on the switcher wins until the query changes again
+  const wanted = useSearchParams().get('map');
+  const [picked, setPicked] = useState<{ query: string | null; index: number } | null>(null);
+  const fromQuery = Math.max(
+    0,
+    boards.findIndex((b) => b.mapId === wanted),
+  );
+  const index = picked && picked.query === wanted ? picked.index : fromQuery;
+  const setIndex = (i: number) => {
+    setPicked({ query: wanted, index: i });
+  };
   const [measuring, setMeasuring] = useMeasureToggle();
   const board = boards[index] ?? boards[0];
   const bare = demo.isSuccess && demo.data.length === 0;

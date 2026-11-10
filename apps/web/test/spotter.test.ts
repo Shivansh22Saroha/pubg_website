@@ -8,6 +8,8 @@ describe('Spotter knowledge base', () => {
     for (const i of INTENTS) {
       for (const n of i.next ?? []) expect(byId.has(n), `${i.id} → ${n}`).toBe(true);
       if (i.link) expect(i.link.href).toMatch(/^\/[a-z]/);
+      // /maps/* is a dev-only page (404 in production)
+      if (i.link) expect(i.link.href).not.toMatch(/^\/maps\//);
     }
     for (const id of [...STARTERS, ...FALLBACK_SUGGESTIONS]) expect(byId.has(id)).toBe(true);
   });
