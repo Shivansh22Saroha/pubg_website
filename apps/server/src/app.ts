@@ -40,6 +40,7 @@ import { createPublicService } from './modules/public/service.js';
 import { shareRoutes } from './modules/share/routes.js';
 import { adminRoutes } from './modules/admin/routes.js';
 import { createAdminStats } from './modules/admin/stats.js';
+import { createGoogleClient, type GoogleClient } from './modules/auth/google.js';
 import { thumbnailRoutes } from './modules/thumbnails/routes.js';
 import { createThumbnailService } from './modules/thumbnails/service.js';
 import { createAssetStorage, type AssetStorage } from './lib/storage.js';
@@ -78,6 +79,8 @@ export interface AppDeps {
   mailer?: Mailer;
   /** board thumbnail storage (tests pass a temp dir); default: from config (S3 or local disk) */
   assets?: AssetStorage;
+  /** Sign in with Google (tests pass a fake); default: from GOOGLE_CLIENT_ID/SECRET, or off */
+  google?: GoogleClient | null;
 }
 
 // SECURITY §7: never log credentials, cookies or tokens — even if a future log call includes them.
@@ -146,6 +149,7 @@ export async function buildApp({
   realtime: withRealtime = true,
   mailer,
   assets = createAssetStorage(config),
+  google: googleOverride,
 }: AppDeps) {
   const app = Fastify({
     logger: loggerOptions(config, logStream),
@@ -290,7 +294,19 @@ export async function buildApp({
       },
     },
   });
+  const google =
+    googleOverride !== undefined
+      ? googleOverride
+      : config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
+        ? createGoogleClient({
+            clientId: config.GOOGLE_CLIENT_ID,
+            clientSecret: config.GOOGLE_CLIENT_SECRET,
+            redirectUri: `${config.APP_ORIGIN}/api/v1/auth/google/callback`,
+          })
+        : null;
   await app.register(authRoutes, {
+    google,
+    cookieSecure: config.COOKIE_SECURE,
     prefix: '/api/v1/auth',
     auth,
     cookies,
@@ -305,7 +321,7 @@ export async function buildApp({
   app.get(
     '/api/v1/config',
     { config: { access: 'public' }, schema: { response: { 200: PublicConfigResponseSchema } } },
-    () => ({ emailEnabled: config.EMAIL_ENABLED }),
+    () => ({ emailEnabled: config.EMAIL_ENABLED, googleEnabled: google !== null }),
   );
   const rateLimits = config.RATE_LIMITS_ENABLED;
   await app.register(roomRoutes, { prefix: '/api/v1', rooms, invites, boards, redis, rateLimits });

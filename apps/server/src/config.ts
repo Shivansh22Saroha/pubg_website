@@ -39,6 +39,9 @@ export const EnvSchema = z
           .map((s) => s.trim())
           .filter(Boolean),
       ),
+    /** Sign in with Google (FEATURES F17): both set = the button appears */
+    GOOGLE_CLIENT_ID: z.string().trim().default(''),
+    GOOGLE_CLIENT_SECRET: z.string().trim().default(''),
     /** site admins (FEATURES F16): comma-separated account emails that may open /admin */
     ADMIN_EMAILS: z
       .string()

@@ -48,6 +48,11 @@ services:
       # site admins (FEATURES F16): your own account email(s), comma-separated — set in the dashboard
       - key: ADMIN_EMAILS
         sync: false
+      # Sign in with Google (FEATURES F17): from Google Cloud → Google Auth Platform → Clients
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
 
   - type: keyvalue
     name: rotationlab-redis

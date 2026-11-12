@@ -110,7 +110,8 @@ test('E2E-12: phone — every tool (six + More), chat sheet both ways, touch dra
   expect(box?.height).toBeGreaterThan(600); // full screen
   await sheet.getByRole('textbox', { name: 'Message' }).fill('rotating north');
   await sheet.getByRole('button', { name: 'Send' }).tap();
-  await expect(b.getByText('rotating north')).toBeVisible();
+  // (the sr-only live region repeats the text — look in the message list)
+  await expect(b.getByTestId('chat-body').filter({ hasText: 'rotating north' })).toBeVisible();
   await b.getByRole('textbox', { name: 'Message' }).fill('copy that');
   await b.keyboard.press('Enter');
   await expect(sheet.getByText('copy that')).toBeVisible();

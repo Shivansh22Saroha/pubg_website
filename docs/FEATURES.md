@@ -225,3 +225,12 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - Who can open it: accounts whose email is in the server's `ADMIN_EMAILS` (set on the host). Nobody is an admin by default; there is no admin password — the admin logs in with their own account. Everyone else gets a 404 page; the user menu shows "Admin" only to admins.
 - AC: an admin gets the numbers; a logged-in non-admin gets 404, anonymous 401 (integration test + authz matrix); the response carries no raw emails, hashes or tokens.
 
+---
+
+## F17. Sign in with Google (2026-11)
+- "Continue with Google" on the login and sign-up pages (Google's dark button style), shown only when the server has `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+- First time: a new account with the Google name as display name, a username from the email (`shiva.s@gmail.com` → `shiva_s`, a number added if taken) and a verified email — no password. If an account already uses that (Google-verified) email, Google is linked to it instead, which also recovers an account whose password was forgotten.
+- Google-only accounts can set a password in Settings (no current password needed the first time); deleting the account or handing a room over asks them to set one first.
+- Email + password sign-up and login stay as they are.
+- AC: new account, linking, next-path honoured, open redirects refused, state-cookie mismatch / reuse / cancel / unverified email refused, 404 when not configured, first password without a current one (integration); PKCE, ID-token issuer / audience / nonce checks (unit).
+

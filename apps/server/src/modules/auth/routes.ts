@@ -1,5 +1,7 @@
 import {
   ForgotPasswordBodySchema,
+  GoogleCallbackQuerySchema,
+  GoogleStartQuerySchema,
   LoginBodySchema,
   RegisterBodySchema,
   ResetPasswordBodySchema,
@@ -17,11 +19,15 @@ import { AppError } from '../../lib/errors.js';
 import { LIMITS, byUser, fixedWindowLimit } from '../../plugins/rateLimit.js';
 import type { AuthCookies } from './cookies.js';
 import type { EmailFlows } from './emailFlows.js';
+import { pkceChallenge, randomToken, safeNext, type GoogleClient } from './google.js';
 import type { AuthService } from './service.js';
 import type { SocketTickets } from './socketTickets.js';
 import type { TokenService } from './tokens.js';
 
 export interface AuthRouteDeps {
+  /** Sign in with Google (F17); null = not configured, its routes answer 404 */
+  google: GoogleClient | null;
+  cookieSecure: boolean;
   auth: AuthService;
   cookies: AuthCookies;
   redis: Redis;
@@ -130,6 +136,83 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteDeps> = (app, deps, d
   );
 
   // ---- email flows (SECURITY A9) -------------------------------------------------------
+  // ---- Sign in with Google (F17, SECURITY A12) ------------------------------------------
+  // state + PKCE verifier + nonce live 10 min in Redis, single use; the state is also bound to
+  // this browser by a short cookie, so a link someone else started can't log you in (login CSRF)
+  const G_COOKIE = 'rl_goauth';
+  const G_TTL = 600;
+  const gKey = (state: string) => `rt:goauth:${state}`;
+  const failTo = (reason: string) => `/login?error=${encodeURIComponent(reason)}`;
+
+  app.get(
+    '/google/start',
+    {
+      config: { access: 'public', rateLimit: LIMITS.login },
+      schema: { querystring: GoogleStartQuerySchema },
+    },
+    async (req, reply) => {
+      if (!deps.google) throw new AppError('NOT_FOUND', 'Not found');
+      const state = randomToken();
+      const verifier = randomToken();
+      const nonce = randomToken();
+      const next = safeNext(req.query.next);
+      await deps.redis.set(gKey(state), JSON.stringify({ verifier, nonce, next }), 'EX', G_TTL);
+      reply.setCookie(G_COOKIE, state, {
+        httpOnly: true,
+        secure: deps.cookieSecure,
+        sameSite: 'lax', // must ride along on Google's top-level redirect back to us
+        path: '/api/v1/auth/google',
+        maxAge: G_TTL,
+      });
+      reply.header('cache-control', 'no-store');
+      return reply.redirect(
+        deps.google.authUrl({ state, challenge: pkceChallenge(verifier), nonce }),
+        303,
+      );
+    },
+  );
+
+  app.get(
+    '/google/callback',
+    {
+      config: { access: 'public', rateLimit: LIMITS.login },
+      schema: { querystring: GoogleCallbackQuerySchema },
+    },
+    async (req, reply) => {
+      if (!deps.google) throw new AppError('NOT_FOUND', 'Not found');
+      reply.header('cache-control', 'no-store');
+      const cookieState = req.cookies[G_COOKIE];
+      reply.clearCookie(G_COOKIE, { path: '/api/v1/auth/google' });
+      const { code, state, error } = req.query;
+      if (error === 'access_denied') return reply.redirect(failTo('google_cancelled'), 303);
+      if (!code || !state || !cookieState || cookieState !== state) {
+        return reply.redirect(failTo('google'), 303);
+      }
+      const saved = await deps.redis.getdel(gKey(state));
+      if (!saved) return reply.redirect(failTo('google_expired'), 303);
+      const { verifier, nonce, next } = JSON.parse(saved) as {
+        verifier: string;
+        nonce: string;
+        next: string;
+      };
+      let to: string;
+      try {
+        const profile = await deps.google.exchange({ code, verifier, nonce });
+        const s = await auth.loginWithGoogle(profile, meta(req));
+        cookies.set(reply, s);
+        req.log.info({ event: 'auth.google', created: s.created }, 'google sign-in');
+        to = s.created ? '/dashboard?welcome=google' : safeNext(next);
+      } catch (err) {
+        req.log.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          'google sign-in failed',
+        );
+        return reply.redirect(failTo('google'), 303);
+      }
+      return reply.redirect(to, 303);
+    },
+  );
+
   app.post(
     '/verify-email',
     {

@@ -103,6 +103,8 @@ export const MeSchema = PublicUserSchema.extend({
   prefs: UserPrefsSchema.default({ roomTourDone: false }),
   /** site admin (ADMIN_EMAILS) — only GET /me sets it; shows the Admin link (F16) */
   isAdmin: z.boolean().default(false),
+  /** false for accounts made with Google sign-in until they set one (F17) */
+  hasPassword: z.boolean().default(true),
 });
 export type Me = z.infer<typeof MeSchema>;
 
@@ -119,10 +121,12 @@ export const UpdateMeBodySchema = z
 export type UpdateMeBody = z.input<typeof UpdateMeBodySchema>;
 
 export const ChangePasswordBodySchema = z.strictObject({
+  /** required when the account has a password; omitted to set a first one (Google accounts) */
   currentPassword: z
     .string()
     .min(1)
-    .max(PASSWORD_MAX * 4),
+    .max(PASSWORD_MAX * 4)
+    .optional(),
   newPassword: PasswordSchema,
 });
 export type ChangePasswordBody = z.input<typeof ChangePasswordBodySchema>;
@@ -168,3 +172,16 @@ export function passwordStrength(pw: string): 0 | 1 | 2 | 3 | 4 {
   if (unique < n / 3) score -= 1;
   return Math.max(0, Math.min(4, score)) as 0 | 1 | 2 | 3 | 4;
 }
+
+/** Sign in with Google (F17, API_SPEC §2): GET /auth/google/start?next=/rooms/… */
+export const GoogleStartQuerySchema = z.object({ next: z.string().max(200).optional() });
+/** what Google appends to the redirect: a code, or an error (e.g. access_denied) */
+export const GoogleCallbackQuerySchema = z.object({
+  code: z.string().max(2048).optional(),
+  state: z.string().max(200).optional(),
+  error: z.string().max(200).optional(),
+  scope: z.string().max(500).optional(),
+  authuser: z.string().max(20).optional(),
+  prompt: z.string().max(50).optional(),
+  hd: z.string().max(200).optional(),
+});

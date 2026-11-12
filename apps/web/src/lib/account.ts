@@ -60,7 +60,10 @@ export function useChangePassword() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: ChangePasswordBody) => api('/me/password', { method: 'POST', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['sessions'] });
+      await qc.invalidateQueries({ queryKey: ME_QUERY_KEY }); // a first password flips hasPassword
+    },
   });
 }
 

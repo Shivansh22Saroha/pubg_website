@@ -12,6 +12,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
+import { GoogleButton } from './GoogleButton';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
@@ -119,6 +120,7 @@ export function RegisterForm({ redirectTo }: { redirectTo: string }) {
       className="flex flex-col gap-4"
     >
       <h1 className="font-display text-[30px] leading-none font-bold">Create your account</h1>
+      <GoogleButton next={redirectTo} />
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">Email</Label>

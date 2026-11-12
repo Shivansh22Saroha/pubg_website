@@ -186,28 +186,41 @@ function Account({ me }: { me: Me }) {
         onSubmit={(e) => {
           e.preventDefault();
           change.mutate(
-            { currentPassword: current, newPassword: next },
+            me.hasPassword
+              ? { currentPassword: current, newPassword: next }
+              : { newPassword: next },
             {
               onSuccess: () => {
                 setCurrent('');
                 setNext('');
-                toast.success('Password changed — your other devices were logged out');
+                toast.success(
+                  me.hasPassword
+                    ? 'Password changed — your other devices were logged out'
+                    : 'Password set — you can now log in with it as well as with Google',
+                );
               },
               onError: fail,
             },
           );
         }}
       >
-        <Field label="Current password">
-          <Input
-            type="password"
-            autoComplete="current-password"
-            value={current}
-            onChange={(e) => {
-              setCurrent(e.target.value);
-            }}
-          />
-        </Field>
+        {me.hasPassword ? (
+          <Field label="Current password">
+            <Input
+              type="password"
+              autoComplete="current-password"
+              value={current}
+              onChange={(e) => {
+                setCurrent(e.target.value);
+              }}
+            />
+          </Field>
+        ) : (
+          <p className="text-sm text-text-muted" data-testid="google-no-password">
+            You sign in with Google. Set a password to also log in with your email — it&apos;s
+            needed to delete your account or hand a room to someone else.
+          </p>
+        )}
         <Field
           label="New password"
           hint="10–128 characters. Changing it logs out your other devices."
@@ -222,8 +235,11 @@ function Account({ me }: { me: Me }) {
           />
         </Field>
         <div>
-          <Button type="submit" disabled={!current || next.length < 10 || change.isPending}>
-            Change password
+          <Button
+            type="submit"
+            disabled={(me.hasPassword && !current) || next.length < 10 || change.isPending}
+          >
+            {me.hasPassword ? 'Change password' : 'Set password'}
           </Button>
         </div>
       </form>

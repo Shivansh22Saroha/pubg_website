@@ -225,7 +225,7 @@ export const INTENTS: Intent[] = [
     keywords: ['password', 'forgot', 'reset', 'login', 'log', 'account', 'email', 'verify', 'sign'],
     phrases: ['forgot my password', 'cant log in', 'reset password'],
     answer:
-      'On the login page choose "Forgot password?" and enter your email; the reset link lasts a short time. Your IGN, display name and password live in Settings once you are logged in.',
+      'If Google sign-in is on, press "Continue with Google" with the same email — it links to your account and logs you in, no password needed. Otherwise use "Forgot password?" on the login page. Your IGN, display name and password live in Settings once you are logged in.',
     link: { label: 'Log in', href: '/login' },
   },
   {

@@ -1,5 +1,6 @@
 import type { PrismaClient, RoomRole } from '@prisma/client';
 import type { OwnedRoomChoice } from '@rotationlab/shared';
+import { hasPassword, SET_PASSWORD_FIRST } from '../auth/service.js';
 import { AppError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
 import type { AuthUser } from '../../lib/policy.js';
@@ -90,6 +91,7 @@ export function createAccountService(d: AccountDeps) {
     ): Promise<Resolution[]> {
       const me = await d.prisma.user.findUnique({ where: { id: user.id } });
       if (!me || me.deletedAt) throw new AppError('UNAUTHENTICATED', 'Log in to continue');
+      if (!hasPassword(me)) throw new AppError('BAD_REQUEST', SET_PASSWORD_FIRST);
       if (!(await d.passwords.verify(me.passwordHash, body.password)))
         throw new AppError('INVALID_CREDENTIALS', 'Password is incorrect');
 

@@ -12,6 +12,7 @@ import {
   type UpdateRoomBodySchema,
 } from '@rotationlab/shared';
 import type { z } from 'zod';
+import { hasPassword, SET_PASSWORD_FIRST } from '../auth/service.js';
 import { AppError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
 import type { AuthUser } from '../../lib/policy.js';
@@ -263,6 +264,7 @@ export function createRoomService(d: RoomServiceDeps) {
     async transfer(user: AuthUser, roomId: string, targetId: string, password: string) {
       await policy.requireRoom(user, roomId, 'room.manage');
       const me = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      if (!hasPassword(me)) throw new AppError('BAD_REQUEST', SET_PASSWORD_FIRST);
       if (!(await d.passwords.verify(me.passwordHash, password))) {
         throw new AppError('INVALID_CREDENTIALS', 'Password is incorrect');
       }

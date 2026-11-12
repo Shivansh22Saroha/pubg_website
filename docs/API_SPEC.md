@@ -66,6 +66,8 @@ Snapshot   = { id, boardId, name, isAuto, elementCount, createdBy: PublicUser|nu
 | `POST /auth/refresh` | refresh cookie | – | `204` + new cookies (rotation) |
 | `POST /auth/logout` | ✓ | – | `204`, clears cookies, revokes refresh token |
 | `POST /auth/logout-all` | ✓ | – | `204`, revokes all user's refresh tokens |
+| `GET /auth/google/start?next=/path` | – | – | `303` to Google's consent screen; sets the 10-min `rl_goauth` state cookie. `404` when `GOOGLE_CLIENT_ID/SECRET` aren't set (F17, SECURITY A12) |
+| `GET /auth/google/callback?code&state` | – | – | `303` to `next` (or `/dashboard?welcome=google` for a new account) with session cookies set; on any failure `303 /login?error=google` (`google_cancelled`, `google_expired`) |
 | `POST /auth/socket-ticket` | ✓ | – | `200 { ticket }`: 43-char single-use ticket for the socket handshake, valid 60 s (SECURITY A11). Rate limit 60 / min / user |
 | `GET  /auth/username-available?u=` | – | – | `200 { available: boolean }` (rate-limited) |
 | `POST /auth/verify-email` | – | `{ token }` | `204` (P1) |
