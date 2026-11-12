@@ -540,14 +540,14 @@ function Shell({
   mode?: 'tool' | 'selection';
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-12 z-[1000] flex justify-center px-4">
+    <div className="pointer-events-none absolute inset-x-0 bottom-12 z-[1000] flex justify-center px-4 pointer-coarse:bottom-16">
       <div
         role="toolbar"
         aria-label="Style"
         data-testid={testId}
         data-mode={mode}
         data-rl-overlay=""
-        className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 glass rounded-panel p-1.5"
+        className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 glass rounded-panel p-1.5 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:overscroll-x-contain"
       >
         {children}
       </div>

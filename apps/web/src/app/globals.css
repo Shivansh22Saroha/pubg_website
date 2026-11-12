@@ -138,6 +138,37 @@
   text-transform: uppercase;
 }
 
+/* Raised surface: hairline top highlight + soft depth. Used for cards and side panels. */
+@utility surface-raised {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-raise);
+}
+
+/* HUD glass: chrome that floats over the map (style bar, HUD, minimap, menus, popovers).
+   (Restored 2026-11-12 — the BGMI theme pass dropped it by accident, leaving these see-through.) */
+@utility glass {
+  background-color: var(--overlay);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* App backdrop for non-map pages: the map grid, very faint, fading out from the top. */
+@utility app-backdrop {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 180, 0, 0.06), transparent 70%),
+    linear-gradient(to bottom, transparent, var(--bg) 70%),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    96px 96px,
+    96px 96px;
+}
+
 /* BGMI type: the display face is a condensed caps face — always set in capitals */
 @layer base {
   .font-display {

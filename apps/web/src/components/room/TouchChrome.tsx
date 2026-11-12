@@ -3,7 +3,7 @@
 import type { Board } from '@rotationlab/shared';
 import { MessageSquare, Menu, X } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,12 +13,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NativeSelect } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { UnreadBadge } from './SidePanel';
 
 /**
  * Tablet / phone chrome of the room (UI_UX_SPEC §7): the right panel as a sheet, the chat
- * button that opens it, and the phone's board dropdown, top-bar menu and banner.
+ * button that opens it, and the phone's board dropdown and top-bar menu.
  */
 
 /** Tablet: a half-height bottom sheet above the bottom toolbar; the map stays usable. */
@@ -177,35 +176,5 @@ export function PhoneRoomMenu({ items }: { items: PhoneMenuItem[] }) {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/** Phone: the drawing tools are limited — say so, once per visit (dismissible). */
-export function PhoneBanner() {
-  const [open, setOpen] = useState(true);
-  if (!open) return null;
-  return (
-    // right padding keeps it clear of the chat button (top-right)
-    <div className="pointer-events-none absolute inset-x-0 top-2 z-[1000] flex justify-center pr-16 pl-3">
-      <p
-        role="note"
-        data-testid="phone-banner"
-        className={cn(
-          'pointer-events-auto flex items-center gap-1 rounded-full border bg-overlay py-1 pr-1 pl-3 text-xs shadow-panel backdrop-blur',
-        )}
-      >
-        Use a larger screen for full drawing tools
-        <button
-          type="button"
-          aria-label="Dismiss"
-          onClick={() => {
-            setOpen(false);
-          }}
-          className="flex size-11 items-center justify-center rounded-full text-text-muted hover:text-text"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      </p>
-    </div>
   );
 }

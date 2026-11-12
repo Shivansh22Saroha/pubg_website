@@ -55,23 +55,37 @@ async function touchDrag(cdp: CDPSession, from: [number, number], to: [number, n
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
-test('E2E-12: phone — view + chat mode, limited tools, chat sheet both ways, a tapped marker syncs', async ({
+test('E2E-12: phone — every tool (six + More), chat sheet both ways, touch drawing and a tapped marker sync', async ({
   browser,
 }) => {
   const { ctxA, ctxB, a, b, nameB } = await twoUsersInRoom(browser, { a: PHONE });
   await expect(a.locator('[data-layout="phone"]')).toBeVisible();
   expect(await noHorizontalScroll(a)).toBe(true);
 
-  // limited tools in a bottom bar, the banner, board dropdown, collapsed top bar
+  // six tools + More in a bottom bar (2026-11: phones draw too), undo / redo in the top bar,
+  // board dropdown, collapsed top bar
   const bar = a.getByTestId('toolbar');
   await expect(bar).toHaveAttribute('data-orientation', 'horizontal');
   const tools = await bar
     .locator('[data-testid^="tool-"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
-  expect(tools).toEqual(['tool-select', 'tool-marker', 'tool-measure', 'tool-laser']);
-  await expect(a.getByTestId('phone-banner')).toHaveText(
-    /Use a larger screen for full drawing tools/,
-  );
+  expect(tools).toEqual([
+    'tool-select',
+    'tool-pen',
+    'tool-arrow',
+    'tool-circle',
+    'tool-marker',
+    'tool-eraser',
+  ]);
+  await expect(bar.getByTestId('tools-more')).toBeVisible();
+  await expect(a.getByTestId('undo')).toBeVisible();
+  await a.getByTestId('tools-more').tap();
+  const more = a.getByTestId('tools-more-menu');
+  for (const id of ['line', 'polygon', 'text', 'measure', 'laser'])
+    await expect(more.getByTestId(`tool-${id}`)).toBeVisible();
+  await more.getByTestId('tool-line').tap();
+  await expect(a.getByTestId('tools-more')).toHaveAttribute('aria-label', 'More tools — Line');
+  await a.getByTestId('tool-select').tap();
   await expect(a.getByTestId('board-select')).toBeVisible();
   await expect(a.getByRole('tablist', { name: 'Boards' })).toHaveCount(0);
   await a.getByTestId('room-menu').tap();
@@ -104,6 +118,15 @@ test('E2E-12: phone — view + chat mode, limited tools, chat sheet both ways, a
   await sheet.getByRole('button', { name: 'Close panel' }).tap();
   await expect(sheet).toHaveCount(0);
 
+  // one finger draws an arrow; the desktop user sees it; undo from the top bar removes it
+  await a.getByTestId('tool-arrow').tap();
+  const cdpDraw = await ctxA.newCDPSession(a);
+  await touchDrag(cdpDraw, await mapPoint(a, 0.3, 0.55), await mapPoint(a, 0.65, 0.35));
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await expect.poll(() => debugCount(b)).toBe(1);
+  await a.getByTestId('undo').tap();
+  await expect.poll(() => debugCount(b)).toBe(0);
+
   // one finger places a marker; the desktop user sees it
   await a.getByTestId('tool-marker').tap();
   await a.getByTestId('marker-kind-enemy_squad').tap();
@@ -125,6 +148,34 @@ test('E2E-12: phone — view + chat mode, limited tools, chat sheet both ways, a
   await menu.getByRole('menuitem', { name: 'Delete' }).tap();
   await expect.poll(() => debugCount(b)).toBe(0);
 
+  await ctxA.close();
+  await ctxB.close();
+});
+
+test('phone held sideways: phone layout, tools in a left column that fits, touch drawing syncs', async ({
+  browser,
+}) => {
+  const { ctxA, ctxB, a, b } = await twoUsersInRoom(browser, {
+    a: { ...PHONE, viewport: { width: 844, height: 390 } },
+  });
+  // 844 px wide would be "tablet" — but it's a touch screen under 520 px tall: a phone
+  await expect(a.locator('[data-layout="phone"]')).toBeVisible();
+  expect(await noHorizontalScroll(a)).toBe(true);
+  const bar = a.getByTestId('toolbar');
+  await expect(bar).toHaveAttribute('data-orientation', 'vertical');
+  // the whole column is on screen: no tool hidden below the fold
+  const fits = await bar.evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
+  expect(fits).toBe(true);
+  const barBox = await bar.boundingBox();
+  const mapBox = await a.locator('.leaflet-container').boundingBox();
+  expect(barBox!.x).toBeLessThan(mapBox!.x); // left of the map
+  expect(mapBox!.height).toBeGreaterThan(300); // the map keeps the height
+
+  await a.getByTestId('tool-pen').tap();
+  const cdp = await ctxA.newCDPSession(a);
+  await touchDrag(cdp, await mapPoint(a, 0.35, 0.6), await mapPoint(a, 0.6, 0.4));
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await expect.poll(() => debugCount(b)).toBe(1);
   await ctxA.close();
   await ctxB.close();
 });

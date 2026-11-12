@@ -201,12 +201,13 @@ Each marker has an optional label (≤ 24 chars) shown under it.
 | ≥ 1280 px | full layout as §3.5 |
 | 1024–1279 | right panel 300 px, collapsed by default; toolbar unchanged |
 | 768–1023 (tablet) | toolbar becomes bottom horizontal bar (scrollable); right panel becomes bottom sheet (half-height) toggled by a chat FAB; touch drawing supported (Pen/Pencil, circle, arrow, marker) |
-| < 768 (phone) | **view + chat mode**: map full screen, board switcher as a dropdown, chat as full-screen sheet, tools limited to Select, Marker, Laser, Measure; banner "Use a larger screen for full drawing tools" |
+| < 768 (phone) | map full screen, board switcher as a dropdown, chat as full-screen sheet; **every tool of the role** (since 2026-11): six in the bottom bar (Select, Pen, Arrow, Circle, Marker, Eraser) and the rest (Line, Polygon, Text, Measure, Laser) under a "More tools" button; undo / redo in the top bar. *(Was "view + chat mode" with four tools and a "Use a larger screen" banner until 2026-11-12.)* |
+| phone held sideways (touch, < 520 px tall, wider than tall, < 1280 px wide) | the phone layout, even at 800–930 px wide: tools in a left column (40 px buttons so all seven fit), a 44 px top bar, safe-area insets respected; the map keeps the full height |
 
 Touch: one finger draws in drawing tools, two fingers always pan/zoom. Long-press = context menu.
 
 Implementation notes (Phase 9):
-- Breakpoints are read from the window width (`useBreakpoint`). Compact: the panel starts collapsed. Tablet: **every** tool of the role (the listed ones are the ones verified with touch), the panel as a half-height sheet above the bottom toolbar, the style bar right above the toolbar. Phone: Select, Marker, Measure, Laser (a viewer keeps Select, Measure, Laser), undo / redo for editors, a dismissible banner, the board dropdown, and one top-bar menu: Invite, Members, Chat, Snapshots…, Export PNG, Room settings, Leave. The chat button (with the unread count) sits at the top right of the map on both touch layouts.
+- Breakpoints are read from the window width (`useBreakpoint`). Compact: the panel starts collapsed. Tablet: **every** tool of the role (the listed ones are the ones verified with touch), the panel as a half-height sheet above the bottom toolbar, the style bar right above the toolbar. Phone (2026-11): every tool of the role — six in the bar plus "More tools" (a viewer's three tools fit without it), undo / redo for editors in the top bar, the board dropdown, and one top-bar menu: Invite, Members, Chat, Snapshots…, Export PNG, Room settings, Leave. The chat button (with the unread count) sits at the top right of the map on both touch layouts.
 - Leaving the room desktop-wide → touch-wide closes the panel; a tool the new layout doesn't offer falls back to Select.
 - Long-press (Select, one finger held 500 ms within 10 px) on an editable element selects it and opens Edit label / Edit text (markers, text) and Delete; the OS long-press menu is suppressed on the map.
 - Touch targets ≥ 44 px via `pointer: coarse` (buttons, menu items, tabs, tool buttons); hover-only actions (chat message options) are always shown on touch.
