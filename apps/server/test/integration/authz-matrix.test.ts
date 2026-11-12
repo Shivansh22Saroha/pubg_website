@@ -135,6 +135,19 @@ const MATRIX: Row[] = [
     request: () => ({ url: '/api/v1/auth/logout-all' }),
     expect: authed(204),
   },
+  // Sign in with Google: public, and 404 while GOOGLE_CLIENT_ID/SECRET aren't set (as here)
+  {
+    method: 'GET',
+    url: '/api/v1/auth/google/start',
+    request: () => ({ url: '/api/v1/auth/google/start' }),
+    expect: everyone(404),
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/auth/google/callback',
+    request: () => ({ url: '/api/v1/auth/google/callback?code=x&state=y' }),
+    expect: everyone(404),
+  },
   {
     method: 'POST',
     url: '/api/v1/auth/socket-ticket',

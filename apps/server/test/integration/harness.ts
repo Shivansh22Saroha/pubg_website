@@ -10,6 +10,7 @@ import type { AddressInfo } from 'node:net';
 import type { ClientToServerEvents, ServerToClientEvents } from '@rotationlab/shared';
 import { io as ioClient, type Socket as ClientSocketBase } from 'socket.io-client';
 import { afterAll, afterEach, beforeEach, inject } from 'vitest';
+import type { GoogleClient } from '../../src/modules/auth/google.js';
 import { buildApp, type App } from '../../src/app.js';
 import type { Mailer } from '../../src/lib/mailer.js';
 import { createLocalStorage, type AssetStorage } from '../../src/lib/storage.js';
@@ -28,7 +29,7 @@ export const assetsDir = mkdtempSync(path.join(tmpdir(), 'rl-assets-'));
 /** Fresh app per call (config overrides allowed). Logs are captured, never printed. */
 export async function makeApp(
   overrides: Record<string, string> = {},
-  opts: { mailer?: Mailer; assets?: AssetStorage } = {},
+  opts: { mailer?: Mailer; assets?: AssetStorage; google?: GoogleClient | null } = {},
 ) {
   const logs = captureLogs();
   const config = testConfig({

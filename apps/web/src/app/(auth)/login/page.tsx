@@ -9,6 +9,11 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { redirectTo } = await searchParams;
-  return <LoginForm redirectTo={safeRedirect(redirectTo)} />;
+  const { redirectTo, error } = await searchParams;
+  return (
+    <LoginForm
+      redirectTo={safeRedirect(redirectTo)}
+      error={typeof error === 'string' ? error : undefined}
+    />
+  );
 }

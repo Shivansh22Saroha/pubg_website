@@ -13,9 +13,10 @@ import { FieldError, Input, Label } from '@/components/ui/input';
 import { ME_QUERY_KEY } from '@/hooks/useMe';
 import { api, refreshSession } from '@/lib/api';
 import { ForgotLink } from './EmailFlows';
+import { GOOGLE_ERRORS, GoogleButton } from './GoogleButton';
 import { applyApiError } from './formErrors';
 
-export function LoginForm({ redirectTo }: { redirectTo: string }) {
+export function LoginForm({ redirectTo, error }: { redirectTo: string; error?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
@@ -74,6 +75,15 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       className="flex flex-col gap-4"
     >
       <h1 className="font-display text-[30px] leading-none font-bold">Log in</h1>
+      {error && GOOGLE_ERRORS[error] && (
+        <p
+          role="alert"
+          className="rounded-control border border-danger/50 bg-danger/10 px-3 py-2 text-sm"
+        >
+          {GOOGLE_ERRORS[error]}
+        </p>
+      )}
+      <GoogleButton next={redirectTo} />
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="identifier">Email or username</Label>

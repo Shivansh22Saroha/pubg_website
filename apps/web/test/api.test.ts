@@ -14,6 +14,7 @@ const ME = {
     createdAt: '2026-10-25T07:10:00.000Z',
     prefs: { roomTourDone: false },
     isAdmin: false,
+    hasPassword: true,
   },
 };
 const json = (status: number, body: unknown) =>

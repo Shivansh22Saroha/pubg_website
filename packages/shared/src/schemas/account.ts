@@ -40,5 +40,9 @@ export const EMAIL_TOKEN_TTL_MS = {
 export type EmailTokenPurpose = keyof typeof EMAIL_TOKEN_TTL_MS;
 
 /** `GET /api/v1/config` — public feature flags the UI needs before login. */
-export const PublicConfigResponseSchema = z.object({ emailEnabled: z.boolean() });
+export const PublicConfigResponseSchema = z.object({
+  emailEnabled: z.boolean(),
+  /** "Continue with Google" is configured (F17) */
+  googleEnabled: z.boolean().default(false),
+});
 export type PublicConfig = z.infer<typeof PublicConfigResponseSchema>;

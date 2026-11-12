@@ -14,6 +14,8 @@ import type { z } from 'zod';
 import { AppError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
 import type { Lockout } from './lockout.js';
+import type { GoogleProfile } from './google.js';
+import { usernameSeed } from './google.js';
 import { assertPasswordPolicy, type PasswordHasher } from './passwords.js';
 import type { RevocationList } from './revocation.js';
 import type { SessionMeta, SessionService } from './sessions.js';
@@ -48,8 +50,18 @@ export function toMe(u: User): Me {
     createdAt: u.createdAt.toISOString(),
     prefs: readPrefs(u.prefs),
     isAdmin: false,
+    hasPassword: hasPassword(u),
   };
 }
+
+/** Google-made accounts store "!google" (and deleted ones "!deleted"): no password to check */
+export function hasPassword(u: Pick<User, 'passwordHash'>): boolean {
+  return !u.passwordHash.startsWith('!');
+}
+
+export const GOOGLE_NO_PASSWORD = '!google';
+export const SET_PASSWORD_FIRST =
+  'Your account signs in with Google. Set a password in Settings first.';
 
 /** `users.prefs` → known keys with defaults; anything unexpected is ignored, never an error. */
 export function readPrefs(raw: unknown): UserPrefs {
@@ -142,6 +154,65 @@ export function createAuthService(d: AuthDeps) {
       return issue(user, meta);
     },
 
+    /**
+     * Sign in with Google (F17): the linked account; else the account with that (Google-
+     * verified) email, which gets linked; else a new account with a username from the email.
+     */
+    async loginWithGoogle(
+      g: GoogleProfile,
+      meta: SessionMeta,
+    ): Promise<IssuedSession & { created: boolean }> {
+      const linked = await prisma.user.findUnique({ where: { googleSub: g.sub } });
+      if (linked) {
+        if (linked.deletedAt) throw new AppError('UNAUTHENTICATED', 'This account was deleted');
+        return { ...(await issue(linked, meta)), created: false };
+      }
+      if (!g.emailVerified) {
+        throw new AppError('UNAUTHENTICATED', 'Verify your Google email address first');
+      }
+      const existing = await prisma.user.findUnique({ where: { email: g.email } });
+      if (existing && !existing.deletedAt) {
+        const user = await prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            googleSub: g.sub,
+            emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
+            failedLoginCount: 0,
+            lockedUntil: null,
+          },
+        });
+        return { ...(await issue(user, meta)), created: false };
+      }
+      const seed = usernameSeed(g.email, g.name);
+      const displayName = (g.name ?? seed).trim().slice(0, 32) || seed;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const username =
+          attempt === 0 ? seed : `${seed}_${Math.floor(Math.random() * 9000 + 1000)}`;
+        if (await prisma.user.count({ where: { username } })) continue;
+        try {
+          const user = await prisma.user.create({
+            data: {
+              id: newId(),
+              email: g.email,
+              username,
+              displayName,
+              passwordHash: GOOGLE_NO_PASSWORD,
+              googleSub: g.sub,
+              emailVerifiedAt: new Date(),
+            },
+          });
+          return { ...(await issue(user, meta)), created: true };
+        } catch (err) {
+          const target = uniqueViolation(err);
+          if (target?.includes('username')) continue; // a race: try another suffix
+          if (target)
+            throw new AppError('EMAIL_TAKEN', 'An account with that email already exists');
+          throw err;
+        }
+      }
+      throw new AppError('CONFLICT', 'Could not pick a username — try again');
+    },
+
     async refresh(rawRefresh: string, meta: SessionMeta) {
       const next = await d.sessions.rotate(rawRefresh, meta);
       await activeUser(next.userId);
@@ -203,8 +274,14 @@ export function createAuthService(d: AuthDeps) {
       body: z.output<typeof ChangePasswordBodySchema>,
     ): Promise<void> {
       const user = await activeUser(userId);
-      if (!(await d.passwords.verify(user.passwordHash, body.currentPassword))) {
-        throw new AppError('INVALID_CREDENTIALS', 'Current password is incorrect');
+      // a Google account sets its first password without one; everyone else proves the current
+      if (hasPassword(user)) {
+        if (
+          !body.currentPassword ||
+          !(await d.passwords.verify(user.passwordHash, body.currentPassword))
+        ) {
+          throw new AppError('INVALID_CREDENTIALS', 'Current password is incorrect');
+        }
       }
       assertPasswordPolicy(body.newPassword, 'newPassword');
       await prisma.user.update({

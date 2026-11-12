@@ -200,9 +200,11 @@ describe('EMAIL_ENABLED=false', () => {
     expect(mailer.sent.length).toBe(before);
     expect((await off.inject({ method: 'GET', url: '/api/v1/config' })).json()).toEqual({
       emailEnabled: false,
+      googleEnabled: false,
     });
     expect((await app.inject({ method: 'GET', url: '/api/v1/config' })).json()).toEqual({
       emailEnabled: true,
+      googleEnabled: false,
     });
   });
 });
