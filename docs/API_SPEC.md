@@ -255,6 +255,13 @@ Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violati
 | `GET /api/v1/assets/thumbnails/:boardId/:file` | public; the **local** storage backend only (dev / tests): serves a stored thumbnail (`image/jpeg`, immutable cache). Keys are unguessable like the R2 URLs; anything not shaped like a key we write → `400` / `404` (Phase 11) |
 | `GET /metrics` | Prometheus, **internal network only** (Caddy never routes it). Process defaults, `http_request_duration_seconds{method,route,status}`, `socketio_connected_clients`. With `METRICS_TOKEN` set it also needs `Authorization: Bearer <token>`; a missing or wrong token gets `404` (Phase 10) |
 
+## 8a. Site admin (FEATURES F16)
+| Method | Path | Access | Response |
+|---|---|---|---|
+| GET | `/admin/stats` | `admin` (email in `ADMIN_EMAILS`; others 404) | `{ stats: AdminStats }` — totals (accounts, verified, rooms, boards, drawings, chat messages, snapshots, share links), active accounts (24 h / 7 d / 30 d, from session refreshes), 30-day series of sign-ups and active accounts, boards per map, the 10 busiest rooms, the 25 newest accounts with masked emails. `Cache-Control: no-store`. |
+
+`GET /me` also returns `isAdmin` (default `false`; other endpoints that return a user omit it, so it defaults).
+
 ## 9. Example: create a room
 ```http
 POST /api/v1/rooms

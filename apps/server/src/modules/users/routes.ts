@@ -25,9 +25,10 @@ export const userRoutes: FastifyPluginCallbackZod<{
   app.get(
     '/me',
     { config: user, schema: { response: { 200: UserResponseSchema } } },
-    async (req) => ({
-      user: await auth.me(requireUser(req).id),
-    }),
+    async (req) => {
+      const id = requireUser(req).id;
+      return { user: { ...(await auth.me(id)), isAdmin: await app.isSiteAdmin(id) } };
+    },
   );
 
   app.patch(

@@ -148,6 +148,13 @@ const MATRIX: Row[] = [
     expect: everyone(200),
   },
   { method: 'GET', url: '/api/v1/me', request: () => ({ url: '/api/v1/me' }), expect: authed(200) },
+  // site admin only (ADMIN_EMAILS — none of these callers): 404 as if the route didn't exist
+  {
+    method: 'GET',
+    url: '/api/v1/admin/stats',
+    request: () => ({ url: '/api/v1/admin/stats' }),
+    expect: authed(404),
+  },
   {
     method: 'PATCH',
     url: '/api/v1/me',

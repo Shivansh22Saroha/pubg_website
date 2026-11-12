@@ -47,6 +47,7 @@ export function toMe(u: User): Me {
     emailVerified: u.emailVerifiedAt !== null,
     createdAt: u.createdAt.toISOString(),
     prefs: readPrefs(u.prefs),
+    isAdmin: false,
   };
 }
 

@@ -35,6 +35,7 @@ Generate secrets with: `openssl rand -base64 48`
 | `MAX_ELEMENTS_PER_BOARD` | – | `5000` | |
 | `MAX_OWNED_ROOMS` | – | `30` | |
 | `CORS_DEV_ORIGINS` | – | `http://localhost:3000` | only honoured when `NODE_ENV=development` |
+| `ADMIN_EMAILS` | – | *(empty: nobody)* | comma-separated account emails that may open `/admin` (FEATURES F16); case-insensitive; everyone else gets 404 |
 | `TRUST_PROXY` | ✓ | `false` (dev) / `true` (prod behind Caddy) | so `req.ip` is the real client IP |
 | `LOG_LEVEL` | – | `debug` | `fatal…trace` |
 | `EMAIL_ENABLED` | – | `false` | enables verification + reset flows |
