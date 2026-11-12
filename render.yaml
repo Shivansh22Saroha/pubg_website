@@ -45,6 +45,9 @@ services:
         value: 'false'
       - key: MAINTENANCE
         value: 'false'
+      # site admins (FEATURES F16): your own account email(s), comma-separated — set in the dashboard
+      - key: ADMIN_EMAILS
+        sync: false
 
   - type: keyvalue
     name: rotationlab-redis

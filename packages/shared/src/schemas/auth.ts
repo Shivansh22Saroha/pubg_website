@@ -101,6 +101,8 @@ export const MeSchema = PublicUserSchema.extend({
   createdAt: z.iso.datetime(),
   /** defaulted so a client never breaks on an API that predates prefs (deploy skew) */
   prefs: UserPrefsSchema.default({ roomTourDone: false }),
+  /** site admin (ADMIN_EMAILS) — only GET /me sets it; shows the Admin link (F16) */
+  isAdmin: z.boolean().default(false),
 });
 export type Me = z.infer<typeof MeSchema>;
 

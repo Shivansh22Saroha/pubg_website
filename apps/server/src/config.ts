@@ -39,6 +39,16 @@ export const EnvSchema = z
           .map((s) => s.trim())
           .filter(Boolean),
       ),
+    /** site admins (FEATURES F16): comma-separated account emails that may open /admin */
+    ADMIN_EMAILS: z
+      .string()
+      .default('')
+      .transform((v) =>
+        v
+          .split(',')
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean),
+      ),
     TRUST_PROXY: bool,
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])

@@ -2,7 +2,7 @@
 
 import type { Me } from '@rotationlab/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, MonitorX, Settings } from 'lucide-react';
+import { LogOut, MonitorX, Settings, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -105,6 +105,18 @@ export function UserMenu({ user }: { user: Me }) {
           >
             <Settings className="size-4" aria-hidden /> Settings
           </Link>
+          {user.isAdmin && (
+            <Link
+              href="/admin"
+              role="menuitem"
+              className={item}
+              onClick={() => {
+                setOpen(false);
+              }}
+            >
+              <ShieldCheck className="size-4" aria-hidden /> Admin
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"

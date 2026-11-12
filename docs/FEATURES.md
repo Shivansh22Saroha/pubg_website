@@ -217,3 +217,11 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 - A free FAQ bot on every page (UI_UX_SPEC §3.10): site help and BGMI tactics from a bundled knowledge base. No backend, no AI model, no API key, nothing sent anywhere — questions never leave the browser.
 - Unknown questions get "I don't know that one yet" plus suggestions; it never guesses below the match threshold.
 - AC: every suggestion chip answers its own intent (unit test over the whole knowledge base); free-text paraphrases reach the right answer; the room opens it from the top bar and Esc on the map doesn't close it (E2E `spotter.spec.ts`).
+
+---
+
+## F16. Site admin dashboard (2026-11)
+- `/admin` shows who uses RotationLab: accounts (and how many verified), active accounts today / this week / this month, sign-ups and active accounts per day for 30 days, rooms, boards, drawings, chat messages, snapshots, share links, boards per map, the busiest rooms and the newest accounts (emails masked, e.g. `sh••••@gmail.com`). Refreshes every minute.
+- Who can open it: accounts whose email is in the server's `ADMIN_EMAILS` (set on the host). Nobody is an admin by default; there is no admin password — the admin logs in with their own account. Everyone else gets a 404 page; the user menu shows "Admin" only to admins.
+- AC: an admin gets the numbers; a logged-in non-admin gets 404, anonymous 401 (integration test + authz matrix); the response carries no raw emails, hashes or tokens.
+

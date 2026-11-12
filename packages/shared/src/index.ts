@@ -12,6 +12,7 @@ export * from './measure.js';
 export * from './permissions.js';
 export * from './realtime.js';
 export * from './schemas/account.js';
+export * from './schemas/admin.js';
 export * from './schemas/auth.js';
 export * from './schemas/chat.js';
 export * from './schemas/elements.js';

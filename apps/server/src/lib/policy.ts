@@ -7,9 +7,11 @@ import { AppError } from './errors.js';
  *
  * - `public` — no authentication (may still read the session if present)
  * - `user`   — any authenticated user
- * Room-scoped levels (member / editor / owner) are added in Phase 4.
+ * - `admin`  — a site admin (email in ADMIN_EMAILS); anyone else gets 404, as if the route
+ *   didn't exist (FEATURES F16)
+ * Room-scoped levels (member / editor / owner) are checked by the rooms policy (Phase 4).
  */
-export const ACCESS_LEVELS = ['public', 'user'] as const;
+export const ACCESS_LEVELS = ['public', 'user', 'admin'] as const;
 export type Access = (typeof ACCESS_LEVELS)[number];
 
 export interface AuthUser {
@@ -29,6 +31,8 @@ declare module 'fastify' {
     /** METHOD + url of every registered route with its access level (authz matrix harness) */
     routeTable: { method: string; url: string; access: Access }[];
     authenticate(request: FastifyRequest): Promise<AuthUser>;
+    /** true when the account's email is in ADMIN_EMAILS */
+    isSiteAdmin(userId: string): Promise<boolean>;
   }
 }
 
@@ -55,5 +59,9 @@ export function registerPolicy(app: FastifyInstance) {
   app.addHook('preHandler', async (request) => {
     const access = request.routeOptions.config.access;
     if (access === 'user') request.user = await app.authenticate(request);
+    if (access === 'admin') {
+      request.user = await app.authenticate(request);
+      if (!(await app.isSiteAdmin(request.user.id))) throw new AppError('NOT_FOUND', 'Not found');
+    }
   });
 }

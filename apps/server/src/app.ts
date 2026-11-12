@@ -38,6 +38,8 @@ import { createSnapshotService } from './modules/snapshots/service.js';
 import { publicRoutes } from './modules/public/routes.js';
 import { createPublicService } from './modules/public/service.js';
 import { shareRoutes } from './modules/share/routes.js';
+import { adminRoutes } from './modules/admin/routes.js';
+import { createAdminStats } from './modules/admin/stats.js';
 import { thumbnailRoutes } from './modules/thumbnails/routes.js';
 import { createThumbnailService } from './modules/thumbnails/service.js';
 import { createAssetStorage, type AssetStorage } from './lib/storage.js';
@@ -267,6 +269,16 @@ export async function buildApp({
     return { id: claims.sub, sid: claims.sid };
   });
 
+  const adminEmails = new Set(config.ADMIN_EMAILS);
+  app.decorate('isSiteAdmin', async (userId: string) => {
+    if (adminEmails.size === 0) return false;
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, deletedAt: true },
+    });
+    return Boolean(u && !u.deletedAt && adminEmails.has(u.email.toLowerCase()));
+  });
+
   // ---- routes ------------------------------------------------------------------------
   await app.register(healthRoutes, {
     checks: checks ?? {
@@ -301,6 +313,7 @@ export async function buildApp({
   await app.register(boardRoutes, { prefix: '/api/v1', boards });
   await app.register(chatRoutes, { prefix: '/api/v1', chat });
   await app.register(snapshotRoutes, { prefix: '/api/v1', snapshots });
+  await app.register(adminRoutes, { prefix: '/api/v1', stats: createAdminStats(prisma) });
   await app.register(publicRoutes, {
     prefix: '/api/v1',
     service: createPublicService({ prisma, demoBoardIds: config.DEMO_BOARD_IDS }),

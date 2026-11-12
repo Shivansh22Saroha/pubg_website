@@ -32,6 +32,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 |---|---|
 | Z1 **MUST** | Every REST handler and every socket event resolves `(userId, roomId) → role` from DB (cached in Redis 30 s, cache busted on role change/kick) and checks it via `policy.ts`. Never trust `roomId`/`boardId` from the client without verifying the board belongs to that room. |
 | Z2 **MUST** | Non-members get `404 NOT_FOUND` for room-scoped resources (no existence leak). |
+| Z2a **MUST** | Site admin routes (`config.access: 'admin'`, FEATURES F16) answer `404` to every account whose email is not in `ADMIN_EMAILS` (401 when logged out). Admin data is aggregate counts plus masked emails — never password hashes, tokens, IPs or chat contents. No account is ever an admin by default. |
 | Z3 **MUST** | Permission matrix (single source in `packages/shared/src/permissions.ts`): |
 
 | Action | OWNER | EDITOR | VIEWER |
