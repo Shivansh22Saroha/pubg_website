@@ -29,7 +29,7 @@ function EmptyHint() {
       className="pointer-events-none absolute inset-x-0 top-1/3 z-[500] px-4 text-center text-sm text-text [text-shadow:0_1px_3px_rgb(0_0_0/0.9)]"
     >
       {touch
-        ? 'Pick a tool below and start drawing.'
+        ? 'Pick a tool and start drawing.'
         : 'Pick a tool on the left and start drawing. Press ? for shortcuts.'}
     </p>
   );

@@ -47,14 +47,12 @@ export function toolsForRole(role: RoomRole): ToolId[] {
 }
 
 /**
- * UI_UX_SPEC §7 phone "view + chat" mode: Select, Marker, Laser and Measure only (what the
- * role allows of them). Tablets and up get the role's full set.
+ * The tools a role gets at a breakpoint. Since 2026-11 phones get the full set too (UI_UX_SPEC
+ * §7: six in the bar, the rest under "More tools"); the breakpoint stays in the signature so a
+ * layout can narrow it again.
  */
-export const PHONE_TOOLS: readonly ToolId[] = ['select', 'marker', 'measure', 'laser'];
-
-export function toolsFor(role: RoomRole, breakpoint: Breakpoint): ToolId[] {
-  const tools = toolsForRole(role);
-  return breakpoint === 'phone' ? tools.filter((t) => PHONE_TOOLS.includes(t)) : tools;
+export function toolsFor(role: RoomRole, _breakpoint: Breakpoint): ToolId[] {
+  return toolsForRole(role);
 }
 
 export interface CreateState {

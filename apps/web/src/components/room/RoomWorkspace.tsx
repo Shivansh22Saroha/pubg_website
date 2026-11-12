@@ -19,7 +19,8 @@ import { toast } from 'sonner';
 import { BoardMapView } from '@/components/map/BoardMapView';
 import { SnapshotsDrawer } from '@/components/snapshots/SnapshotsDrawer';
 import { ShortcutsDialog } from '@/components/tools/ShortcutsDialog';
-import { Toolbar } from '@/components/tools/Toolbar';
+import { Toolbar, UndoRedo } from '@/components/tools/Toolbar';
+import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -28,7 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { isTouchLayout, useBreakpoint } from '@/hooks/useBreakpoint';
+import { isTouchLayout, useBreakpoint, useLandscapePhone } from '@/hooks/useBreakpoint';
 import { useMe } from '@/hooks/useMe';
 import { env } from '@/env';
 import { useRoomRealtime } from '@/hooks/useRoomRealtime';
@@ -55,7 +56,6 @@ import {
   ChatButton,
   FullSheet,
   HalfSheet,
-  PhoneBanner,
   PhoneRoomMenu,
   type PhoneMenuItem,
 } from './TouchChrome';
@@ -92,6 +92,8 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const breakpoint = useBreakpoint();
   const touch = isTouchLayout(breakpoint);
   const phone = breakpoint === 'phone';
+  // a phone held sideways: tools in a left column so the map keeps its height
+  const landscape = useLandscapePhone() && phone;
 
   // UI_UX_SPEC §7: the panel starts open only on wide screens (compact: collapsed; tablet /
   // phone: it is a sheet) — and closes when the layout changes under it
@@ -331,7 +333,8 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       session={session}
       nameOf={nameOf}
       breakpoint={breakpoint}
-      orientation={touch ? 'horizontal' : 'vertical'}
+      orientation={touch && !landscape ? 'horizontal' : 'vertical'}
+      compact={phone}
     />
   );
   const phoneMenu: PhoneMenuItem[] = [
@@ -397,7 +400,14 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   return (
     <div className="flex h-dvh flex-col" data-layout={breakpoint}>
       {phone ? (
-        <header className="relative z-30 flex h-12 shrink-0 items-center gap-1 border-b bg-[linear-gradient(180deg,var(--surface),var(--bg))] pr-1">
+        <header
+          className={cn(
+            'relative z-30 flex shrink-0 items-center gap-1 border-b bg-[linear-gradient(180deg,var(--surface),var(--bg))] pr-1',
+            landscape
+              ? 'h-11 pr-[max(0.25rem,env(safe-area-inset-right))] pl-[env(safe-area-inset-left)]'
+              : 'h-12',
+          )}
+        >
           <Link
             href="/dashboard"
             aria-label="Back to dashboard"
@@ -409,6 +419,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             {room.name}
           </span>
           <BoardSelect boards={boards} activeId={active?.id} onSelect={select} />
+          <UndoRedo role={role} session={session} nameOf={nameOf} size="sm" />
           <SyncIndicator />
           <PhoneRoomMenu items={phoneMenu} />
         </header>
@@ -574,9 +585,8 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       )}
 
       <div className="flex min-h-0 flex-1">
-        {!touch && toolbar}
+        {(!touch || landscape) && toolbar}
         <main className="relative min-w-0 flex-1" aria-label="Map">
-          {phone && <PhoneBanner />}
           {active && (
             <BoardMapView
               key={active.id}
@@ -601,7 +611,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           </aside>
         )}
       </div>
-      {touch && toolbar}
+      {touch && !landscape && toolbar}
       {touch && !panelOpen && (
         <ChatButton
           unread={unread}

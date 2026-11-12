@@ -1,45 +1,47 @@
 import type { DemoBoard } from '@rotationlab/shared';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { tourReducer, placeCard, TOUR_STEPS, type TourState } from '@/components/room/tourModel';
 import { elementLabel } from '@/components/tools/ElementList';
-import { PHONE_TOOLS, toolsFor } from '@/components/tools/gating';
-import { Toolbar } from '@/components/tools/Toolbar';
-import { breakpointFor, isTouchLayout } from '@/hooks/useBreakpoint';
+import { toolsFor } from '@/components/tools/gating';
+import { PHONE_PRIMARY, Toolbar } from '@/components/tools/Toolbar';
+import { breakpointFor, isLandscapePhone, isTouchLayout } from '@/hooks/useBreakpoint';
 import { exploreBoards } from '@/lib/explore';
 import { securityTxt } from '@/lib/securityTxt';
 import { devPagesEnabled, serverEnv } from '@/lib/serverEnv';
 
 describe('breakpoints (UI_UX_SPEC §7)', () => {
   it('desktop ≥ 1280, compact 1024–1279, tablet 768–1023, phone < 768', () => {
-    expect([1920, 1280, 1279, 1024, 1023, 768, 767, 390, 360].map(breakpointFor)).toEqual([
-      'desktop',
-      'desktop',
-      'compact',
-      'compact',
-      'tablet',
-      'tablet',
-      'phone',
-      'phone',
-      'phone',
-    ]);
+    expect([1920, 1280, 1279, 1024, 1023, 768, 767, 390, 360].map((w) => breakpointFor(w))).toEqual(
+      ['desktop', 'desktop', 'compact', 'compact', 'tablet', 'tablet', 'phone', 'phone', 'phone'],
+    );
     expect(isTouchLayout('tablet') && isTouchLayout('phone')).toBe(true);
     expect(isTouchLayout('compact') || isTouchLayout('desktop')).toBe(false);
+  });
+
+  it('a phone held sideways is a phone, even 800–930 px wide (touch, under 520 px tall)', () => {
+    expect(breakpointFor(844, 390, true)).toBe('phone'); // iPhone 13 landscape
+    expect(breakpointFor(932, 430, true)).toBe('phone'); // iPhone Pro Max landscape
+    expect(breakpointFor(844, 390, false)).toBe('tablet'); // a short desktop window: mouse
+    expect(breakpointFor(1024, 768, true)).toBe('compact'); // iPad landscape is not a phone
+    expect(breakpointFor(390, 844, true)).toBe('phone');
+    expect(isLandscapePhone(844, 390, true)).toBe(true);
+    expect(isLandscapePhone(390, 844, true)).toBe(false); // portrait
   });
 
   it('tool sets per breakpoint and role', () => {
     const all = toolsFor('EDITOR', 'desktop');
     expect(toolsFor('EDITOR', 'compact')).toEqual(all);
     expect(toolsFor('EDITOR', 'tablet')).toEqual(all); // full set, touch-drawn
-    expect(toolsFor('EDITOR', 'phone')).toEqual(['select', 'marker', 'measure', 'laser']);
-    expect(toolsFor('OWNER', 'phone')).toEqual(['select', 'marker', 'measure', 'laser']);
+    // since 2026-11 phones draw too: the full set (six in the bar, the rest under More)
+    expect(toolsFor('EDITOR', 'phone')).toEqual(all);
+    expect(toolsFor('OWNER', 'phone')).toEqual(all);
     // phones never add a tool the role lacks: viewers keep Select, Measure, Laser
     expect(toolsFor('VIEWER', 'phone')).toEqual(['select', 'measure', 'laser']);
     expect(toolsFor('VIEWER', 'desktop')).toEqual(['select', 'measure', 'laser']);
-    for (const t of toolsFor('EDITOR', 'phone')) expect(PHONE_TOOLS).toContain(t);
   });
 
-  it('the toolbar renders only those tools, horizontally on touch layouts', () => {
+  it('a phone bar: six tools, the rest under More tools, undo / redo moved to the top bar', () => {
     render(
       <Toolbar
         role="EDITOR"
@@ -47,15 +49,24 @@ describe('breakpoints (UI_UX_SPEC §7)', () => {
         nameOf={() => ''}
         breakpoint="phone"
         orientation="horizontal"
+        compact
       />,
     );
     const bar = screen.getByTestId('toolbar');
     expect(bar.dataset.orientation).toBe('horizontal');
-    expect(screen.queryByTestId('tool-pen')).toBeNull();
-    expect(screen.queryByTestId('tool-eraser')).toBeNull();
-    for (const id of ['select', 'marker', 'measure', 'laser'])
+    for (const id of PHONE_PRIMARY) expect(screen.getByTestId(`tool-${id}`)).toBeTruthy();
+    for (const id of ['line', 'polygon', 'text', 'measure', 'laser'])
+      expect(screen.queryByTestId(`tool-${id}`)).toBeNull(); // behind More (opens on tap)
+    expect(screen.getByTestId('tools-more')).toBeTruthy();
+    expect(screen.queryByTestId('undo')).toBeNull();
+  });
+
+  it('viewers on a phone: their three tools fit, no More button', () => {
+    cleanup();
+    render(<Toolbar role="VIEWER" session={null} nameOf={() => ''} breakpoint="phone" compact />);
+    for (const id of ['select', 'measure', 'laser'])
       expect(screen.getByTestId(`tool-${id}`)).toBeTruthy();
-    expect(screen.getByTestId('undo')).toBeTruthy(); // editors keep undo / redo
+    expect(screen.queryByTestId('tools-more')).toBeNull();
   });
 });
 

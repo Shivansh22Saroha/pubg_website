@@ -263,7 +263,7 @@ export const INTENTS: Intent[] = [
     topic: 'site',
     keywords: ['phone', 'mobile', 'android', 'iphone', 'tablet', 'touch', 'work'],
     answer:
-      'Yes. On a phone the room is a view-and-chat layout: full-screen map, a board dropdown, chat as a sheet, and the Select, Marker, Measure and Laser tools. A tablet gets every tool in a bottom bar. For full drawing, use a tablet or laptop.',
+      'Yes — in portrait or sideways. Six tools sit in the bottom bar (Select, Pen, Arrow, Circle, Marker, Eraser); tap ⋯ for Line, Polygon, Text, Measure and Laser. Undo and redo are in the top bar. One finger draws, two fingers pan and zoom. Turn your phone sideways for a bigger map — the tools move to the left edge.',
   },
   {
     id: 'labels-grid',
