@@ -38,13 +38,14 @@ describe('security headers (SECURITY §5 T4, TESTING §5.6)', () => {
 });
 
 describe('maintenance mode (DEPLOYMENT §7)', () => {
-  it('answers 503 MAINTENANCE with Retry-After, but health and metrics stay up', async () => {
+  it('answers 503 MAINTENANCE with Retry-After, but health, live and metrics stay up', async () => {
     app = await unitApp(up, { MAINTENANCE: 'true' });
     const res = await app.inject({ method: 'GET', url: '/api/v1/rooms' });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toMatchObject({ error: { code: 'MAINTENANCE' } });
     expect(res.headers['retry-after']).toBe('300');
     expect((await app.inject('/api/health')).statusCode).toBe(200);
+    expect((await app.inject('/api/live')).statusCode).toBe(200);
     expect((await app.inject('/metrics')).statusCode).toBe(200);
   });
 

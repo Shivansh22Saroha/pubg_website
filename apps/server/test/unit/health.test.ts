@@ -1,4 +1,4 @@
-import { HealthResponseSchema } from '@rotationlab/shared';
+import { HealthResponseSchema, LiveResponseSchema } from '@rotationlab/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { App } from '../../src/app.js';
 import type { HealthChecks } from '../../src/routes/health.js';
@@ -45,5 +45,21 @@ describe('GET /api/health', () => {
     const res = await getHealth({ db: hang, redis: ok });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toMatchObject({ db: 'error' });
+  });
+});
+
+describe('GET /api/live', () => {
+  it('answers 200 without running any dependency check', async () => {
+    let calls = 0;
+    const counted = () => {
+      calls++;
+      return Promise.reject(new Error('down'));
+    };
+    app = await unitApp({ db: counted, redis: counted });
+    const res = await app.inject({ method: 'GET', url: '/api/live' });
+    expect(res.statusCode).toBe(200);
+    expect(LiveResponseSchema.parse(res.json())).toMatchObject({ status: 'ok' });
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(calls).toBe(0);
   });
 });

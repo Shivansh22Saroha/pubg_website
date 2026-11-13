@@ -251,7 +251,7 @@ Every animation answers something a person did; nothing loops while the tab is i
 - **Sync indicator**: one green pulse each time changes land (the dot), a spinner while reconnecting; saving and offline keep their glyphs. Text labels are unchanged.
 - **Board switch**: the new board wipes in from the left (420 ms clip-path).
 - **Snapshot restore**: a rewind mark spins once over the map, alongside the existing toast.
-- **Waking the server**: any request pending for over 2.5 s shows a bottom-centre card with a radar sweep — "Waking the server… It naps when nobody is planning. Up to 30 s." (free hosting sleeps when idle). It never takes clicks.
+- **Waking the server**: any request pending for over 2.5 s, or retrying because the host answered a 502/503/504 page while the API boots, shows a bottom-centre card with a radar sweep — "Waking the server… It naps when nobody is planning. Up to a minute — we'll retry for you." (free hosting sleeps when idle). Requests retry with backoff for up to 90 s, then fail with a "still starting" error. It never takes clicks.
 - E2E runs with reduced motion (the animations cost real CPU in software-rendered headless Chrome and move marker boxes while tests measure them); `motion.spec.ts` and the ping fly-to test opt back in.
 
 ## 10. Accessibility

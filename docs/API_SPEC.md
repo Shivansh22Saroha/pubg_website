@@ -37,7 +37,7 @@ Cursor-based: `?limit=50&before=<id>` → response `{ items: [...], nextCursor: 
 | 423 | `ACCOUNT_LOCKED` |
 | 429 | `RATE_LIMITED` (+ `Retry-After` header) |
 | 500 | `INTERNAL` |
-| 503 | `MAINTENANCE` (+ `Retry-After: 300`) — every route but `/api/health` and `/metrics` while `MAINTENANCE=true`; socket handshakes fail with the same code (Phase 10, DEPLOYMENT §7) |
+| 503 | `MAINTENANCE` (+ `Retry-After: 300`) — every route but `/api/health`, `/api/live` and `/metrics` while `MAINTENANCE=true`; socket handshakes fail with the same code (Phase 10, DEPLOYMENT §7) |
 
 ### 1.5 Common objects
 ```ts
@@ -251,6 +251,7 @@ Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violati
 | Path | Purpose |
 |---|---|
 | `GET /api/health` | `{ status: 'ok', db: 'ok', redis: 'ok', version }` |
+| `GET /api/live` | `{ status: 'ok', version }` — liveness only, touches no dependency (keep-warm pings) |
 | `GET /api/v1/maps` | static map registry `{ items: [{ id, name, worldSize, tileBaseUrl: { labels, clean }, maxNativeZoom, thumbnailUrl }] }` |
 | `GET /api/v1/public/demo-boards` | read-only demo boards for `/explore`: `{ items: [{ board, layers, elements }] }`, no auth, rate-limited 30 / min / IP, `Cache-Control: public, max-age=300`. Only boards whose id is in `DEMO_BOARD_IDS` (≤ 3, env order; ids that don't exist or whose room is deleted are skipped; unset → `{ items: [] }`). The id list never comes from the request. Nothing points back at a room or a person: `board` has no `roomId`, elements have `createdBy` / `updatedBy: null` |
 | `PUT /api/v1/boards/:boardId/thumbnail` | EDITOR+ (`board.edit`), raw `image/jpeg` body ≤ 100 KB, exactly 256×256 → `200 { thumbnailUrl }`. The server checks the JPEG magic bytes, decodes with sharp (pixel cap), re-encodes (q80, metadata stripped) and stores it under a fresh random key `thumbnails/<boardId>/<128-bit>.jpg`, then deletes the previous one; `boards.updated_at` is not touched. Other content types → `415 BAD_REQUEST`; > 100 KB → `413 PAYLOAD_TOO_LARGE`; not a 256×256 JPEG → `400 VALIDATION_ERROR`; viewers `403`, non-members `404` (Phase 11) |

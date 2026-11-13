@@ -1,4 +1,8 @@
-import { HealthResponseSchema, type DependencyStatus } from '@rotationlab/shared';
+import {
+  HealthResponseSchema,
+  LiveResponseSchema,
+  type DependencyStatus,
+} from '@rotationlab/shared';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { VERSION } from '../lib/version.js';
 
@@ -48,6 +52,17 @@ export const healthRoutes: FastifyPluginCallbackZod<{ checks: HealthChecks }> = 
         .header('cache-control', 'no-store')
         .send({ status, db, redis, version: VERSION });
     },
+  );
+  /**
+   * `GET /api/live` — liveness only: answers without touching Postgres or Redis, so an uptime
+   * ping that keeps the free Render instance awake doesn't also keep Neon awake (its free plan
+   * counts compute hours). Deep checks stay on /api/health.
+   */
+  app.get(
+    '/api/live',
+    { config: { access: 'public' }, schema: { response: { 200: LiveResponseSchema } } },
+    async (_request, reply) =>
+      reply.header('cache-control', 'no-store').send({ status: 'ok', version: VERSION }),
   );
   done();
 };
