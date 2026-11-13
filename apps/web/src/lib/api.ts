@@ -6,7 +6,7 @@ import {
   type ErrorCode,
 } from '@rotationlab/shared';
 import type { z } from 'zod';
-import { trackSlow } from './slowRequests';
+import { markWaking, trackSlow } from './slowRequests';
 
 const API_BASE = '/api/v1'; // same origin in every environment (ARCHITECTURE §1)
 
@@ -70,6 +70,61 @@ async function toError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message, details);
 }
 
+/** how long a request keeps retrying while the API boots (Render free plan: ~30–60 s) */
+export const WAKE_MAX_MS = 90_000;
+const WAKE_DELAYS_MS = [1000, 2000, 3000, 4000, 5000];
+
+/**
+ * The host, not our API, answered: while a sleeping free-tier instance boots, the proxy returns
+ * 502/503/504 with an HTML page. Our own errors are always JSON, so they never match — and a
+ * request that got this answer never reached the API, so retrying any method is safe.
+ */
+export function isWakingResponse(res: Response): boolean {
+  if (res.status !== 502 && res.status !== 503 && res.status !== 504) return false;
+  return !(res.headers.get('content-type') ?? '').includes('application/json');
+}
+
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true },
+    );
+  });
+}
+
+/** send(), retried with backoff while the API is booting; shows the "waking" card meanwhile */
+async function sendAwake(
+  path: string,
+  method: Method,
+  body: unknown,
+  signal?: AbortSignal,
+  raw?: { data: Blob; type: string },
+): Promise<Response> {
+  let res = await send(path, method, body, signal, raw);
+  if (!isWakingResponse(res)) return res;
+  const done = markWaking();
+  try {
+    const started = Date.now();
+    for (let i = 0; isWakingResponse(res) && Date.now() - started < WAKE_MAX_MS; i++) {
+      await pause(WAKE_DELAYS_MS[Math.min(i, WAKE_DELAYS_MS.length - 1)] ?? 5000, signal);
+      res = await send(path, method, body, signal, raw);
+    }
+    return res;
+  } finally {
+    done();
+  }
+}
+
 let refreshing: Promise<boolean> | null = null;
 
 /**
@@ -77,7 +132,7 @@ let refreshing: Promise<boolean> | null = null;
  * call). 409 means another tab refreshed a moment ago — its new cookies are already set.
  */
 export function refreshSession(): Promise<boolean> {
-  refreshing ??= send('/auth/refresh', 'POST', undefined)
+  refreshing ??= sendAwake('/auth/refresh', 'POST', undefined)
     .then((res) => res.status === 204 || res.status === 409)
     .catch(() => false)
     .finally(() => {
@@ -96,18 +151,27 @@ export async function api<S extends z.ZodType | undefined = undefined>(
   opts: RequestOptions<S> = {},
 ): Promise<Result<S>> {
   const method = opts.method ?? 'GET';
-  let res = await send(path, method, opts.body, opts.signal, opts.raw).catch((err: unknown) => {
-    if (err instanceof DOMException && err.name === 'AbortError') throw err;
-    throw new ApiError(0, 'NETWORK', 'Network error — check your connection');
-  });
+  let res = await sendAwake(path, method, opts.body, opts.signal, opts.raw).catch(
+    (err: unknown) => {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      throw new ApiError(0, 'NETWORK', 'Network error — check your connection');
+    },
+  );
 
   if (res.status === 401 && !path.startsWith('/auth/')) {
     const { code } = await toError(res.clone());
     if ((code === 'TOKEN_EXPIRED' || code === 'UNAUTHENTICATED') && (await refreshSession())) {
-      res = await send(path, method, opts.body, opts.signal, opts.raw);
+      res = await sendAwake(path, method, opts.body, opts.signal, opts.raw);
     }
   }
 
+  if (isWakingResponse(res)) {
+    throw new ApiError(
+      res.status,
+      'NETWORK',
+      'The server is still starting — try again in a moment',
+    );
+  }
   if (!res.ok) throw await toError(res);
   if (!opts.schema || res.status === 204) return undefined as Result<S>;
   return opts.schema.parse(await res.json()) as Result<S>;

@@ -1,6 +1,7 @@
 import { UserResponseSchema } from '@rotationlab/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, isWakingResponse, WAKE_MAX_MS } from '@/lib/api';
+import { useSlowRequests } from '@/lib/slowRequests';
 
 const ME = {
   user: {
@@ -22,8 +23,16 @@ const json = (status: number, body: unknown) =>
 const err = (status: number, code: string) =>
   json(status, { error: { code, message: code, requestId: 'r' } });
 
+const html = (status: number) =>
+  new Response('<!doctype html><title>502</title>', {
+    status,
+    headers: { 'content-type': 'text/html' },
+  });
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+  useSlowRequests.setState({ slow: 0, waking: 0 });
 });
 
 describe('api()', () => {
@@ -129,5 +138,81 @@ describe('api()', () => {
       vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
     );
     await expect(api('/me')).rejects.toMatchObject({ code: 'NETWORK' });
+  });
+
+  describe('while the API is booting (free-tier cold start)', () => {
+    it('recognises host 502/503/504 pages but never our own JSON errors', () => {
+      expect(isWakingResponse(html(502))).toBe(true);
+      expect(isWakingResponse(html(503))).toBe(true);
+      expect(isWakingResponse(html(504))).toBe(true);
+      expect(isWakingResponse(err(503, 'SERVICE_UNAVAILABLE'))).toBe(false);
+      expect(isWakingResponse(html(500))).toBe(false);
+      expect(isWakingResponse(json(200, ME))).toBe(false);
+    });
+
+    it('retries until the API answers, showing the waking card meanwhile', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(html(502))
+        .mockResolvedValueOnce(html(503))
+        .mockResolvedValueOnce(json(200, ME));
+      vi.stubGlobal('fetch', fetchMock);
+      const p = api('/me', { schema: UserResponseSchema });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(useSlowRequests.getState().waking).toBe(1);
+      await vi.advanceTimersByTimeAsync(5000);
+      const res = await p;
+      expect(res.user.username).toBe('alice');
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(useSlowRequests.getState().waking).toBe(0);
+    });
+
+    it('retries writes too — a gateway page means the request never reached the API', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(html(502))
+        .mockResolvedValueOnce(json(200, ME));
+      vi.stubGlobal('fetch', fetchMock);
+      const p = api('/me', { method: 'PATCH', body: { ign: 'x' }, schema: UserResponseSchema });
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(p).resolves.toMatchObject({ user: { username: 'alice' } });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry our own 503 JSON error', async () => {
+      const fetchMock = vi.fn(() => Promise.resolve(err(503, 'SERVICE_UNAVAILABLE')));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(api('/me')).rejects.toMatchObject({ status: 503 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives up after WAKE_MAX_MS with a clear NETWORK error', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi.fn(() => Promise.resolve(html(502)));
+      vi.stubGlobal('fetch', fetchMock);
+      const p = api('/me').catch((x: unknown) => x);
+      await vi.advanceTimersByTimeAsync(WAKE_MAX_MS + 6000);
+      const e = await p;
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as ApiError).code).toBe('NETWORK');
+      expect(useSlowRequests.getState().waking).toBe(0);
+    });
+
+    it('stops retrying when the caller aborts', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve(html(502))),
+      );
+      const ac = new AbortController();
+      const p = api('/me', { signal: ac.signal }).catch((x: unknown) => x);
+      await vi.advanceTimersByTimeAsync(500);
+      ac.abort();
+      const e = await p;
+      expect((e as DOMException).name).toBe('AbortError');
+      expect(useSlowRequests.getState().waking).toBe(0);
+    });
   });
 });

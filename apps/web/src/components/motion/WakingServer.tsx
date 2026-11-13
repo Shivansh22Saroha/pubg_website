@@ -3,12 +3,13 @@
 import { useSlowRequests } from '@/lib/slowRequests';
 
 /**
- * Free hosting puts the API to sleep when idle; the first request can take ~30 s. Instead of a
- * page that looks broken, a small radar card explains the wait while any request hangs.
+ * Free hosting puts the API to sleep when idle; the first request can take up to a minute,
+ * hanging or answering 502 while it boots (api.ts retries those). Instead of a page that looks
+ * broken, a small radar card explains the wait while any request hangs or retries.
  */
 export function WakingServer() {
-  const slow = useSlowRequests((s) => s.slow);
-  if (slow === 0) return null;
+  const busy = useSlowRequests((s) => s.slow + s.waking);
+  if (busy === 0) return null;
   return (
     <div
       role="status"
@@ -21,7 +22,7 @@ export function WakingServer() {
       <span className="flex flex-col">
         <span className="text-sm font-semibold text-text">Waking the server…</span>
         <span className="text-xs text-text-muted">
-          It naps when nobody is planning. Up to 30 s.
+          It naps when nobody is planning. Up to a minute — we&apos;ll retry for you.
         </span>
       </span>
     </div>

@@ -90,7 +90,7 @@ export const EnvSchema = z
     /** Sentry environment tag (production / staging); release = package version */
     SENTRY_ENVIRONMENT: optionalString,
     METRICS_TOKEN: optionalString,
-    /** DEPLOYMENT §7: every request but /api/health and /metrics gets 503 MAINTENANCE */
+    /** DEPLOYMENT §7: every request but /api/health, /api/live and /metrics gets 503 MAINTENANCE */
     MAINTENANCE: bool.default(false),
     /**
      * Board thumbnails (Phase 11). With every S3_* + PUBLIC_ASSETS_BASE_URL set they go to
