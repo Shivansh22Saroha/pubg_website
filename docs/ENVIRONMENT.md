@@ -103,6 +103,15 @@ Server-only web settings (Phase 9; `src/lib/serverEnv.ts`) — read per request 
 | `OUT_DIR` | `./out` | |
 | `RCLONE_REMOTE` | `r2:rotationlab-tiles/v1` | upload target |
 
+### Vehicle spawns (`packages/vehicle-spawns`, FEATURES F18)
+Run by the "Vehicle spawns" GitHub workflow; nothing here is deployed.
+| Variable | Example | Description |
+|---|---|---|
+| `PUBG_API_KEY` | – | **GitHub Actions secret only** (developer.pubg.com). Sent only to `api.pubg.com`, never logged, never in the web app |
+| `PUBG_SHARD` | `steam` | API platform shard |
+| `MATCHES_PER_MAP` | `250` | matches read per map (workflow input) |
+| `OUT_DIR` | `../../apps/web/public/spawns` | where `<mapId>.json` is written |
+
 ## 4. Services
 
 | Service | Dev | Prod |

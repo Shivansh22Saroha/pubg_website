@@ -1,19 +1,22 @@
 'use client';
 
 import 'leaflet/dist/leaflet.css';
-import { MAPS, type MapId, type Pt } from '@rotationlab/shared';
+import { MAPS, tileWorldSize, type MapId, type Pt } from '@rotationlab/shared';
 import type L from 'leaflet';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ImageOverlay, MapContainer, Pane, TileLayer } from 'react-leaflet';
 import { env } from '@/env';
 import { createCrs, worldBounds } from '@/lib/coords';
 import { prefersReducedMotion } from '@/lib/motion';
+import { useSpawnData, useVehiclePrefs } from '@/lib/vehicleSpawns';
 import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { GRID_PANE, GridLayer } from './GridLayer';
 import { GridLabels } from './GridLabels';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { MapHud } from './MapHud';
 import { Minimap } from './Minimap';
+import { VehicleControl } from './VehicleControl';
+import { VEHICLE_PANE, VehicleLayer } from './VehicleLayer';
 
 export type BaseVariant = 'labels' | 'clean';
 
@@ -87,6 +90,9 @@ export default function MapCanvas({
   }, [map]);
   const [variant, setVariant] = useState<BaseVariant>('labels');
   const [grid, setGrid] = useState(true);
+  const [vehicles, setVehicles] = useVehiclePrefs();
+  const spawnData = useSpawnData(mapId, vehicles.on);
+  const tileWorld = useMemo(() => tileWorldSize(config), [config]);
 
   const toggleLabels = useCallback(() => {
     setVariant((v) => (v === 'labels' ? 'clean' : 'labels'));
@@ -131,6 +137,7 @@ export default function MapCanvas({
       data-map={mapId}
       data-variant={variant}
       data-grid={grid ? 'on' : 'off'}
+      data-vehicles={vehicles.on ? 'on' : 'off'}
       data-center={view.center}
       data-zoom={view.zoom}
       className="relative h-full w-full overflow-hidden bg-bg"
@@ -184,6 +191,16 @@ export default function MapCanvas({
               <GridLayer worldSize={worldSize} cells={gridCells} maxNativeZoom={maxNativeZoom} />
             )}
           </Pane>
+          {/* vehicle spawns: above the grid, below drawings (400) */}
+          <Pane name={VEHICLE_PANE} style={{ zIndex: 360 }}>
+            {vehicles.on && spawnData.status === 'ready' && (
+              <VehicleLayer
+                spawns={spawnData.file.spawns}
+                kinds={vehicles.kinds}
+                tileWorld={tileWorld}
+              />
+            )}
+          </Pane>
           {children}
         </MapContainer>
       </div>
@@ -199,6 +216,7 @@ export default function MapCanvas({
           onToggleLabels={toggleLabels}
           onToggleGrid={toggleGrid}
           onFit={fit}
+          vehicles={<VehicleControl prefs={vehicles} onChange={setVehicles} data={spawnData} />}
         />
       )}
     </div>

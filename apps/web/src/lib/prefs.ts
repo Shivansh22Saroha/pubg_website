@@ -38,4 +38,6 @@ export const prefKeys = {
   lootItem: 'lootItem',
   /** minimap collapsed (Phase 11) */
   minimapCollapsed: 'minimapCollapsed',
+  /** vehicle spawn layer on + which kinds (2026-11) */
+  vehicles: 'vehicles',
 } as const;

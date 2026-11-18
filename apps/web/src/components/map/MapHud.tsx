@@ -18,6 +18,8 @@ interface MapHudProps {
   onToggleLabels: () => void;
   onToggleGrid: () => void;
   onFit: () => void;
+  /** the Vehicles toggle + filter (MapCanvas owns its state) */
+  vehicles?: ReactNode;
 }
 
 function HudButton({
@@ -63,6 +65,7 @@ export function MapHud({
   onToggleLabels,
   onToggleGrid,
   onFit,
+  vehicles,
 }: MapHudProps) {
   const [cursor, setCursor] = useState<Pt | null>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -133,6 +136,7 @@ export function MapHud({
         >
           <Grid3x3 className="size-[18px]" />
         </HudButton>
+        {vehicles}
         <span aria-hidden className="mx-1 h-5 w-px bg-border" />
         <HudButton
           label="Zoom out"

@@ -86,6 +86,9 @@ Implemented (Phase 10): the existing `check` and `fresh-clone-boot` jobs, plus `
 - Repo variables: `STAGING_HOST/USER/URL/TILES_BASE_URL`, `PROD_HOST/USER/URL/TILES_BASE_URL`, optional `WEB_SENTRY_DSN`. Secrets: `STAGING_SSH_KEY`, `STAGING_KNOWN_HOSTS`, `PROD_SSH_KEY`, `PROD_KNOWN_HOSTS`. GHCR uses the job's `GITHUB_TOKEN`. App secrets live on the VMs, not in Actions. Each job is skipped while its `*_HOST` variable is unset.
 - Rollback is rehearsed (Phase 10, §9): a release whose server never turns healthy is detected and the previous tag restored. **Migrations are not rolled back** — they must stay additive (§7).
 
+### `.github/workflows/vehicle-spawns.yml` (manual)
+- Actions tab → "Vehicle spawns" → Run workflow (input: matches per map). Needs the repo secret `PUBG_API_KEY`. Regenerates `apps/web/public/spawns/<map>.json` from the PUBG API (FEATURES F18) and pushes them to a new `data/vehicle-spawns-<run>` branch; open a PR from it and merge as usual — Vercel serves the files. Permissions: `contents: write` (that branch only). Re-run after a PUBG map update.
+
 ## 6. Server setup checklist (fresh VM, Ubuntu 24.04 LTS)
 - [ ] Create non-root deploy user, SSH key auth only, disable password login & root SSH.
 - [ ] `ufw allow 22,80,443/tcp && ufw allow 443/udp && ufw enable`
