@@ -1,0 +1,16 @@
+{
+  "name": "vehicle-spawns",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI that derives vehicle spawn points from PUBG API telemetry (first ride of each vehicle) and writes apps/web/public/spawns/<map>.json. Run by the 'Vehicle spawns' GitHub workflow. Not deployed.",
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@rotationlab/shared": "workspace:*"
+  }
+}
