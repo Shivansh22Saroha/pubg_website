@@ -18,18 +18,19 @@ export const VEHICLE_COLORS: Record<VehicleKind, string> = {
 
 /** 24-unit glyphs (stroked), the same shapes as the legend icons */
 export const VEHICLE_GLYPHS: Record<VehicleKind, string> = {
-  car: 'M4.5 15.5V12l1.8-4.2a1 1 0 0 1 .9-.6h9.6a1 1 0 0 1 .9.6l1.8 4.2v3.5ZM4.5 12h15M7.5 15.5v2M16.5 15.5v2',
+  car: 'M5 15.5H3.5v-2.9a1 1 0 0 1 .7-1l1.3-.5 2.4-3.3a1 1 0 0 1 .8-.4h5.6a1 1 0 0 1 .8.4l2.7 3.3 2.3.6a1 1 0 0 1 .8 1v2.8H19M9 15.5h6M5 15.5a2 2 0 1 0 4 0a2 2 0 1 0-4 0M15 15.5a2 2 0 1 0 4 0a2 2 0 1 0-4 0M5.5 11.1h12.3M11.5 7.4v3.7',
   bike: 'M3 16.5a3 3 0 1 0 6 0a3 3 0 1 0-6 0M15 16.5a3 3 0 1 0 6 0a3 3 0 1 0-6 0M6 16.5l3.5-6h5l3.5 6M9.5 10.5 8.5 7.5H6.5M14.5 10.5l1-3h2',
   boat: 'M3 14h18l-3 4.5H6ZM12 14V4.5l6.5 7.5H12',
   glider: 'M2 11h20M12 6.5v9.5M9 16h6M10.5 6.5h3',
 };
 
-/** at least this many screen px per km before points become icon badges (else dots) */
+/** at least this many screen px per km before icons switch to the large badges */
 const BADGE_PX_PER_KM = 260;
 
 /**
  * Vehicle spawn points on one canvas in their own pane (above the grid, below drawings).
- * Zoomed out: small coloured dots. Zoomed in: dark round badges with the vehicle glyph. The
+ * Every point is a vehicle icon (car, bike, boat, glider). Zoomed out: small badges in the
+ * kind's colour with a dark glyph. Zoomed in: larger dark badges with a coloured glyph. The
  * canvas covers the view plus a margin, is re-placed and redrawn after every move / zoom, and
  * hidden during zoom animations. Not interactive — it never takes clicks from the tools.
  */
@@ -96,44 +97,35 @@ class SpawnCanvas extends L.Layer {
     ctx.clearRect(0, 0, w, h);
 
     const pxPerKm = 100_000 / worldPerPx(map, this.tileWorld);
-    const badges = pxPerKm >= BADGE_PX_PER_KM;
-    const r = badges ? 11 : 3;
+    const large = pxPerKm >= BADGE_PX_PER_KM;
+    // zoomed out: small filled badges with a dark glyph (reads at 14 px); zoomed in: dark
+    // badges with a coloured ring and glyph
+    const r = large ? 11 : 7;
+    const scale = large ? 0.62 : 0.42;
     for (const s of this.spawns) {
       const p = map.latLngToContainerPoint(toLatLng([s.x, s.y]));
       const x = p.x + ox;
       const y = p.y + oy;
       if (x < -r || y < -r || x > w + r || y > h + r) continue;
       const color = VEHICLE_COLORS[s.kind];
-      if (!badges) {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(5,7,10,0.85)';
-        ctx.stroke();
-        continue;
-      }
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(10,12,16,0.88)';
+      ctx.fillStyle = large ? 'rgba(10,12,16,0.88)' : color;
       ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = color;
+      ctx.lineWidth = large ? 2 : 1;
+      ctx.strokeStyle = large ? color : 'rgba(5,7,10,0.85)';
       ctx.stroke();
       const glyph = this.glyphs.get(s.kind);
-      if (glyph) {
-        ctx.save();
-        const scale = 0.62;
-        ctx.translate(x - 12 * scale, y - 12 * scale);
-        ctx.scale(scale, scale);
-        ctx.lineWidth = 2.2;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = color;
-        ctx.stroke(glyph);
-        ctx.restore();
-      }
+      if (!glyph) continue;
+      ctx.save();
+      ctx.translate(x - 12 * scale, y - 12 * scale);
+      ctx.scale(scale, scale);
+      ctx.lineWidth = large ? 2.2 : 2.6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = large ? color : 'rgba(5,7,10,0.92)';
+      ctx.stroke(glyph);
+      ctx.restore();
     }
   };
 }
