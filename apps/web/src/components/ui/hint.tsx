@@ -11,9 +11,10 @@ const TOUCH_HINT_VISIBLE_MS = 1400;
 /**
  * Hover / focus hint for icon buttons (UI_UX_SPEC §3.5): the button's name, an optional line
  * on what it does, and its keyboard shortcut. Mouse: on hover after a short delay; keyboard: on
- * focus. Touch has no hover, so holding the button shows the hint and that press doesn't
- * trigger the button. Purely visual — the button keeps its own aria-label (screen readers
- * already get the name), so the bubble is aria-hidden to avoid announcing it twice.
+ * focus. Touch has no hover, so holding the button shows the hint for a moment. Lifting the
+ * finger still presses the button — a hint never swallows a tap (a slow phone, or a test
+ * runner, can make a quick tap look like a hold). Purely visual — the button keeps its own
+ * aria-label, so the bubble is aria-hidden to avoid announcing it twice.
  */
 export function Hint({
   label,
@@ -72,16 +73,11 @@ export function Hint({
           onPointerLeave={(e) => {
             if (e.pointerType === 'touch') endPress();
           }}
-          onClickCapture={(e) => {
-            // the press that showed the hint isn't also a tap on the button
-            if (press.current?.fired) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-            press.current = null;
-          }}
           onContextMenu={(e) => {
             if (press.current) e.preventDefault(); // no OS menu over the hint
+          }}
+          onClick={() => {
+            press.current = null;
           }}
         >
           {children}

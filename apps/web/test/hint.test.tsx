@@ -42,7 +42,7 @@ describe('tool hints (UI_UX_SPEC §3.5)', () => {
     expect(hint.textContent).toContain('Mark a zone');
   });
 
-  it('touch: holding the button shows the hint and that press does not trigger the button', () => {
+  it('touch: holding the button shows the hint, and releasing still presses it (no swallowed taps)', () => {
     vi.useFakeTimers();
     const { onClick, button } = renderHint();
     fireEvent.pointerDown(button, { pointerType: 'touch' });
@@ -52,7 +52,7 @@ describe('tool hints (UI_UX_SPEC §3.5)', () => {
     expect(screen.getByTestId('hint').textContent).toContain('Mark a zone');
     fireEvent.pointerUp(button, { pointerType: 'touch' });
     fireEvent.click(button);
-    expect(onClick).not.toHaveBeenCalled();
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it('touch: a quick tap still presses the button', () => {
