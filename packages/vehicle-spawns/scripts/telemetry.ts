@@ -1,44 +1,87 @@
 import { vehicleKindOf, type SpawnSighting, type VehicleKind } from '@rotationlab/shared';
 
-/** the subset of a PUBG `LogVehicleRide` telemetry event this tool reads */
-interface RideEvent {
-  _T: 'LogVehicleRide';
-  character?: { location?: { x?: number; y?: number } };
-  vehicle?: { vehicleType?: string; vehicleId?: string; vehicleUniqueId?: number | string };
+type Loc = { x?: unknown; y?: unknown };
+
+/** the subset of PUBG `LogVehicleRide` / `LogVehicleLeave` telemetry events this tool reads */
+interface VehicleEvent {
+  _T: 'LogVehicleRide' | 'LogVehicleLeave';
+  character?: { location?: Loc };
+  vehicle?: {
+    vehicleType?: unknown;
+    vehicleId?: unknown;
+    vehicleUniqueId?: unknown;
+    healthPercent?: unknown;
+    location?: Loc;
+  };
 }
 
-function isRide(e: unknown): e is RideEvent {
-  return typeof e === 'object' && e !== null && (e as { _T?: unknown })._T === 'LogVehicleRide';
+function isVehicleEvent(e: unknown): e is VehicleEvent {
+  if (typeof e !== 'object' || e === null) return false;
+  const t = (e as { _T?: unknown })._T;
+  return t === 'LogVehicleRide' || t === 'LogVehicleLeave';
 }
+
+function isRide(e: unknown): e is VehicleEvent {
+  return isVehicleEvent(e) && e._T === 'LogVehicleRide';
+}
+
+function point(l: Loc | undefined): { x: number; y: number } | null {
+  if (!l || typeof l.x !== 'number' || typeof l.y !== 'number') return null;
+  if (!Number.isFinite(l.x) || !Number.isFinite(l.y)) return null;
+  return { x: l.x, y: l.y };
+}
+
+/** a vehicle re-entered within this distance of where one of the same model was left (cm) */
+export const REENTRY_RADIUS = 600;
+
+const near = (list: { x: number; y: number }[] | undefined, p: { x: number; y: number }) =>
+  !!list?.some((q) => Math.hypot(q.x - p.x, q.y - p.y) <= REENTRY_RADIUS);
 
 /**
  * One sighting per vehicle per match: where it was *first* entered — a vehicle stays at its
- * spawn point until somebody gets in, so that spot is the spawn (the rider stands within a
- * metre or two of it). Telemetry names the model in `vehicleId` (`Dacia_A_01_v2_C`);
- * `vehicleType` is only the class (`WheeledVehicle`, `FloatingVehicle`), used as a fallback for
- * boats. Vehicles without a `vehicleUniqueId` can't be told apart and are skipped, as are kinds
- * that never spawn at fixed points (`vehicleKindOf` → null). Telemetry is untrusted input:
- * anything malformed is ignored, never thrown.
+ * spawn point until somebody gets in, so that spot is the spawn. Telemetry names the model in
+ * `vehicleId` (`Dacia_A_01_v2_C`); `vehicleType` is only the class (`WheeledVehicle`,
+ * `FloatingVehicle`), used as a fallback for boats. The vehicle's own `location` is used (the
+ * rider's when absent).
+ *
+ * Current telemetry has no per-vehicle id, so a first ride is told apart by elimination: the
+ * vehicle is at full health, no vehicle of the same model was left within `REENTRY_RADIUS` of
+ * that spot earlier in the match (a re-entry), and none was already entered there (a
+ * squadmate getting in). Older files with `vehicleUniqueId` use the id instead. Kinds that
+ * never spawn at fixed points (`vehicleKindOf` → null) are skipped. Telemetry is untrusted
+ * input: anything malformed is ignored, never thrown. Mistakes left over (a pushed vehicle)
+ * land in one match only and are dropped by clustering's minimum-matches rule.
  */
 export function firstRides(events: unknown, matchId: string): SpawnSighting[] {
   if (!Array.isArray(events)) return [];
-  const seen = new Set<number | string>();
+  const seenIds = new Set<number | string>();
+  const left = new Map<string, { x: number; y: number }[]>();
+  const entered = new Map<string, { x: number; y: number }[]>();
   const out: SpawnSighting[] = [];
   for (const e of events) {
-    if (!isRide(e)) continue;
+    if (!isVehicleEvent(e)) continue;
     const v = e.vehicle;
-    const loc = e.character?.location;
-    const uid = v?.vehicleUniqueId;
-    if ((typeof uid !== 'number' && typeof uid !== 'string') || uid === '' || seen.has(uid))
-      continue;
-    seen.add(uid);
-    if (typeof loc?.x !== 'number' || typeof loc.y !== 'number') continue;
-    if (!Number.isFinite(loc.x) || !Number.isFinite(loc.y)) continue;
+    const p = point(v?.location) ?? point(e.character?.location);
+    if (!p) continue;
     const model = typeof v?.vehicleId === 'string' ? v.vehicleId : '';
+    const key = model || (typeof v?.vehicleType === 'string' ? v.vehicleType : '');
+    if (e._T === 'LogVehicleLeave') {
+      left.set(key, [...(left.get(key) ?? []), p]);
+      continue;
+    }
+    const uid = v?.vehicleUniqueId;
+    if (typeof uid === 'number' || (typeof uid === 'string' && uid !== '')) {
+      if (seenIds.has(uid)) continue;
+      seenIds.add(uid);
+    } else {
+      if (typeof v?.healthPercent === 'number' && v.healthPercent < 99) continue;
+      if (near(left.get(key), p) || near(entered.get(key), p)) continue;
+      entered.set(key, [...(entered.get(key) ?? []), p]);
+    }
     let kind: VehicleKind | null = model ? vehicleKindOf(model) : null;
     if (!model && v?.vehicleType === 'FloatingVehicle') kind = 'boat';
     if (!kind) continue;
-    out.push({ x: Math.round(loc.x), y: Math.round(loc.y), kind, matchId });
+    out.push({ x: Math.round(p.x), y: Math.round(p.y), kind, matchId });
   }
   return out;
 }
