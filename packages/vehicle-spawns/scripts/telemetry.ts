@@ -4,7 +4,7 @@ import { vehicleKindOf, type SpawnSighting, type VehicleKind } from '@rotationla
 interface RideEvent {
   _T: 'LogVehicleRide';
   character?: { location?: { x?: number; y?: number } };
-  vehicle?: { vehicleType?: string; vehicleId?: string; vehicleUniqueId?: number };
+  vehicle?: { vehicleType?: string; vehicleId?: string; vehicleUniqueId?: number | string };
 }
 
 function isRide(e: unknown): e is RideEvent {
@@ -22,14 +22,15 @@ function isRide(e: unknown): e is RideEvent {
  */
 export function firstRides(events: unknown, matchId: string): SpawnSighting[] {
   if (!Array.isArray(events)) return [];
-  const seen = new Set<number>();
+  const seen = new Set<number | string>();
   const out: SpawnSighting[] = [];
   for (const e of events) {
     if (!isRide(e)) continue;
     const v = e.vehicle;
     const loc = e.character?.location;
     const uid = v?.vehicleUniqueId;
-    if (typeof uid !== 'number' || seen.has(uid)) continue;
+    if ((typeof uid !== 'number' && typeof uid !== 'string') || uid === '' || seen.has(uid))
+      continue;
     seen.add(uid);
     if (typeof loc?.x !== 'number' || typeof loc.y !== 'number') continue;
     if (!Number.isFinite(loc.x) || !Number.isFinite(loc.y)) continue;
@@ -44,3 +45,34 @@ export function firstRides(events: unknown, matchId: string): SpawnSighting[] {
 
 /** match types whose vehicles spawn by the normal rules (no event / arcade modes) */
 export const NORMAL_MATCH_TYPES: ReadonlySet<string> = new Set(['official', 'competitive']);
+
+/** shape of a value without its content: `{x:number,name:string}` — for logs, never values */
+function shapeOf(v: unknown, depth = 0): string {
+  if (Array.isArray(v)) return `array(${v.length})`;
+  if (v === null || typeof v !== 'object') return typeof v;
+  if (depth >= 1) return 'object';
+  return `{${Object.entries(v)
+    .map(([k, x]) => `${k}:${shapeOf(x, depth + 1)}`)
+    .join(',')}}`;
+}
+
+/**
+ * A one-line description of a telemetry file for the workflow log: event counts for
+ * vehicle-related event types and the *field names and types* of the first ride event (no
+ * player names or other values), so a format change shows up without exposing match data.
+ */
+export function describeTelemetry(events: unknown): string {
+  if (!Array.isArray(events)) return `not an array: ${shapeOf(events)}`;
+  const counts = new Map<string, number>();
+  for (const e of events) {
+    const t = typeof e === 'object' && e !== null ? (e as { _T?: unknown })._T : undefined;
+    if (typeof t === 'string' && /vehicle/i.test(t)) counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  const ride = events.find(isRide);
+  const sample = ride
+    ? ` ride: vehicle=${shapeOf(ride.vehicle)} character=${shapeOf(ride.character)} model=${
+        typeof ride.vehicle?.vehicleId === 'string' ? ride.vehicle.vehicleId.slice(0, 40) : '-'
+      }`
+    : ' no LogVehicleRide';
+  return `${events.length} events; ${JSON.stringify(Object.fromEntries(counts))};${sample}`;
+}

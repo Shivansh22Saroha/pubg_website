@@ -24,7 +24,7 @@ import {
   type MapId,
   type SpawnSighting,
 } from '@rotationlab/shared';
-import { firstRides, NORMAL_MATCH_TYPES } from './telemetry.js';
+import { describeTelemetry, firstRides, NORMAL_MATCH_TYPES } from './telemetry.js';
 
 const API = 'https://api.pubg.com';
 const KEY = process.env.PUBG_API_KEY ?? '';
@@ -78,6 +78,7 @@ async function main() {
   const full = () => MAP_IDS.every((m) => used[m] >= PER_MAP);
   let next = 0;
   let failures = 0;
+  const described = new Set<MapId>();
 
   async function worker() {
     while (next < ids.length && !full()) {
@@ -93,7 +94,12 @@ async function main() {
         used[mapId]++; // reserve before the slow download so workers don't overshoot
         const res = await fetch(url, { headers: { 'accept-encoding': 'gzip' } });
         if (!res.ok) throw new Error(`telemetry HTTP ${res.status}`);
-        sightings[mapId].push(...firstRides(await res.json(), id));
+        const events: unknown = await res.json();
+        if (!described.has(mapId)) {
+          described.add(mapId);
+          console.log(`${mapId} telemetry sample: ${describeTelemetry(events)}`);
+        }
+        sightings[mapId].push(...firstRides(events, id));
       } catch (err) {
         failures++;
         console.warn(`match ${id}: ${(err as Error).message}`);
@@ -110,6 +116,13 @@ async function main() {
       continue;
     }
     const spawns = clusterSpawns(sightings[mapId], MAPS[mapId].worldSize);
+    if (spawns.length === 0) {
+      // never replace real data with an empty file (a telemetry format change, a bad sample)
+      console.log(
+        `${mapId}: ${used[mapId]} matches, ${sightings[mapId].length} first rides → 0 spawn points — file left as it was`,
+      );
+      continue;
+    }
     const file = VehicleSpawnFileSchema.parse({
       mapId,
       source: 'pubg-api',

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { firstRides } from '../scripts/telemetry.js';
+import { describeTelemetry, firstRides } from '../scripts/telemetry.js';
 
 const ride = (
-  uid: number | undefined,
+  uid: number | string | undefined,
   x: number,
   y: number,
   vehicleId?: string,
@@ -50,5 +50,20 @@ describe('first rides from telemetry', () => {
     expect(firstRides([ride(7, 10, 20, undefined, 'FloatingVehicle')], 'm2')).toEqual([
       { x: 10, y: 20, kind: 'boat', matchId: 'm2' },
     ]);
+  });
+
+  it('accepts string vehicle ids', () => {
+    expect(
+      firstRides([ride('a1', 10, 20, 'Uaz_A_01_C'), ride('a1', 99, 99, 'Uaz_A_01_C')], 'm3'),
+    ).toEqual([{ x: 10, y: 20, kind: 'car', matchId: 'm3' }]);
+  });
+
+  it('describes a telemetry file by shape only, never player names', () => {
+    const d = describeTelemetry([{ _T: 'LogMatchStart' }, ride(1, 5, 5, 'Dacia_A_01_v2_C')]);
+    expect(d).toContain('"LogVehicleRide":1');
+    expect(d).toContain('vehicleUniqueId:number');
+    expect(d).toContain('name:string');
+    expect(d).not.toContain('"p"');
+    expect(describeTelemetry({ a: 1 })).toBe('not an array: {a:number}');
   });
 });
