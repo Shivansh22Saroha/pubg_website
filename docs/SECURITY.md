@@ -139,6 +139,7 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 - Docker images: run as non-root user, read-only root FS (compose `read_only: true` + tmpfs), `HEALTHCHECK` set. Bases (Phase 10): web `node:22-alpine`; server `node:22-bookworm-slim` — Prisma's engine on musl was CPU-bound at a fraction of glibc's throughput (CHANGELOG, Phase 10 load test).
 - Accepted advisories (`package.json` → `pnpm.auditConfig.ignoreGhsas`), reviewed each release:
   - `GHSA-ggr8-5vv4-36mx` deepmerge-ts < 8 (stack exhaustion on recursive objects): only reached by Prisma 6's own config loader at CLI / startup, never with request data. Revisit with Prisma 7.
+  - `GHSA-fc5q-39xc-vjpf` picomatch ≤ 4.0.7 (ReDoS through repeated extglobs; no patched version yet, 2026-11-18): the only production path is `@sentry/nextjs` → `@rollup/plugin-commonjs` → picomatch, which matches our own build-config globs at build time — never a pattern from a request. Drop the ignore once a patched picomatch ships.
 - Map tile script verifies SHA-256 of downloaded LFS objects against the pointer `oid`, and checks image magic bytes before processing (treat downloaded files as untrusted; run `sharp` with `limitInputPixels` set to the expected size, not `false`, once the real size is known).
 
 ## 10. Threat model (STRIDE summary)
