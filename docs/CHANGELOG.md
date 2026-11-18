@@ -46,6 +46,7 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 - Verified in a cloud VM: a production web build serving `localhost` with the API on `127.0.0.1`, which the browser treats as different sites. The browser held no cookie for the API host, two users reached **Synced**, and chat crossed the socket. Integration 567/567, E2E 57/57, unit 432/432.
 
 ### Changed
+- 2026-11-18 — Vehicle spawn points are drawn as vehicle icons at every zoom (a car for cars; bike, boat and glider icons for the rest) instead of plain dots when zoomed out (user feedback).
 - 2026-11-04 — **Premium UI pass** (UI_UX_SPEC §2–3; no behaviour, API or data changes).
   - **Tokens** (`globals.css`, UI_UX_SPEC §2.1 updated): deeper graphite base, a third surface step, `--border-strong`, a 1 px inset top highlight on raised surfaces, an accent gradient (`--accent-hi` → `--accent`) with a soft glow. New utilities: `surface-raised`, `glass` (HUD chrome over the map), `app-backdrop` (faint map grid behind non-map pages). Radius 8 / 12 / 18 px. `section-label` is sentence case now.
   - **Primitives:** accent buttons get the gradient + inset highlight, and disabled accent buttons a neutral fill instead of a half-transparent amber; outline buttons are quieter; inputs, selects and textareas sit recessed with a 3 px focus glow; dialogs blur the page behind them; dropdown menus are glass.
