@@ -18,6 +18,8 @@ import {
   type ZonePreset,
 } from '@rotationlab/shared';
 import { ChevronDown, Trash2 } from 'lucide-react';
+import { Hint } from '@/components/ui/hint';
+import { CurvedIcon, DashedIcon, DoubleHeadIcon } from './icons';
 import { toast } from 'sonner';
 import { v7 as uuid } from 'uuid';
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
@@ -208,45 +210,49 @@ export function StyleBar({
                 editStyle({ width }, (e) => VECTOR.has(e.type));
               }}
             />
-            <Seg
-              aria-pressed={first.style.dashed}
-              aria-label="Dashed"
-              onClick={() => {
-                editStyle({ dashed: !first.style.dashed }, (e) => VECTOR.has(e.type));
-              }}
-            >
-              ┄
-            </Seg>
-            {arrows.length > 0 && (
+            <Hint label="Dashed" description="Dashed line — a planned or unsure route" side="top">
               <Seg
-                aria-pressed={allDouble}
-                aria-label="Double-headed"
-                title="Double-headed arrow"
+                aria-pressed={first.style.dashed}
+                aria-label="Dashed"
                 onClick={() => {
-                  // one batch, one undo step, arrows only
-                  edit(
-                    (i) => ({ ...i, props: withFlag(i.props, 'doubleHeaded', !allDouble) }),
-                    (e) => e.type === 'ARROW',
-                  );
+                  editStyle({ dashed: !first.style.dashed }, (e) => VECTOR.has(e.type));
                 }}
               >
-                ⟷
+                <DashedIcon className="size-4" />
               </Seg>
+            </Hint>
+            {arrows.length > 0 && (
+              <Hint label="Double-headed" description="Arrow heads at both ends" side="top">
+                <Seg
+                  aria-pressed={allDouble}
+                  aria-label="Double-headed"
+                  onClick={() => {
+                    // one batch, one undo step, arrows only
+                    edit(
+                      (i) => ({ ...i, props: withFlag(i.props, 'doubleHeaded', !allDouble) }),
+                      (e) => e.type === 'ARROW',
+                    );
+                  }}
+                >
+                  <DoubleHeadIcon className="size-4" />
+                </Seg>
+              </Hint>
             )}
             {arrows.length > 0 && (
-              <Seg
-                aria-pressed={allCurved}
-                aria-label="Curved"
-                title="Curved arrow (through its bends)"
-                onClick={() => {
-                  edit(
-                    (i) => ({ ...i, props: withFlag(i.props, 'curved', !allCurved) }),
-                    (e) => e.type === 'ARROW',
-                  );
-                }}
-              >
-                ∿
-              </Seg>
+              <Hint label="Curved" description="Smooth curve through the arrow's bends" side="top">
+                <Seg
+                  aria-pressed={allCurved}
+                  aria-label="Curved"
+                  onClick={() => {
+                    edit(
+                      (i) => ({ ...i, props: withFlag(i.props, 'curved', !allCurved) }),
+                      (e) => e.type === 'ARROW',
+                    );
+                  }}
+                >
+                  <CurvedIcon className="size-4" />
+                </Seg>
+              </Hint>
             )}
           </>
         )}
@@ -406,38 +412,42 @@ export function StyleBar({
               set({ width });
             }}
           />
-          <Seg
-            aria-pressed={st.dashed}
-            aria-label="Dashed"
-            onClick={() => {
-              set({ dashed: !st.dashed });
-            }}
-          >
-            ┄
-          </Seg>
-          {tool === 'arrow' && (
+          <Hint label="Dashed" description="Dashed line — a planned or unsure route" side="top">
             <Seg
-              aria-pressed={arrowDoubleHeaded}
-              aria-label="Double-headed"
-              title="Double-headed arrow"
+              aria-pressed={st.dashed}
+              aria-label="Dashed"
               onClick={() => {
-                useToolStore.getState().setArrowDoubleHeaded(!arrowDoubleHeaded);
+                set({ dashed: !st.dashed });
               }}
             >
-              ⟷
+              <DashedIcon className="size-4" />
             </Seg>
+          </Hint>
+          {tool === 'arrow' && (
+            <Hint label="Double-headed" description="Arrow heads at both ends" side="top">
+              <Seg
+                aria-pressed={arrowDoubleHeaded}
+                aria-label="Double-headed"
+                onClick={() => {
+                  useToolStore.getState().setArrowDoubleHeaded(!arrowDoubleHeaded);
+                }}
+              >
+                <DoubleHeadIcon className="size-4" />
+              </Seg>
+            </Hint>
           )}
           {tool === 'arrow' && (
-            <Seg
-              aria-pressed={arrowCurved}
-              aria-label="Curved"
-              title="Curved arrow (through its bends)"
-              onClick={() => {
-                useToolStore.getState().setArrowCurved(!arrowCurved);
-              }}
-            >
-              ∿
-            </Seg>
+            <Hint label="Curved" description="Smooth curve through the arrow's bends" side="top">
+              <Seg
+                aria-pressed={arrowCurved}
+                aria-label="Curved"
+                onClick={() => {
+                  useToolStore.getState().setArrowCurved(!arrowCurved);
+                }}
+              >
+                <CurvedIcon className="size-4" />
+              </Seg>
+            </Hint>
           )}
         </>
       )}

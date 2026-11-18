@@ -7,46 +7,90 @@ import {
   type MarkerKind,
   type RoomRole,
 } from '@rotationlab/shared';
-import {
-  Circle,
-  Eraser,
-  MapPin,
-  MoreHorizontal,
-  MousePointer2,
-  MoveUpRight,
-  Pencil,
-  Pentagon,
-  Redo2,
-  Ruler,
-  Slash,
-  Sparkle,
-  Type,
-  Undo2,
-  type LucideIcon,
-} from 'lucide-react';
+import { MoreHorizontal, Redo2, Undo2 } from 'lucide-react';
 import { Popover } from 'radix-ui';
 import { useState } from 'react';
 import { safeColor } from '@/components/map/markerDom';
+import { Hint } from '@/components/ui/hint';
 import { editorActions, type EditSink } from '@/lib/editing';
 import { cn } from '@/lib/utils';
 import { useBoardStore } from '@/stores/boardStore';
 import { useToolStore } from '@/stores/toolStore';
 import type { Breakpoint } from '@/hooks/useBreakpoint';
 import { resolveActiveLayer, toolsFor } from './gating';
+import {
+  AreaIcon,
+  ArrowIcon,
+  EraserIcon,
+  LaserIcon,
+  LineIcon,
+  MarkerIcon,
+  MeasureIcon,
+  PenIcon,
+  SelectIcon,
+  TextIcon,
+  ZoneIcon,
+  type ToolIcon,
+} from './icons';
 import { IMPLEMENTED_TOOLS, type ToolId } from './types';
 
-const TOOLS: { id: ToolId; label: string; key: string; icon: LucideIcon }[] = [
-  { id: 'select', label: 'Select', key: 'V', icon: MousePointer2 },
-  { id: 'pen', label: 'Pen', key: 'P', icon: Pencil },
-  { id: 'line', label: 'Line', key: 'L', icon: Slash },
-  { id: 'arrow', label: 'Arrow', key: 'A', icon: MoveUpRight },
-  { id: 'circle', label: 'Circle', key: 'C', icon: Circle },
-  { id: 'polygon', label: 'Polygon', key: 'G', icon: Pentagon },
-  { id: 'text', label: 'Text', key: 'T', icon: Type },
-  { id: 'marker', label: 'Marker', key: 'M', icon: MapPin },
-  { id: 'eraser', label: 'Eraser', key: 'E', icon: Eraser },
-  { id: 'measure', label: 'Measure', key: 'R', icon: Ruler },
-  { id: 'laser', label: 'Laser', key: 'K', icon: Sparkle },
+type IconLike = ToolIcon | typeof Undo2;
+
+/** label = accessible name (unchanged, tests and screen readers rely on it); hint = what it does */
+export const TOOLS: { id: ToolId; label: string; key: string; icon: ToolIcon; hint: string }[] = [
+  {
+    id: 'select',
+    label: 'Select',
+    key: 'V',
+    icon: SelectIcon,
+    hint: 'Pick a drawing, then drag to move it',
+  },
+  { id: 'pen', label: 'Pen', key: 'P', icon: PenIcon, hint: 'Draw a free route' },
+  { id: 'line', label: 'Line', key: 'L', icon: LineIcon, hint: 'Straight line between two points' },
+  {
+    id: 'arrow',
+    label: 'Arrow',
+    key: 'A',
+    icon: ArrowIcon,
+    hint: 'Push or rotation — click to add bends',
+  },
+  { id: 'circle', label: 'Circle', key: 'C', icon: ZoneIcon, hint: 'Mark a zone or area to hold' },
+  {
+    id: 'polygon',
+    label: 'Polygon',
+    key: 'G',
+    icon: AreaIcon,
+    hint: 'Outline a compound or region',
+  },
+  { id: 'text', label: 'Text', key: 'T', icon: TextIcon, hint: 'Write a note on the map' },
+  {
+    id: 'marker',
+    label: 'Marker',
+    key: 'M',
+    icon: MarkerIcon,
+    hint: 'Squads, enemies, vehicles, loot…',
+  },
+  {
+    id: 'eraser',
+    label: 'Eraser',
+    key: 'E',
+    icon: EraserIcon,
+    hint: 'Tap or drag over drawings to delete',
+  },
+  {
+    id: 'measure',
+    label: 'Measure',
+    key: 'R',
+    icon: MeasureIcon,
+    hint: 'Distance and travel time',
+  },
+  {
+    id: 'laser',
+    label: 'Laser',
+    key: 'K',
+    icon: LaserIcon,
+    hint: 'Point at a spot — fades for everyone',
+  },
 ];
 
 export const MARKER_LABELS: Record<MarkerKind, string> = {
@@ -64,6 +108,8 @@ export const MARKER_LABELS: Record<MarkerKind, string> = {
 function ToolButton({
   label,
   shortcut,
+  hint,
+  hintSide = 'right',
   icon: Icon,
   active,
   disabled,
@@ -74,7 +120,9 @@ function ToolButton({
 }: {
   label: string;
   shortcut: string;
-  icon: LucideIcon;
+  hint?: string;
+  hintSide?: 'top' | 'right' | 'bottom' | 'left';
+  icon: IconLike;
   active?: boolean;
   disabled?: boolean;
   /** not built yet (Measure, Laser) */
@@ -85,27 +133,33 @@ function ToolButton({
   small?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={active ?? undefined}
-      aria-disabled={disabled || undefined}
-      title={soon ? `${label} (${shortcut}) — coming in a later update` : `${label} (${shortcut})`}
-      data-testid={testId}
-      onClick={disabled ? undefined : onClick}
-      className={cn(
-        small
-          ? 'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors'
-          : 'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
-        'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
-        active
-          ? 'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_6px_16px_-6px_var(--accent-glow)]'
-          : 'hover:bg-surface-3 hover:text-text',
-        disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-muted',
-      )}
+    <Hint
+      label={label}
+      shortcut={shortcut}
+      description={soon ? 'Coming in a later update' : hint}
+      side={hintSide}
     >
-      <Icon className="size-5" aria-hidden />
-    </button>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active ?? undefined}
+        aria-disabled={disabled || undefined}
+        data-testid={testId}
+        onClick={disabled ? undefined : onClick}
+        className={cn(
+          small
+            ? 'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors'
+            : 'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
+          'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
+          active
+            ? 'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_6px_16px_-6px_var(--accent-glow)]'
+            : 'hover:bg-surface-3 hover:text-text',
+          disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-muted',
+        )}
+      >
+        <Icon className="size-5" aria-hidden />
+      </button>
+    </Hint>
   );
 }
 
@@ -144,6 +198,8 @@ export function UndoRedo({
       <ToolButton
         label="Undo"
         shortcut="Ctrl+Z"
+        hint="Undo your last change"
+        hintSide={size === 'sm' ? 'bottom' : 'right'}
         icon={Undo2}
         disabled={undoCount === 0}
         testId="undo"
@@ -155,6 +211,8 @@ export function UndoRedo({
       <ToolButton
         label="Redo"
         shortcut="Ctrl+Shift+Z"
+        hint="Redo what you undid"
+        hintSide={size === 'sm' ? 'bottom' : 'right'}
         icon={Redo2}
         disabled={redoCount === 0}
         testId="redo"
@@ -203,6 +261,7 @@ export function Toolbar({
   const inBar = split ? available.filter((t) => PHONE_PRIMARY.includes(t.id)) : available;
   const overflow = split ? available.filter((t) => !PHONE_PRIMARY.includes(t.id)) : [];
   const overflowActive = overflow.find((t) => t.id === tool);
+  const hintSide = horizontal ? 'top' : 'right';
 
   const pickMarker = (kind: MarkerKind) => {
     const { view } = useBoardStore.getState();
@@ -236,28 +295,34 @@ export function Toolbar({
         if (t.id === 'marker') {
           return (
             <Popover.Root key={t.id} open={pickerOpen} onOpenChange={setPickerOpen}>
-              <Popover.Trigger asChild>
-                <button
-                  type="button"
-                  aria-label={`${t.label} — ${MARKER_LABELS[markerKind]}`}
-                  aria-pressed={tool === 'marker'}
-                  title={`${t.label} (${t.key})`}
-                  data-testid="tool-marker"
-                  data-tool-button=""
-                  className={cn(
-                    'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
-                    'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
-                    tool === 'marker'
-                      ? 'bg-accent text-accent-fg'
-                      : 'hover:bg-surface-2 hover:text-text',
-                  )}
-                  onClick={() => {
-                    setTool('marker');
-                  }}
-                >
-                  <MapPin className="size-5" aria-hidden />
-                </button>
-              </Popover.Trigger>
+              <Hint
+                label={`${t.label} — ${MARKER_LABELS[markerKind]}`}
+                shortcut={t.key}
+                description={t.hint}
+                side={hintSide}
+              >
+                <Popover.Trigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`${t.label} — ${MARKER_LABELS[markerKind]}`}
+                    aria-pressed={tool === 'marker'}
+                    data-testid="tool-marker"
+                    data-tool-button=""
+                    className={cn(
+                      'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
+                      'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
+                      tool === 'marker'
+                        ? 'bg-accent text-accent-fg'
+                        : 'hover:bg-surface-2 hover:text-text',
+                    )}
+                    onClick={() => {
+                      setTool('marker');
+                    }}
+                  >
+                    <MarkerIcon className="size-5" aria-hidden />
+                  </button>
+                </Popover.Trigger>
+              </Hint>
               <Popover.Portal>
                 <Popover.Content
                   side={horizontal ? 'top' : 'right'}
@@ -305,6 +370,8 @@ export function Toolbar({
               label={t.label}
               shortcut={t.key}
               icon={t.icon}
+              hint={t.hint}
+              hintSide={hintSide}
               active={tool === t.id}
               disabled={!implemented}
               soon={!implemented}
@@ -318,28 +385,34 @@ export function Toolbar({
       })}
       {split && (
         <Popover.Root open={moreOpen} onOpenChange={setMoreOpen}>
-          <Popover.Trigger asChild>
-            <button
-              type="button"
-              aria-label={overflowActive ? `More tools — ${overflowActive.label}` : 'More tools'}
-              aria-pressed={Boolean(overflowActive)}
-              data-testid="tools-more"
-              data-tool-button=""
-              className={cn(
-                'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
-                'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
-                overflowActive
-                  ? 'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg'
-                  : 'hover:bg-surface-3 hover:text-text',
-              )}
-            >
-              {overflowActive ? (
-                <overflowActive.icon className="size-5" aria-hidden />
-              ) : (
-                <MoreHorizontal className="size-5" aria-hidden />
-              )}
-            </button>
-          </Popover.Trigger>
+          <Hint
+            label={overflowActive ? `More tools — ${overflowActive.label}` : 'More tools'}
+            description="Line, polygon, text, measure, laser"
+            side={hintSide}
+          >
+            <Popover.Trigger asChild>
+              <button
+                type="button"
+                aria-label={overflowActive ? `More tools — ${overflowActive.label}` : 'More tools'}
+                aria-pressed={Boolean(overflowActive)}
+                data-testid="tools-more"
+                data-tool-button=""
+                className={cn(
+                  'flex size-10 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors pointer-coarse:size-11',
+                  'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
+                  overflowActive
+                    ? 'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg'
+                    : 'hover:bg-surface-3 hover:text-text',
+                )}
+              >
+                {overflowActive ? (
+                  <overflowActive.icon className="size-5" aria-hidden />
+                ) : (
+                  <MoreHorizontal className="size-5" aria-hidden />
+                )}
+              </button>
+            </Popover.Trigger>
+          </Hint>
           <Popover.Portal>
             <Popover.Content
               side={horizontal ? 'top' : 'right'}

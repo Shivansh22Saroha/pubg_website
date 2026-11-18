@@ -346,6 +346,21 @@ export function ToolLayer({
     let touchBlocked = false;
     /** the press a tool is following; `claimed` = captured, Leaflet doesn't see it */
     let press: { id: number; claimed: boolean } | null = null;
+    // A claimed touch press in Select (dragging an element) must not also pan the map:
+    // preventDefault on pointerdown stops Leaflet's mouse drag, but its touch drag listens to
+    // `touchstart`, which still fires — the map then slid with the finger and the element never
+    // moved. Leaflet's drag is paused for that press and resumed when it ends.
+    let dragPaused = false;
+    const pauseLeafletDrag = () => {
+      if (dragPaused || !map.dragging.enabled()) return;
+      map.dragging.disable();
+      dragPaused = true;
+    };
+    const resumeLeafletDrag = () => {
+      if (!dragPaused) return;
+      dragPaused = false;
+      if (usesLeafletDrag()) map.dragging.enable();
+    };
     const pointer = (e: PointerEvent | MouseEvent): ToolPointer => ({
       world: clientToWorld(map, e, worldSize),
       screen: [e.clientX, e.clientY],
@@ -382,6 +397,7 @@ export function ToolLayer({
           if (press?.id === id && container.hasPointerCapture(id))
             container.releasePointerCapture(id);
           press = null;
+          resumeLeafletDrag();
           selection().select([hit.id]);
           if ('vibrate' in navigator) navigator.vibrate(10); // not in Safari
           setMenu({ elementId: hit.id, x: at.clientX, y: at.clientY });
@@ -400,6 +416,7 @@ export function ToolLayer({
           if (press?.claimed && container.hasPointerCapture(press.id))
             container.releasePointerCapture(press.id);
           press = null;
+          resumeLeafletDrag(); // two fingers: Leaflet pans / pinches as usual
           touchBlocked = true;
           return;
         }
@@ -423,6 +440,7 @@ export function ToolLayer({
       if (claimed) {
         e.preventDefault(); // no Leaflet drag, no text selection / focus stealing
         container.setPointerCapture(e.pointerId);
+        if (e.pointerType === 'touch' && usesLeafletDrag()) pauseLeafletDrag();
       }
     };
 
@@ -487,6 +505,7 @@ export function ToolLayer({
       if (press?.id !== e.pointerId) return;
       press = null;
       current()?.onPointerUp(pointer(e));
+      resumeLeafletDrag();
     };
 
     const onCancel = (e: PointerEvent) => {
@@ -498,6 +517,7 @@ export function ToolLayer({
         press = null;
         current()?.cancel();
       }
+      resumeLeafletDrag();
     };
 
     // capture phase: runs before Leaflet's own dblclick (zoom), so a consumed one can stop it
@@ -644,6 +664,7 @@ export function ToolLayer({
       container.removeEventListener('pointermove', onMove);
       container.removeEventListener('pointerup', onUp);
       container.removeEventListener('pointercancel', onCancel);
+      resumeLeafletDrag();
       container.removeEventListener('dblclick', onDblClick, true);
       container.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('keydown', onKeyDown);
