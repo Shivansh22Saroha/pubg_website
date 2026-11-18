@@ -2,7 +2,9 @@
 
 import { formatMetres, gridRef, type Pt } from '@rotationlab/shared';
 import L from 'leaflet';
-import { Grid3x3, Layers, Maximize2, Minus, Plus } from 'lucide-react';
+import { Grid3x3, Maximize2, Minus, Plus } from 'lucide-react';
+import { MapLabelsIcon } from '@/components/tools/icons';
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { fromLatLng } from '@/lib/coords';
 import { cn } from '@/lib/utils';
@@ -21,31 +23,34 @@ interface MapHudProps {
 function HudButton({
   label,
   shortcut,
+  hint,
   pressed,
   onClick,
   children,
 }: {
   label: string;
   shortcut?: string;
+  hint?: string;
   pressed?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      title={shortcut ? `${label} (${shortcut})` : label}
-      onClick={onClick}
-      className={cn(
-        'flex size-8 items-center justify-center rounded-control text-text transition-colors duration-150 ease-hud hover:bg-surface-2',
-        pressed === true &&
-          'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-105',
-      )}
-    >
-      {children}
-    </button>
+    <Hint label={label} shortcut={shortcut} description={hint} side="top">
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={pressed}
+        onClick={onClick}
+        className={cn(
+          'flex size-8 items-center justify-center rounded-control text-text transition-colors duration-150 ease-hud hover:bg-surface-2',
+          pressed === true &&
+            'bg-[linear-gradient(180deg,var(--accent-hi),var(--accent))] text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-105',
+        )}
+      >
+        {children}
+      </button>
+    </Hint>
   );
 }
 
@@ -110,15 +115,28 @@ export function MapHud({
         {readout}
       </output>
       <div ref={controlsRef} className={cn(panel, 'flex items-center gap-0.5 p-1')}>
-        <HudButton label="Map labels" shortcut="N" pressed={labels} onClick={onToggleLabels}>
-          <Layers className="size-[18px]" />
+        <HudButton
+          label="Map labels"
+          shortcut="N"
+          hint="Show or hide place names"
+          pressed={labels}
+          onClick={onToggleLabels}
+        >
+          <MapLabelsIcon className="size-[18px]" />
         </HudButton>
-        <HudButton label="Grid" shortcut="Shift+G" pressed={grid} onClick={onToggleGrid}>
+        <HudButton
+          label="Grid"
+          shortcut="Shift+G"
+          hint="Show or hide the A–H / I–P grid"
+          pressed={grid}
+          onClick={onToggleGrid}
+        >
           <Grid3x3 className="size-[18px]" />
         </HudButton>
         <span aria-hidden className="mx-1 h-5 w-px bg-border" />
         <HudButton
           label="Zoom out"
+          shortcut="−"
           onClick={() => {
             window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
             map.zoomOut();
@@ -128,6 +146,7 @@ export function MapHud({
         </HudButton>
         <HudButton
           label="Zoom in"
+          shortcut="+"
           onClick={() => {
             window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
             map.zoomIn();
@@ -137,6 +156,7 @@ export function MapHud({
         </HudButton>
         <HudButton
           label="Fit map"
+          hint="Show the whole map"
           onClick={() => {
             window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
             onFit();

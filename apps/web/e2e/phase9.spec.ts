@@ -153,6 +153,41 @@ test('E2E-12: phone — every tool (six + More), chat sheet both ways, touch dra
   await ctxB.close();
 });
 
+test('phone: one finger drags a selected drawing to move it, and still pans the empty map', async ({
+  browser,
+}) => {
+  const { ctxA, ctxB, a, b } = await twoUsersInRoom(browser, { a: PHONE });
+  const cdp = await ctxA.newCDPSession(a);
+  // a circle, drawn with one finger
+  await a.getByTestId('tool-circle').tap();
+  await touchDrag(cdp, await mapPoint(a, 0.5, 0.5), await mapPoint(a, 0.6, 0.5));
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await expect.poll(() => debugCount(b)).toBe(1);
+  const geometryOn = (p: Page) =>
+    p.evaluate(() => JSON.stringify(window.__rlDebug?.elements()[0]?.geometry));
+  const before = await geometryOn(b);
+
+  // Select, tap it, then drag it with one finger: the circle moves (it used to pan the map,
+  // because Leaflet's touch drag also started — the drawing stayed put under the finger)
+  await a.getByTestId('tool-select').tap();
+  await a.touchscreen.tap(...(await mapPoint(a, 0.5, 0.5)));
+  await expect(a.getByTestId('style-bar')).toBeVisible();
+  const pane = () =>
+    a.evaluate(() => (document.querySelector('.leaflet-map-pane') as HTMLElement).style.transform);
+  const pan0 = await pane();
+  await touchDrag(cdp, await mapPoint(a, 0.5, 0.5), await mapPoint(a, 0.5, 0.7));
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await expect.poll(() => geometryOn(b)).not.toBe(before);
+  expect(await pane()).toBe(pan0); // the map stayed where it was
+
+  // one finger on empty map still pans it
+  await touchDrag(cdp, await mapPoint(a, 0.15, 0.2), await mapPoint(a, 0.35, 0.35));
+  await expect.poll(pane).not.toBe(pan0);
+
+  await ctxA.close();
+  await ctxB.close();
+});
+
 test('phone held sideways: phone layout, tools in a left column that fits, touch drawing syncs', async ({
   browser,
 }) => {
