@@ -85,7 +85,7 @@ test('E2E-7: save → modify → restore; both contexts equal the snapshot and u
   await ctxB.close();
 });
 
-test('E2E-11: Export PNG downloads a non-empty image of viewport × DPR with the footer', async ({
+test('E2E-11: Export view downloads a sharp 2× image of the viewport with the footer', async ({
   browser,
 }) => {
   const { ctxA, ctxB, a } = await twoUsersInRoom(browser);
@@ -94,13 +94,12 @@ test('E2E-11: Export PNG downloads a non-empty image of viewport × DPR with the
   const size = await a.locator('.leaflet-container').evaluate((el) => ({
     w: el.clientWidth,
     h: el.clientHeight,
-    dpr: Math.min(2, window.devicePixelRatio || 1),
   }));
 
   await a.getByTestId('more-menu').click();
   const [download] = await Promise.all([
     a.waitForEvent('download'),
-    a.getByRole('menuitem', { name: 'Export PNG' }).click(),
+    a.getByRole('menuitem', { name: 'Export view as PNG' }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(
     /^realtime-[a-z0-9]+_erangel-plan-1_\d{4}-\d{2}-\d{2}\.png$/,
@@ -109,9 +108,10 @@ test('E2E-11: Export PNG downloads a non-empty image of viewport × DPR with the
   expect(bytes.length).toBeGreaterThan(1000);
   expect(bytes.subarray(1, 4).toString('ascii')).toBe('PNG');
   // IHDR: width / height, big-endian, right after the signature and chunk header
+  // always 2× the view, even on a 1× screen (this browser): sharp map and drawings
   expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([
-    Math.round(size.w * size.dpr),
-    Math.round(size.h * size.dpr),
+    Math.round(size.w * 2),
+    Math.round(size.h * 2),
   ]);
   // the footer strip: solid #0B0F14 at the bottom-left corner
   const pixel = await a.evaluate(async (b64) => {
@@ -123,6 +123,42 @@ test('E2E-11: Export PNG downloads a non-empty image of viewport × DPR with the
     return Array.from(ctx.getImageData(2, bmp.height - 2, 1, 1).data.slice(0, 3));
   }, bytes.toString('base64'));
   expect(pixel).toEqual([11, 15, 20]);
+
+  await ctxA.close();
+  await ctxB.close();
+});
+
+test('E2E-11b: Export whole map downloads a 4096 px square of the map with its drawings', async ({
+  browser,
+}) => {
+  const { ctxA, ctxB, a } = await twoUsersInRoom(browser);
+  await placeMarker(a, await at(a, 0.5, 0.5));
+  await expect.poll(() => debugPending(a)).toBe(0);
+  await a.getByTestId('more-menu').click();
+  const [download] = await Promise.all([
+    a.waitForEvent('download'),
+    a.getByRole('menuitem', { name: 'Export whole map as PNG' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(
+    /^realtime-[a-z0-9]+_erangel-plan-1-map_\d{4}-\d{2}-\d{2}\.png$/,
+  );
+  const bytes = readFileSync(await download.path());
+  expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([4096, 4096]);
+  // the map art fills the square inside the margin (not the dark background), the margin
+  // stays dark, and the footer strip is there
+  const px = await a.evaluate(async (b64) => {
+    const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const bmp = await createImageBitmap(new Blob([bin], { type: 'image/png' }));
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(bmp, 0, 0);
+    const at = (x: number, y: number) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3));
+    return { inside: at(1000, 3000), margin: at(40, 2000), footer: at(2, 4094) };
+  }, bytes.toString('base64'));
+  expect(px.inside).not.toEqual([11, 15, 20]);
+  expect(px.margin).toEqual([11, 15, 20]);
+  expect(px.footer).toEqual([11, 15, 20]);
+  await expect(a.getByText(/PNG exported \(4096×4096\)/)).toBeVisible();
 
   await ctxA.close();
   await ctxB.close();

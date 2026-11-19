@@ -18,7 +18,7 @@ import { ElementRenderer } from './elementRenderer';
 export const ELEMENTS_PANE = 'elements';
 
 /** loot item icons are deployed next to the tiles (Phase 12) */
-const ICON_BASE = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
+export const ICON_BASE = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 /** Text labels scale with zoom between 0.75× and 1.5×, then clamp (UI_UX_SPEC §6). */
 export function textScale(zoom: number, maxNativeZoom: number) {
   return Math.min(1.5, Math.max(0.75, 2 ** (zoom - (maxNativeZoom - 2))));

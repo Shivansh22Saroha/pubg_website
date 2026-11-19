@@ -20,9 +20,9 @@ interface WorkspaceState {
   focusRequest: { boardId: string; x: number; y: number; n: number } | null;
   /** how many sockets follow me (`followers:update`); I send view updates only while > 0 */
   followerCount: number;
-  /** bumped by "Export PNG": the map's ExportController renders the current viewport */
-  exportRequest: number;
-  requestExport: () => void;
+  /** set by "Export view / whole map as PNG": the map's ExportController renders it */
+  exportRequest: { area: ExportArea; n: number } | null;
+  requestExport: (area: ExportArea) => void;
   setPanelOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   setTab: (tab: PanelTab) => void;
   setPingPick: (on: boolean) => void;
@@ -35,6 +35,9 @@ interface WorkspaceState {
   setFollowerCount: (n: number) => void;
 }
 
+/** what a PNG export covers (FEATURES F12) */
+export type ExportArea = 'view' | 'map';
+
 /** UI state of the room screen shared by the panel, the map overlays and the top bar. */
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   panelOpen: true,
@@ -45,9 +48,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   boardRequest: null,
   focusRequest: null,
   followerCount: 0,
-  exportRequest: 0,
-  requestExport: () => {
-    set((s) => ({ exportRequest: s.exportRequest + 1 }));
+  exportRequest: null,
+  requestExport: (area) => {
+    set((s) => ({ exportRequest: { area, n: (s.exportRequest?.n ?? 0) + 1 } }));
   },
   setPanelOpen: (open) => {
     set((s) => ({ panelOpen: typeof open === 'function' ? open(s.panelOpen) : open }));

@@ -192,11 +192,12 @@ Common behavior: tool creates a **draft** locally; others see a `stroke:preview`
 ---
 
 ## F12. Export PNG [STUDY-2]
-- Captures current viewport at device pixel ratio (max 2×): tiles + elements + optional grid; excludes cursors, selection, HUD.
-- Adds a small footer strip: room · board · map · date · "PUBG map imagery © KRAFTON".
-- Filename `{room-slug}_{board-slug}_{YYYY-MM-DD}.png`.
-- Tiles must be served with `Access-Control-Allow-Origin` for the app origin so the canvas isn't tainted.
-- From the ⋯ menu (every role). It is a canvas composite (tiles of the shown variant, grid lines + letters when shown, the element canvas, markers and text re-drawn) — no screenshot library. The measure line, cursors, selection, drafts, ghosts, laser and pulses are left out. The footer overlays the bottom 24 px, so the image is exactly viewport × DPR (E2E-11).
+- Two items in the ⋯ menu (every role): **Export view as PNG** (what's on screen, at **2×** its size on every screen) and **Export whole map as PNG** (a **4096×4096** square of the entire map with a thin dark margin holding the grid letters). Both include every drawing on visible layers (layers hidden in this tab stay hidden) and the grid when it's on; they exclude cursors, selection, drafts, ghosts, laser, pulses, the measure line and the HUD.
+- Rendered fresh, not copied off the screen (2026-11): a hidden Leaflet map of the export's size re-draws the grid and drawings at 2× (`components/map/exportRender.ts`), and the map art is loaded at the resolution the export needs — the tile zoom whose pixels are at least as fine as the export's, up to the deepest tiles (z5 ≈ 1 m per pixel); a custom map uses its full uploaded image (≤ 4096 px), never the 512 px preview. Zoomed in past the source art, the art is the limit.
+- Adds a small footer strip: room · board · map · date · "PUBG map imagery © KRAFTON" (the credit is left out on custom maps).
+- Filename `{room-slug}_{board-slug}_{YYYY-MM-DD}.png`; the whole map adds `-map` to the board slug. A toast shows the size when done.
+- Map images must be served with `Access-Control-Allow-Origin` for the app origin so the canvas isn't tainted (tiles host, R2 bucket CORS).
+- A canvas composite (map art, grid lines + letters, the element canvas, markers and text re-drawn) — no screenshot library. The footer overlays the bottom 24 px (E2E-11: view = viewport × 2; E2E-11b: whole map 4096² with map art inside the margin; E2E-C1: a custom map's whole-map export uses the full image).
 
 ---
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
 import { twoUsersInRoom } from './fixtures';
@@ -118,6 +119,27 @@ test('E2E-C1: upload a custom map, plan on it, measure in its metres; a teammate
       return Number((/([\d\s\u00a0\u202f]+) m/.exec(t)?.[1] ?? '').replace(/\D/g, ''));
     })
     .toBeGreaterThan(2040);
+
+  // the whole-map export uses the full uploaded image: orange on the left, teal on the right
+  await a.getByTestId('more-menu').click();
+  const [download] = await Promise.all([
+    a.waitForEvent('download'),
+    a.getByRole('menuitem', { name: 'Export whole map as PNG' }).click(),
+  ]);
+  const bytes = readFileSync(await download.path());
+  expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([4096, 4096]);
+  const px = await a.evaluate(async (b64) => {
+    const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const bmp = await createImageBitmap(new Blob([bin], { type: 'image/png' }));
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(bmp, 0, 0);
+    const at = (x: number, y: number) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3));
+    return { left: at(1300, 2300), right: at(2800, 2300) }; // inside squares, off the grid lines
+  }, bytes.toString('base64'));
+  const near = (p: number[], q: number[]) => p.every((v, i) => Math.abs(v - (q[i] ?? 0)) < 24);
+  expect(near(px.left, [240, 140, 40])).toBe(true);
+  expect(near(px.right, [30, 160, 160])).toBe(true);
 
   await ctxA.close();
   await ctxB.close();
