@@ -25,12 +25,13 @@ export class TokenBucket {
   }
 }
 
-export type LimitGroup = 'durable' | 'chat' | 'volatile';
+export type LimitGroup = 'durable' | 'chat' | 'volatile' | 'signal';
 
 export const SOCKET_LIMITS = {
   durable: { rate: 30, burst: 60 }, // element:* / layer:* (+ control events)
   chat: { rate: 0.5, burst: 5 }, // 5 per 10 s
   volatile: { rate: 40, burst: 40 }, // cursor / laser / stroke:preview / view, combined
+  signal: { rate: 30, burst: 150 }, // voice:signal — an ICE burst to 7 peers on join, then quiet
   abuse: { violations: 10, windowMs: 60_000 }, // then disconnect
 } as const;
 
@@ -39,6 +40,7 @@ export function createSocketLimiter(now: () => number = Date.now) {
     durable: new TokenBucket(SOCKET_LIMITS.durable.rate, SOCKET_LIMITS.durable.burst, now),
     chat: new TokenBucket(SOCKET_LIMITS.chat.rate, SOCKET_LIMITS.chat.burst, now),
     volatile: new TokenBucket(SOCKET_LIMITS.volatile.rate, SOCKET_LIMITS.volatile.burst, now),
+    signal: new TokenBucket(SOCKET_LIMITS.signal.rate, SOCKET_LIMITS.signal.burst, now),
   };
   const violations: number[] = [];
   return {

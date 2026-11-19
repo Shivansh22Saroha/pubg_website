@@ -90,7 +90,7 @@ Content-Security-Policy:
   frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
 X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: camera=(), microphone=(), geolocation=()
+Permissions-Policy: camera=(), microphone=(self), geolocation=()   # microphone: room voice chat (F19)
 Cross-Origin-Opener-Policy: same-origin
 ```
 (Tighten `style-src` later by removing `'unsafe-inline'` if feasible — Leaflet sets inline styles, so it is currently required.)
@@ -126,6 +126,13 @@ Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets.
 - Logs: never log passwords, tokens, cookies, chat bodies, room passwords. Pino redaction paths configured for `req.headers.cookie`, `*.password`, `*.token`.
 - Account deletion: anonymise within 30 days (see DB schema §6).
 - No third-party analytics by default. If added, cookie-less (e.g. self-hosted Plausible) and documented in the privacy page.
+
+### 7.1 Voice chat (FEATURES F19)
+| # | Control |
+|---|---|
+| VC1 **MUST** | Signalling authorization: `voice:join` needs `room.interact` and a prior `room:join` (outsiders are already refused there with `NOT_FOUND`); `voice:signal` is relayed only to the addressed socket, only while sender and target are both in that room's channel, and only while the sender is still a member — `from` is always set by the server. Leaving, a kick, `room:leave` and disconnecting take the socket out of the channel at once. At most 8 per channel, one voice tab per user. SDP and ICE payloads are size-limited Zod schemas (V1); `voice:signal` has its own token bucket. Covered by the socket authz matrix and `voice.test.ts`. |
+| VC2 **MUST** | Relay credentials: the Cloudflare TURN key and API token live only in the API's environment (`CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`), never in the browser or the repo. Each voice join mints its own credentials that expire after 6 h; joins are capped at 30 / 10 min per user. Residual risk: a member could reuse their credentials to relay other traffic until they expire — billed beyond Cloudflare's free 1 000 GB / month — so watch the Cloudflare usage page and set a usage alert there. A Cloudflare failure falls back to STUN (logged), never to an unauthenticated relay. |
+| VC3 | Privacy: audio goes browser-to-browser (or through Cloudflare's relay) and is never recorded or sent to our servers. Peer-to-peer means people **in the same voice channel** can see each other's IP addresses (ICE candidates); only invited room members can join, and nobody's address is shared before they join voice themselves. The mic is opened only after the user clicks Join; everyone joins muted, mute disables the track, and leaving stops it. `Permissions-Policy: microphone=(self)` (no third-party frames get the mic). |
 
 ## 8. Secrets management
 - All secrets via environment variables (ENVIRONMENT.md). `.env*` in `.gitignore`; `.env.example` contains placeholders only.

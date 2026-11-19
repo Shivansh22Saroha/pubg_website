@@ -48,6 +48,10 @@ services:
       # site admins (FEATURES F16): your own account email(s), comma-separated — set in the dashboard
       - key: ADMIN_EMAILS
         sync: false
+      - key: CF_TURN_KEY_ID # voice relay (FEATURES F19), optional: Cloudflare TURN key id
+        sync: false
+      - key: CF_TURN_API_TOKEN # its API token (secret); set both or neither
+        sync: false
       # Sign in with Google (FEATURES F17): from Google Cloud → Google Auth Platform → Clients
       - key: GOOGLE_CLIENT_ID
         sync: false

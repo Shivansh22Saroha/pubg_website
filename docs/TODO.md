@@ -176,7 +176,7 @@ _Status 2026-11-03: met — unit 130 + 71 + 231, integration 556, E2E 57 (+4 in 
 | PUBG API match telemetry replay overlay (positions over time) — world units already compatible | P3 |
 | More maps from the same repo: Sanhok, Vikendi, Karakin, Taego, Deston (config + tiles only) | P2 |
 | Hindi UI translation | P3 |
-| Voice chat (WebRTC SFU) — likely never; Discord covers it | P3 |
+| ~~Voice chat~~ — done 2026-11 as a peer-to-peer mesh, ≤ 8 per room (FEATURES F19); an SFU for bigger channels stays P3 | P3 |
 | ~~Item icons for markers~~ — Phase 12 loot markers; PUBG has no usable vehicle icons (`Assets/Vehicle` = 5760×3240 renders) | P2 |
 
 ## Known risks / watch list

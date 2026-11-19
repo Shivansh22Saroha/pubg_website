@@ -22,11 +22,17 @@ import {
   StrokePreviewSchema,
   SummonSchema,
   ViewUpdateSchema,
+  VOICE_MAX_PEERS,
+  VoiceJoinSchema,
+  VoiceLeaveSchema,
+  VoiceMuteSchema,
+  VoiceSignalSchema,
   type AckResult,
   type BoardOp,
   type ClientToServerEvents,
   type ErrorCode,
   type ServerToClientEvents,
+  type VoicePeer,
 } from '@rotationlab/shared';
 import type { FastifyInstance } from 'fastify';
 import type { Redis } from 'ioredis';
@@ -42,6 +48,7 @@ import type { BoardOpsService, OpRequest } from '../modules/elements/service.js'
 import type { RoomEvents } from '../modules/rooms/events.js';
 import type { RoomPolicy } from '../modules/rooms/policy.js';
 import type { RoomService } from '../modules/rooms/service.js';
+import type { IceProvider } from '../modules/voice/turn.js';
 import { createPresence, type PresenceStore } from './presence.js';
 import { createSocketLimiter, type LimitGroup } from './rateLimiter.js';
 
@@ -65,6 +72,9 @@ export const ACKED_EVENTS = [
   'follow:stop',
   'summon',
   'chat:send',
+  'voice:join',
+  'voice:leave',
+  'voice:mute',
 ] as const;
 export const VOLATILE_EVENTS = [
   'cursor:move',
@@ -73,6 +83,11 @@ export const VOLATILE_EVENTS = [
   'view:update',
   'chat:typing',
 ] as const;
+/** reliable but un-acked: relayed to one socket (voice signalling, FEATURES F19) */
+export const RELAYED_EVENTS = ['voice:signal'] as const;
+
+/** voice joins per user per 10 min — each one mints TURN credentials (SECURITY VC2) */
+export const VOICE_JOINS_PER_10_MIN = 30;
 
 /** Phase 11: a socket's typing pings are relayed at most once per 2 s (FEATURES F9) */
 export const TYPING_INTERVAL_MS = 2_000;
@@ -86,6 +101,8 @@ export interface SocketData {
   boardRoomId: string | null;
   /** access token expiry, epoch seconds */
   exp: number;
+  /** the room voice channel this socket is in (FEATURES F19) */
+  voice: { roomId: string; muted: boolean } | null;
 }
 
 export type RealtimeServer = Server<
@@ -115,6 +132,8 @@ export interface RealtimeDeps {
   boardOps: BoardOpsService;
   chat: ChatService;
   events: RoomEvents;
+  /** voice relay credentials (Cloudflare TURN, or STUN only) */
+  ice: IceProvider;
   /** disconnect this long after the access token's exp (sessions never outlive their token) */
   tokenGraceSec: number;
 }
@@ -128,6 +147,7 @@ const ch = {
   user: (id: string) => `user:${id}`,
   session: (sid: string) => `session:${sid}`,
   followers: (userId: string) => `follow:${userId}`,
+  voice: (roomId: string) => `voice:${roomId}`,
 };
 
 function connectError(code: ErrorCode, message: string) {
@@ -216,6 +236,7 @@ export function createRealtime(d: RealtimeDeps): {
           boardId: null,
           boardRoomId: null,
           exp: claims.exp,
+          voice: null,
         };
         next();
       } catch (err) {
@@ -258,6 +279,52 @@ export function createRealtime(d: RealtimeDeps): {
     } catch (err) {
       log.warn({ err }, 'follower count failed');
     }
+  }
+
+  // ---- voice (FEATURES F19) --------------------------------------------------------------
+  // The channel's members are the sockets in the `voice:<roomId>` Socket.IO room — the adapter
+  // keeps that true across instances and drops a socket the moment it disconnects, so there
+  // is no separate list to go stale. `socket.data.voice` carries the mute flag.
+
+  async function voicePeers(roomId: string): Promise<VoicePeer[]> {
+    const sockets = await io.in(ch.voice(roomId)).fetchSockets();
+    return sockets
+      .map((s) => ({ peerId: s.id, userId: s.data.userId, muted: s.data.voice?.muted ?? true }))
+      .sort((a, b) => a.peerId.localeCompare(b.peerId));
+  }
+
+  /** Never rejects (often fire-and-forget): a Redis failure is logged, not thrown. */
+  async function broadcastVoice(roomId: string) {
+    try {
+      const peers = await voicePeers(roomId);
+      if (closing) return;
+      io.to(ch.room(roomId)).emit('voice:peers', { roomId, peers });
+    } catch (err) {
+      log.warn({ err, roomId }, 'voice broadcast failed');
+    }
+  }
+
+  /** Serialises joins per room across instances so the cap holds (a short Redis lock). */
+  async function withVoiceLock<T>(roomId: string, fn: () => Promise<T>): Promise<T> {
+    const key = `voice:lock:${roomId}`;
+    const token = `${process.pid}:${Math.random()}`;
+    for (let i = 0; i < 40; i += 1) {
+      if ((await d.redis.set(key, token, 'PX', 3_000, 'NX')) === 'OK') {
+        try {
+          return await fn();
+        } finally {
+          // release only our own lock (it may have expired and been taken meanwhile)
+          await d.redis.eval(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0",
+            1,
+            key,
+            token,
+          );
+        }
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new AppError('CONFLICT', 'Voice is busy — try again');
   }
 
   function broadcastOps(socket: RtSocket, boardId: string, ops: BoardOp[]) {
@@ -384,6 +451,12 @@ export function createRealtime(d: RealtimeDeps): {
       const online = await presence.list(roomId);
       void broadcastPresence(roomId);
       void notifyFollowers(user.id, socket); // a reconnecting leader learns its follower count
+      // who is in the voice channel right now (later changes arrive as broadcasts)
+      voicePeers(roomId)
+        .then((peers) => {
+          socket.emit('voice:peers', { roomId, peers });
+        })
+        .catch(() => undefined);
       const onlineIds = new Set(online.map((p) => p.userId));
       return {
         room: { ...detail.room, onlineCount: onlineIds.size },
@@ -394,6 +467,7 @@ export function createRealtime(d: RealtimeDeps): {
     });
 
     async function leaveRoom(roomId: string) {
+      if (myVoice()?.roomId === roomId) await leaveVoice();
       await socket.leave(ch.room(roomId));
       if (socket.data.boardRoomId === roomId && socket.data.boardId) {
         await socket.leave(ch.board(socket.data.boardId));
@@ -552,6 +626,104 @@ export function createRealtime(d: RealtimeDeps): {
       socket.volatile.to(ch.room(roomId)).emit('chat:typing', { userId: user.id });
     });
 
+    // ---- voice (FEATURES F19, SECURITY VC1–VC3) -------------------------------------------
+    /**
+     * The room's voice channel this socket is really in. Channel membership is the truth —
+     * another tab joining takes this socket out of the channel from wherever it runs, which
+     * can't reach `socket.data` here, so a stale flag is cleared on the next look.
+     */
+    function myVoice(): { roomId: string; muted: boolean } | null {
+      const v = socket.data.voice;
+      if (v && !socket.rooms.has(ch.voice(v.roomId))) socket.data.voice = null;
+      return socket.data.voice;
+    }
+
+    /** take this socket out of its voice channel (if any) and tell the room */
+    async function leaveVoice() {
+      const v = socket.data.voice;
+      if (!v) return;
+      socket.data.voice = null;
+      await socket.leave(ch.voice(v.roomId));
+      await broadcastVoice(v.roomId);
+    }
+
+    on('voice:join', VoiceJoinSchema, 'durable', async ({ roomId }) => {
+      requireJoined(roomId);
+      await d.policy.requireRoom(user, roomId, 'room.interact');
+      // each join mints relay credentials: a per-user budget on top of the socket bucket
+      const budgetKey = `rl:voice:${user.id}`;
+      const used = await d.redis.incr(budgetKey);
+      if (used === 1) await d.redis.expire(budgetKey, 600);
+      if (used > VOICE_JOINS_PER_10_MIN)
+        throw new AppError('RATE_LIMITED', 'Too many voice joins — wait a few minutes');
+      const current = myVoice();
+      if (current && current.roomId !== roomId) await leaveVoice();
+      await withVoiceLock(roomId, async () => {
+        const inVoice = await io.in(ch.voice(roomId)).fetchSockets();
+        // one voice tab per user: joining here takes their other tab out
+        for (const other of inVoice) {
+          if (other.data.userId !== user.id || other.id === socket.id) continue;
+          other.emit('voice:ended', { roomId, reason: 'elsewhere' });
+          other.leave(ch.voice(roomId));
+        }
+        const count = inVoice.filter((o) => o.data.userId !== user.id || o.id === socket.id).length;
+        const already = inVoice.some((o) => o.id === socket.id);
+        if (!already && count >= VOICE_MAX_PEERS)
+          throw new AppError('LIMIT_REACHED', `Voice is full (${VOICE_MAX_PEERS} max)`);
+        await socket.join(ch.voice(roomId));
+        socket.data.voice = { roomId, muted: myVoice()?.muted ?? true };
+      });
+      const [peers, iceServers] = await Promise.all([voicePeers(roomId), d.ice.iceServers()]);
+      void broadcastVoice(roomId);
+      return { peerId: socket.id, peers: peers.filter((p) => p.peerId !== socket.id), iceServers };
+    });
+
+    on('voice:leave', VoiceLeaveSchema, 'durable', async ({ roomId }) => {
+      if (myVoice()?.roomId === roomId) await leaveVoice();
+    });
+
+    on('voice:mute', VoiceMuteSchema, 'durable', async ({ roomId, muted }) => {
+      const v = myVoice();
+      if (v?.roomId !== roomId) throw new AppError('FORBIDDEN', 'Join voice first');
+      if (v.muted === muted) return;
+      socket.data.voice = { roomId, muted };
+      await broadcastVoice(roomId);
+    });
+
+    // offers / answers / ICE go to one peer, only while both are in this room's channel and
+    // the sender is still a member. Peer lookups are cached briefly (an ICE burst is ~10
+    // signals per peer); a kick or leave removes the socket from the channel at once.
+    let voiceMember: { roomId: string; until: number } | null = null;
+    let peerCache: { roomId: string; ids: Set<string>; until: number } | null = null;
+    async function signalTarget(roomId: string, to: string): Promise<boolean> {
+      if (myVoice()?.roomId !== roomId || to === socket.id) return false;
+      const now = Date.now();
+      if (!(voiceMember?.roomId === roomId && voiceMember.until > now)) {
+        if (!can(await d.policy.roleOf(roomId, user.id), 'room.interact')) return false;
+        voiceMember = { roomId, until: now + CURSOR_MEMBER_TTL_MS };
+      }
+      if (!(peerCache?.roomId === roomId && peerCache.until > now && peerCache.ids.has(to))) {
+        const ids = new Set((await io.in(ch.voice(roomId)).fetchSockets()).map((s) => s.id));
+        peerCache = { roomId, ids, until: now + 2_000 };
+      }
+      return peerCache.ids.has(to);
+    }
+
+    (socket.on as (ev: string, fn: (payload: unknown) => void) => void)(
+      'voice:signal',
+      (payload) => {
+        if (!limiter.take('signal')) return;
+        const parsed = VoiceSignalSchema.safeParse(payload);
+        if (!parsed.success) return;
+        const { roomId, to, data } = parsed.data;
+        signalTarget(roomId, to)
+          .then((ok) => {
+            if (ok) io.to(to).emit('voice:signal', { roomId, from: socket.id, data });
+          })
+          .catch(() => undefined);
+      },
+    );
+
     // leaders this socket followed: their counts drop once it is gone
     let followed: string[] = [];
     socket.on('disconnecting', () => {
@@ -562,6 +734,8 @@ export function createRealtime(d: RealtimeDeps): {
 
     socket.on('disconnect', () => {
       clearTimeout(expiryTimer);
+      // the adapter already dropped it from the voice room: tell the others
+      if (socket.data.voice) void broadcastVoice(socket.data.voice.roomId);
       for (const leaderId of followed) void notifyFollowers(leaderId);
       for (const roomId of socket.data.rooms) {
         // fire-and-forget, but never an unhandled rejection (Redis gone → process crash)
@@ -585,12 +759,14 @@ export function createRealtime(d: RealtimeDeps): {
         s.emit('member:kicked', { userId });
         s.disconnect(true);
       } else {
+        s.leave(ch.voice(roomId));
         s.leave(ch.room(roomId));
         if (s.data.boardRoomId === roomId && s.data.boardId) s.leave(ch.board(s.data.boardId));
       }
     }
     await presence.removeUser(roomId, userId);
     await broadcastPresence(roomId);
+    await broadcastVoice(roomId);
   }
 
   d.events.on('chat:message', ({ roomId, message }) =>

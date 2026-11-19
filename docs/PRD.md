@@ -50,9 +50,9 @@ Give a team **one shared, persistent, zoomable map** where everyone can draw, pl
 11. **Snapshots** — save named snapshot of a board, view and restore.
 12. **Export** — PNG of current viewport with drawings.
 13. **Responsive** — full use on desktop; view + chat + basic drawing on tablet; view + chat on phone.
+14. **Voice chat** (added 2026-11, user feedback) — talk with teammates inside a room: peer-to-peer, up to 8 people per room, everyone joins muted, mute / deafen / push-to-talk. Discord stays fine for bigger calls.
 
 ### 4.2 Out of scope — v1 (see TODO.md for later)
-- Voice chat (teams use Discord)
 - Automatic zone simulator with real phase shrink logic
 - PUBG API match replay / telemetry overlay
 - Public room discovery / matchmaking

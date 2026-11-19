@@ -228,6 +228,13 @@ Redis hash `presence:{roomId}` → `userId → {socketCount, boardId, lastActive
 - Prefer `transports: ['websocket']`; if polling fallback is enabled, use sticky sessions at the proxy.
 - Seq allocation inside a Postgres transaction (`UPDATE boards SET last_seq = last_seq + 1 ... RETURNING last_seq`) is correct across instances. For hot boards it's ~1 row lock per op — fine at v1 scale; can move to Redis `INCR` + async write-behind later.
 
+### 7.8 Voice chat (FEATURES F19)
+- **Topology:** a WebRTC **mesh**, audio only — each participant holds one `RTCPeerConnection` per other participant, so a speaker uploads one Opus stream per listener. That is why the channel is capped at `VOICE_MAX_PEERS` = 8 (≈ 7 × 30–40 kbps up). No media touches our servers; only signalling does.
+- **Signalling** rides the room socket: `voice:join` / `voice:leave` / `voice:mute` (acked) and `voice:signal` (offers, answers, trickle ICE; reliable, un-acked, relayed to one socket). The channel *is* the Socket.IO room `voice:{roomId}` — the Redis adapter keeps it right across instances and drops a socket the moment it disconnects, so there is no separate list to go stale; `socket.data.voice` only carries the mute flag. Joins take a 3 s Redis lock per room so the cap holds when people join at once.
+- **Negotiation:** of each pair, the smaller peer id (socket id) offers — no glare — and restarts ICE when the link fails or stays disconnected for 5 s. A newcomer offers to the larger ids it gets in the join ack; existing peers with smaller ids offer when the `voice:peers` broadcast names the newcomer. Signals that beat the join ack are queued. A reconnect means a new socket and peer id: the client closes its links and joins again by itself.
+- **NAT traversal:** STUN (`stun.cloudflare.com`) for direct routes; when `CF_TURN_KEY_ID` / `CF_TURN_API_TOKEN` are set, each join also gets short-lived Cloudflare TURN credentials (6 h, minted server-side; port-53 URLs dropped) so peers on strict NATs (mobile data, campus Wi-Fi) relay through Cloudflare. Cloudflare failure → STUN only, never a failed join.
+- **Client:** `lib/voice/voiceSession.ts` (connections, mic, mute / deafen / push-to-talk, speaking detection with an `AnalyserNode` per stream polled every 100 ms) writes `stores/voiceStore.ts`; `components/room/VoiceControls.tsx` renders it. Mute disables the mic track — no renegotiation. No usable mic → listen-only.
+
 ## 8. REST vs realtime split
 
 | Via REST (`/api/v1`) | Via Socket.IO |

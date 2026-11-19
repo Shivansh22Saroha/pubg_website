@@ -69,6 +69,19 @@ export default function PrivacyPage() {
           /explore are sample content and contain no user data.
         </p>
       </Section>
+      <Section title="Voice chat">
+        <p>
+          Voice goes directly between the teammates in a room&apos;s voice channel (or through
+          Cloudflare&apos;s relay when a network blocks direct calls). We never record it and it
+          never passes through our servers. Your microphone is only used after you press Join, and
+          you join muted.
+        </p>
+        <p>
+          Because calls are direct, the people in the same voice channel can see each other&apos;s
+          IP address. Only members of the room can join, and your address is shared only once you
+          join voice yourself.
+        </p>
+      </Section>
       <Section title="Contact">
         <p>
           Questions or a security issue? See our{' '}

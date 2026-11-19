@@ -174,7 +174,7 @@ export interface RoomFixture {
   outsider: { id: string; jar: Jar };
 }
 
-async function newUser(app: App, name: string) {
+export async function newUser(app: App, name: string) {
   const { res, jar } = await register(app, new Jar(), {
     email: `${name}@example.com`,
     username: name,

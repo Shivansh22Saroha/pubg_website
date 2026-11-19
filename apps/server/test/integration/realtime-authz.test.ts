@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { App } from '../../src/app.js';
-import { ACKED_EVENTS, VOLATILE_EVENTS } from '../../src/realtime/server.js';
+import { ACKED_EVENTS, RELAYED_EVENTS, VOLATILE_EVENTS } from '../../src/realtime/server.js';
 import {
   ack,
   arrow,
@@ -41,6 +41,12 @@ interface AckedRow {
   label?: string;
   payload: (ctx: Ctx) => unknown;
   expect: Record<Exclude<Caller, 'anonymous'>, Outcome>;
+  /** runs on the caller's socket first (its outcome is not checked) */
+  before?: (socket: ClientSocket, ctx: Ctx) => Promise<unknown>;
+}
+interface RelayedRow {
+  event: (typeof RELAYED_EVENTS)[number];
+  delivered: Record<Exclude<Caller, 'anonymous'>, boolean>;
 }
 interface VolatileRow {
   event: (typeof VOLATILE_EVENTS)[number];
@@ -152,6 +158,19 @@ const ACKED: AckedRow[] = [
     payload: ({ f }) => ({ clientId: opId(), roomId: f.roomId, body: 'matrix' }),
     expect: joined,
   },
+  // voice (FEATURES F19): every member after room:join (room.interact)
+  { event: 'voice:join', payload: ({ f }) => ({ roomId: f.roomId }), expect: joined },
+  {
+    event: 'voice:leave',
+    payload: ({ f }) => ({ roomId: f.roomId }),
+    expect: { outsider: 'ok', viewer: 'ok', editor: 'ok', owner: 'ok' }, // a no-op outside voice
+  },
+  {
+    event: 'voice:mute',
+    payload: ({ f }) => ({ roomId: f.roomId, muted: false }),
+    before: (socket, { f }) => ack(socket, 'voice:join', { roomId: f.roomId }),
+    expect: joined,
+  },
 ];
 
 const everyMember = { outsider: false, viewer: true, editor: true, owner: true };
@@ -185,6 +204,9 @@ const VOLATILE: VolatileRow[] = [
   },
 ];
 
+// voice signals reach a peer only while both are in the room's voice channel
+const RELAYED: RelayedRow[] = [{ event: 'voice:signal', delivered: everyMember }];
+
 useCleanState();
 
 let app: App;
@@ -212,6 +234,7 @@ describe('socket authz matrix', () => {
   it('has exactly one row per handled event (add a row when you add an event)', () => {
     expect([...new Set(ACKED.map((r) => r.event))].sort()).toEqual([...ACKED_EVENTS].sort());
     expect(VOLATILE.map((r) => r.event).sort()).toEqual([...VOLATILE_EVENTS].sort());
+    expect(RELAYED.map((r) => r.event).sort()).toEqual([...RELAYED_EVENTS].sort());
   });
 
   it('anonymous callers cannot open a socket at all', async () => {
@@ -225,6 +248,7 @@ describe('socket authz matrix', () => {
       const want = row.expect[caller];
       it(`${row.event}${row.label ? ` (${row.label})` : ''} as ${caller} → ${want}`, async () => {
         const { ctx, socket } = await prepare(caller);
+        await row.before?.(socket, ctx);
         const res = await ack(socket, row.event, row.payload(ctx));
         if (want === 'ok') expect(res, JSON.stringify(res)).toMatchObject({ ok: true });
         else expect(res).toMatchObject({ ok: false, code: want });
@@ -255,6 +279,32 @@ describe('socket authz matrix', () => {
           await sleep(100);
         }
         await sleep(150);
+        expect(seen.length > 0).toBe(want);
+      });
+    }
+  }
+
+  for (const row of RELAYED) {
+    for (const caller of CALLERS) {
+      if (caller === 'anonymous') continue;
+      const want = row.delivered[caller];
+      it(`${row.event} as ${caller} → ${want ? 'delivered' : 'dropped'}`, async () => {
+        const { ctx, socket, owner } = await prepare(caller);
+        let observer: ClientSocket = owner;
+        if (caller === 'owner') {
+          observer = await connect(url, ctx.f.editor.jar);
+          await joinBoard(observer, ctx.f.roomId, ctx.f.boardId);
+        }
+        const joinedVoice = await ack(observer, 'voice:join', { roomId: ctx.f.roomId });
+        expect(joinedVoice.ok).toBe(true);
+        await ack(socket, 'voice:join', { roomId: ctx.f.roomId }); // the outsider is refused
+        const seen = collect(observer, 'voice:signal');
+        socket.emit(row.event, {
+          roomId: ctx.f.roomId,
+          to: joinedVoice.data.peerId,
+          data: { type: 'offer', sdp: 'v=0' },
+        } as never);
+        await sleep(300);
         expect(seen.length > 0).toBe(want);
       });
     }

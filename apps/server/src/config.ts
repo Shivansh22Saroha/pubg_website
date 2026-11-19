@@ -42,6 +42,9 @@ export const EnvSchema = z
     /** Sign in with Google (FEATURES F17): both set = the button appears */
     GOOGLE_CLIENT_ID: z.string().trim().default(''),
     GOOGLE_CLIENT_SECRET: z.string().trim().default(''),
+    /** voice relay (FEATURES F19): a Cloudflare Realtime TURN key — both set, or neither */
+    CF_TURN_KEY_ID: z.string().trim().default(''),
+    CF_TURN_API_TOKEN: z.string().trim().default(''),
     /** site admins (FEATURES F16): comma-separated account emails that may open /admin */
     ADMIN_EMAILS: z
       .string()
@@ -117,6 +120,13 @@ export const EnvSchema = z
         code: 'custom',
         path: ['RATE_LIMITS_ENABLED'],
         message: 'rate limits cannot be disabled in production',
+      });
+    }
+    if (Boolean(e.CF_TURN_KEY_ID) !== Boolean(e.CF_TURN_API_TOKEN)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [e.CF_TURN_KEY_ID ? 'CF_TURN_API_TOKEN' : 'CF_TURN_KEY_ID'],
+        message: 'voice relay needs both CF_TURN_KEY_ID and CF_TURN_API_TOKEN',
       });
     }
     if (e.EMAIL_ENABLED && !e.SMTP_HOST) {
