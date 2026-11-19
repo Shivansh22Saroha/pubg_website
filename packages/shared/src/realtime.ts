@@ -11,6 +11,13 @@ import {
 } from './schemas/elements.js';
 import { ChatBodySchema, PingInputSchema, type ChatMessage } from './schemas/chat.js';
 import { BoardSchema, LayerSchema, MemberSchema, RoomDetailSchema } from './schemas/rooms.js';
+import type {
+  VoiceJoinSchema,
+  VoiceLeaveSchema,
+  VoiceMuteSchema,
+  VoiceSignalSchema,
+} from './voice.js';
+import { type VoiceJoinAck, type VoicePeer, type VoiceSignalData } from './voice.js';
 
 /**
  * Socket.IO contract (API_SPEC §7). Path `/realtime`, websocket transport. Every
@@ -206,6 +213,12 @@ export interface ClientToServerEvents {
   'chat:send': (p: In<typeof ChatSendSchema>, ack: Ack<{ message: ChatMessage }>) => void;
   /** volatile, no ack: relayed to the rest of the room ≤ 1 / 2 s per socket (Phase 11) */
   'chat:typing': (p: In<typeof ChatTypingSchema>) => void;
+  // voice (FEATURES F19)
+  'voice:join': (p: In<typeof VoiceJoinSchema>, ack: Ack<VoiceJoinAck>) => void;
+  'voice:leave': (p: In<typeof VoiceLeaveSchema>, ack: Ack) => void;
+  'voice:mute': (p: In<typeof VoiceMuteSchema>, ack: Ack) => void;
+  /** no ack, but not volatile either: offers / answers / ICE must arrive (relayed, F19) */
+  'voice:signal': (p: In<typeof VoiceSignalSchema>) => void;
 }
 
 export interface ServerToClientEvents {
@@ -248,6 +261,11 @@ export interface ServerToClientEvents {
   'chat:message': (p: { message: ChatMessage }) => void;
   'chat:deleted': (p: { messageId: string }) => void;
   'chat:typing': (p: { userId: string }) => void;
+  /** who is in the room's voice channel — to the whole room on every change, and on join */
+  'voice:peers': (p: { roomId: string; peers: VoicePeer[] }) => void;
+  'voice:signal': (p: { roomId: string; from: string; data: VoiceSignalData }) => void;
+  /** this socket was taken out of voice: the user joined from another tab */
+  'voice:ended': (p: { roomId: string; reason: 'elsewhere' }) => void;
   error: (p: { code: ErrorCode; message: string }) => void;
 }
 

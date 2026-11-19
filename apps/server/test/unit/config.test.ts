@@ -69,6 +69,22 @@ describe('thumbnail storage config (Phase 11)', () => {
     PUBLIC_ASSETS_BASE_URL: 'https://assets.example.com',
   };
 
+  it('voice relay: both Cloudflare TURN values or neither (never echoing them)', () => {
+    expect(loadConfig(base).CF_TURN_KEY_ID).toBe('');
+    expect(
+      loadConfig({ ...base, CF_TURN_KEY_ID: 'kid', CF_TURN_API_TOKEN: 'tok' }).CF_TURN_API_TOKEN,
+    ).toBe('tok');
+    expect(() => loadConfig({ ...base, CF_TURN_KEY_ID: 'kid' })).toThrow(/CF_TURN_API_TOKEN/);
+    let msg = '';
+    try {
+      loadConfig({ ...base, CF_TURN_API_TOKEN: 'super-secret-token' });
+    } catch (e) {
+      msg = String(e);
+    }
+    expect(msg).toMatch(/CF_TURN_KEY_ID/);
+    expect(msg).not.toContain('super-secret-token');
+  });
+
   it('defaults to local disk; empty S3 values count as unset', () => {
     const cfg = loadConfig({ ...base, S3_ENDPOINT: '', S3_BUCKET: '' });
     expect(cfg.ASSETS_DIR).toBe('data/assets');

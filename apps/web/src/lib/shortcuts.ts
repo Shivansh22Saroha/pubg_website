@@ -129,6 +129,8 @@ export function shortcutHelp(mac: boolean): { group: string; items: [string, str
         ['1 – 9', 'Switch board'],
         ['Shift G', 'Toggle grid'],
         ['N', 'Toggle map labels'],
+        ['Shift M', 'Mute / unmute (in voice)'],
+        ['` (hold)', 'Push to talk (in voice, when on)'],
         ['/', 'Focus chat'],
         [']', 'Toggle right panel'],
         ['?', 'This help'],

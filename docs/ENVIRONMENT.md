@@ -37,6 +37,8 @@ Generate secrets with: `openssl rand -base64 48`
 | `CORS_DEV_ORIGINS` | – | `http://localhost:3000` | only honoured when `NODE_ENV=development` |
 | `GOOGLE_CLIENT_ID` | – | *(empty: off)* | OAuth client id from Google Cloud (Web application); with the secret, enables "Continue with Google" (F17). Redirect URI to register: `<APP_ORIGIN>/api/v1/auth/google/callback` |
 | `GOOGLE_CLIENT_SECRET` | – | *(empty: off)* | that client's secret — host env only, never in the repo |
+| `CF_TURN_KEY_ID` | – | *(empty: STUN only)* | Voice relay (F19): the **Turn Token ID** of a Cloudflare Realtime TURN key (dashboard → Realtime → TURN Server). Set both or neither — one alone refuses to start. Each voice join mints its own 6 h credentials from it |
+| `CF_TURN_API_TOKEN` | – | *(empty)* | Voice relay (F19): that key's **API Token**. Secret — Render environment only, never the web app or the repo |
 | `ADMIN_EMAILS` | – | *(empty: nobody)* | comma-separated account emails that may open `/admin` (FEATURES F16); case-insensitive; everyone else gets 404 |
 | `TRUST_PROXY` | ✓ | `false` (dev) / `true` (prod behind Caddy) | so `req.ip` is the real client IP |
 | `LOG_LEVEL` | – | `debug` | `fatal…trace` |

@@ -125,6 +125,7 @@ Desktop ≥ 1280 px:
 - Back to dashboard, room name with dropdown (room settings, copy invite, leave).
 - **Board tabs**: tab label = board name, small map icon; active tab underlined with `--accent`; small avatar dots on a tab show who is on that board; `+` opens "New board" (name + map picker); right-click/kebab: rename, duplicate, delete, snapshots.
 - **Presence stack**: up to 5 avatars (colored ring = presence color), `+N`. Click avatar → menu: Follow, Go to their board.
+- **Voice** (F19), left of the presence stack: not in voice → an outlined *Voice* button with a green count of teammates already talking (disabled when 8/8). In voice → one green-tinted group: mic (green filled = live, red mic-off = muted; in push-to-talk it reads "Hold to talk" and works by press-and-hold), deafen, avatars of the people in voice (green ring while they speak, a warning icon if a link can't connect) which open the list — name, (you), "Connecting" / "Can't connect", muted icon, mic problem text and the *Push to talk* switch — and a red leave button. Phone: *Join voice (N in)* / *Leave voice* in the room menu; while in voice the same group floats at the map's top-left (≥ 44 px targets).
 - **Invite** button (accent outline) → Invite dialog.
 - **Sync indicator**: `● Synced` (green) / `◌ Saving…` (muted) / `▲ Reconnecting…` (amber) / `✕ Offline — changes will sync` (red).
 
@@ -208,7 +209,7 @@ Each marker has an optional label (≤ 24 chars) shown under it.
 Touch: one finger draws in drawing tools, two fingers always pan/zoom. Long-press = context menu. In Select, one finger on a selected drawing (or a circle's radius handle) drags it; one finger on empty map pans (2026-11 fix: Leaflet's touch drag listens to `touchstart`, which `preventDefault` on `pointerdown` doesn't stop, so the map slid with the finger and the drawing never moved — Leaflet's drag is now paused for that press).
 
 Implementation notes (Phase 9):
-- Breakpoints are read from the window width (`useBreakpoint`). Compact: the panel starts collapsed. Tablet: **every** tool of the role (the listed ones are the ones verified with touch), the panel as a half-height sheet above the bottom toolbar, the style bar right above the toolbar. Phone (2026-11): every tool of the role — six in the bar plus "More tools" (a viewer's three tools fit without it), undo / redo for editors in the top bar, the board dropdown, and one top-bar menu: Invite, Members, Chat, Snapshots…, Export PNG, Room settings, Leave. The chat button (with the unread count) sits at the top right of the map on both touch layouts.
+- Breakpoints are read from the window width (`useBreakpoint`). Compact: the panel starts collapsed. Tablet: **every** tool of the role (the listed ones are the ones verified with touch), the panel as a half-height sheet above the bottom toolbar, the style bar right above the toolbar. Phone (2026-11): every tool of the role — six in the bar plus "More tools" (a viewer's three tools fit without it), undo / redo for editors in the top bar, the board dropdown, and one top-bar menu: Invite, Join / Leave voice, Members, Chat, Snapshots…, Export PNG, Room settings, Leave. The chat button (with the unread count) sits at the top right of the map on both touch layouts.
 - Leaving the room desktop-wide → touch-wide closes the panel; a tool the new layout doesn't offer falls back to Select.
 - Long-press (Select, one finger held 500 ms within 10 px) on an editable element selects it and opens Edit label / Edit text (markers, text) and Delete; the OS long-press menu is suppressed on the map.
 - Touch targets ≥ 44 px via `pointer: coarse` (buttons, menu items, tabs, tool buttons); hover-only actions (chat message options) are always shown on touch.
@@ -228,6 +229,8 @@ Implementation notes (Phase 9):
 | 1 – 9 | switch board tab |
 | G (with Shift) | toggle grid |
 | N | toggle map labels |
+| Shift+M | mute / unmute (in voice, F19) |
+| ` (hold) | push to talk (in voice, when push-to-talk is on) |
 | / | focus chat input |
 | \] | toggle right panel |
 | ? | shortcut help dialog |

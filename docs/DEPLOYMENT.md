@@ -191,6 +191,13 @@ GitHub Pages sends `Access-Control-Allow-Origin: *`, so Export PNG works without
    `JWT_SECRET` and `IP_HASH_SALT` are generated; `REDIS_URL` is wired to the Key Value.
 3. **Apply**. The container runs `scripts/start.sh` (`prisma migrate deploy`, then the API). The first build takes a few minutes. `https://rotationlab-api.onrender.com/api/health` should answer `{"status":"ok","db":"ok","redis":"ok",…}` (the URL is shown on the service page).
 
+### 10.4a Voice relay → Cloudflare TURN (optional, FEATURES F19)
+Voice works without it for most networks; the relay lets teammates on strict NATs (mobile data, campus Wi-Fi) connect.
+1. dash.cloudflare.com → sign up (free, no domain needed) → **Realtime** (may be listed as **Calls**) → **TURN Server** → **Create**, name `rotationlab`.
+2. Copy the **Turn Token ID** and the **API Token** (shown once).
+3. Render → API service → **Environment**: `CF_TURN_KEY_ID` = the Turn Token ID, `CF_TURN_API_TOKEN` = the API Token → **Save** (the service restarts).
+4. Cloudflare → Realtime → usage: the first 1 000 GB / month are free, then $0.05 / GB. Voice relays use a few MB per person-hour; set a usage alert (SECURITY VC2).
+
 ### 10.5 Web → Vercel
 1. vercel.com → sign up (GitHub login) → **Add New → Project** → import `pubg_website`.
 2. **Root Directory**: `apps/web` (framework: Next.js; Vercel installs from the monorepo root with pnpm).
@@ -207,6 +214,7 @@ GitHub Pages sends `Access-Control-Allow-Origin: *`, so Export PNG works without
    SECURITY_CONTACT=mailto:<you>@example.com
    ```
    `NEXT_PUBLIC_*` and `API_PROXY_URL` are baked in at build time: redeploy after changing them.
+   Tick **Production and Preview** for each: a preview build (every PR) needs them too, or it fails at "Collecting page data" with a Zod error naming the `NEXT_PUBLIC_*` keys.
 5. Project → **Settings → Functions → Region: Singapore (sin1)**. Server-side page renders then run next to the API instead of in the US.
 6. Deploy. If the real domain differs from what you entered, set it in `NEXT_PUBLIC_APP_ORIGIN` (Vercel) and `APP_ORIGIN` (Render → service → Environment), then redeploy both. **Login fails until these match.**
 

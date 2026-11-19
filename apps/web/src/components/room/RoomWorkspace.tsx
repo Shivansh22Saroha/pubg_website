@@ -33,6 +33,7 @@ import { isTouchLayout, useBreakpoint, useLandscapePhone } from '@/hooks/useBrea
 import { useMe } from '@/hooks/useMe';
 import { env } from '@/env';
 import { useRoomRealtime } from '@/hooks/useRoomRealtime';
+import { useVoice } from '@/hooks/useVoice';
 import { useThumbnailUploader } from '@/hooks/useThumbnailUploader';
 import { ApiError } from '@/lib/api';
 import { loadDebugHook } from '@/lib/debug/loadDebugHook';
@@ -51,6 +52,7 @@ import {
 } from './RealtimeStatus';
 import { RoomTour } from './RoomTour';
 import { SidePanel, UnreadBadge } from './SidePanel';
+import { VoiceControls } from './VoiceControls';
 import {
   BoardSelect,
   ChatButton,
@@ -64,6 +66,7 @@ import { useFxStore } from '@/stores/fxStore';
 import { useSpotter } from '@/stores/spotterStore';
 import { SpotterIcon } from '@/components/spotter/SpotterIcon';
 import { useFollowStore } from '@/stores/followStore';
+import { useVoiceStore } from '@/stores/voiceStore';
 import { setPlayers } from '@/stores/playersStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
@@ -169,6 +172,10 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       });
     },
   });
+
+  const voice = useVoice(roomId, me.data?.id);
+  const voiceStatus = useVoiceStore((s) => s.status);
+  const inVoice = useVoiceStore((s) => s.peers.length);
 
   useEffect(() => {
     const hook = session && active ? loadDebugHook() : null; // dev / E2E only
@@ -348,6 +355,12 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           },
         ]
       : []),
+    voiceStatus === 'idle'
+      ? {
+          label: inVoice > 0 ? `Join voice (${inVoice} in)` : 'Join voice',
+          onSelect: () => void voice?.join(),
+        }
+      : { label: 'Leave voice', onSelect: () => void voice?.leave() },
     {
       label: 'Members',
       onSelect: () => {
@@ -482,6 +495,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
 
           <div className="ml-auto flex shrink-0 items-center gap-2 px-3">
             <SyncIndicator />
+            <VoiceControls voice={voice} members={members} variant="header" />
             <PresenceStack
               members={members}
               meId={me.data.id}
@@ -587,6 +601,11 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       <div className="flex min-h-0 flex-1">
         {(!touch || landscape) && toolbar}
         <main className="relative min-w-0 flex-1" aria-label="Map">
+          {phone && (
+            <div className="absolute top-2 left-2 z-[1100]">
+              <VoiceControls voice={voice} members={members} variant="dock" />
+            </div>
+          )}
           {active && (
             <BoardMapView
               key={active.id}

@@ -211,6 +211,10 @@ Implementation notes (Phase 5A/5B):
 | `follow:start` / `follow:stop` | `{ targetUserId }` | – | |
 | `summon` | `{ boardId }` | – | asks all to follow you; permission `board.edit` (OWNER/EDITOR). Receivers start following **immediately** and may opt out ("Don't follow", 5 s) |
 | `presence:heartbeat` | `{ roomId, boardId, idle: boolean }` | – | every 20 s |
+| `voice:join` | `{ roomId }` | `{ peerId, peers: VoicePeer[], iceServers: IceServer[] }` | FEATURES F19. `room.interact` (viewers too) after `room:join` (`FORBIDDEN` before). Joins the room's voice channel muted; `peers` are the others already in it, `peerId` is this socket's id. At most `VOICE_MAX_PEERS` (8) sockets (`LIMIT_REACHED` "Voice is full (8 max)"; joins are serialised per room by a short Redis lock, so the cap holds under concurrency). One voice socket per user per room: joining from another tab sends `voice:ended` to the old one and takes it out. `iceServers`: STUN, plus Cloudflare TURN credentials valid 6 h when `CF_TURN_*` is set (a Cloudflare failure falls back to STUN, never an error). 30 joins / 10 min per user (`RATE_LIMITED`) — each mints relay credentials |
+| `voice:leave` | `{ roomId }` | – | leaves the channel; a no-op outside it. `room:leave`, a kick, leaving the room and disconnecting also take the socket out |
+| `voice:mute` | `{ roomId, muted }` | – | `FORBIDDEN` when this socket isn't in that channel; broadcast in `voice:peers` |
+| `voice:signal` | `{ roomId, to: peerId, data: { type: 'offer' \| 'answer', sdp } \| { type: 'ice', candidate } }` | – (no ack, **not** volatile) | relayed as `voice:signal { roomId, from, data }` to the socket `to` only, and only while the sender and `to` are both in that room's channel and the sender is still a member (`room.interact`); anything else is dropped silently. `from` is set by the server. SDP ≤ 16 000 chars, candidate ≤ 1 000. Own bucket (30 / s burst 150) |
 
 `ElementInput` = `Element` without `seq, createdBy, updatedBy, updatedAt` (server sets them). `LayerInput` similarly. Phase 11: an ARROW's `props` may carry `doubleHeaded: true` (strict; anything else → `VALIDATION_ERROR`). Phase 12: an `own_player` MARKER's `props` may carry `memberId` (uuid) — it must be a current member of the board's room, and other kinds may not carry it (`VALIDATION_ERROR`). Public responses (`/public/share/:token`, `/public/demo-boards`) drop `memberId`. A `loot` MARKER may carry `item` — an id from `LOOT_ITEMS` (unknown ids, paths and URLs → `VALIDATION_ERROR`; other kinds may not carry it).
 
@@ -224,6 +228,9 @@ Implementation notes (Phase 5A/5B):
 | `chat:message` | `{ message: ChatMessage }` (to the whole room, sender included — the client matches its optimistic copy by `clientId`) |
 | `chat:deleted` | `{ messageId }` |
 | `chat:typing` | `{ userId }` |
+| `voice:peers` | `{ roomId, peers: VoicePeer[] }` where `VoicePeer = { peerId, userId, muted }` — the room's whole voice channel, to everyone in the room on every change, and to a socket right after its `room:join` |
+| `voice:signal` | `{ roomId, from, data }` (see `voice:signal` above) |
+| `voice:ended` | `{ roomId, reason: 'elsewhere' }` — this socket was taken out of voice because the same user joined from another tab |
 | `presence:update` | `{ roomId, users: Presence[] }` where `Presence = { userId, boardId, idle, color }` |
 | `cursor:batch` | `{ boardId, cursors: [{ userId, x, y }] }` — every 50 ms (`CURSOR_FLUSH_MS`), the latest position of each cursor on that board that moved since the last flush; one message per recipient per tick (Phase 10, replaces a per-move `cursor:move` broadcast). Includes the recipient's own cursor: ignore it. Volatile |
 | `stroke:preview` | `{ userId, boardId, tempId, points, style }` |
@@ -243,6 +250,8 @@ Implementation notes (Phase 5A/5B):
 | durable ops (`element:*`, `layer:*`) | 30 / s burst 60 |
 | `chat:send` | 5 / 10 s burst 5 |
 | volatile (`cursor`, `laser`, `stroke:preview`, `view`) | 40 / s combined; excess dropped silently |
+| `voice:signal` | 30 / s burst 150; excess dropped silently |
+| `voice:join` (per user, Redis) | 30 / 10 min → `RATE_LIMITED` |
 | max message size | 64 KB (`maxHttpBufferSize`) |
 | sockets per user | 5 |
 Exceeding durable/chat limits → ack `RATE_LIMITED`; repeated abuse (10 violations / min) → disconnect.

@@ -22,5 +22,6 @@ export * from './schemas/rooms.js';
 export * from './schemas/share.js';
 export * from './schemas/snapshots.js';
 export * from './vehicleSpawns.js';
+export * from './voice.js';
 export * from './text.js';
 export * from './zones.js';

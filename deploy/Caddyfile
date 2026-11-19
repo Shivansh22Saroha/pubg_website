@@ -12,7 +12,7 @@
 		Strict-Transport-Security "max-age=63072000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Permissions-Policy "camera=(), microphone=(self), geolocation=()"
 		Cross-Origin-Opener-Policy "same-origin"
 		# responses that bring no CSP of their own (static files, a 404 for /robots.txt) get a
 		# deny-all one; `?` never overrides the pages' nonce CSP or the API's

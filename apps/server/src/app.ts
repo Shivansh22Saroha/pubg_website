@@ -24,6 +24,7 @@ import { createPrismaRefreshTokenStore } from './modules/auth/sessionStore.js';
 import { createSessionService } from './modules/auth/sessions.js';
 import { createTokenService } from './modules/auth/tokens.js';
 import { createBoardOpsService } from './modules/elements/service.js';
+import { createIceProvider } from './modules/voice/turn.js';
 import { createRealtime, disconnectSessions } from './realtime/server.js';
 import { boardRoutes } from './modules/boards/routes.js';
 import { chatRoutes } from './modules/chat/routes.js';
@@ -359,6 +360,13 @@ export async function buildApp({
       boardOps,
       chat,
       events,
+      ice: createIceProvider({
+        keyId: config.CF_TURN_KEY_ID,
+        apiToken: config.CF_TURN_API_TOKEN,
+        onError: (err) => {
+          app.log.warn({ err }, 'voice relay credentials failed — STUN only for this join');
+        },
+      }),
       tokenGraceSec: config.SOCKET_TOKEN_GRACE_SEC,
     });
     dropSessions = (sids) => {
