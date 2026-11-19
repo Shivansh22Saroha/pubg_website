@@ -1,9 +1,10 @@
 'use client';
 
-import type { Layer, MapId, SnapshotData } from '@rotationlab/shared';
+import type { Layer, SnapshotData } from '@rotationlab/shared';
 import { useMemo } from 'react';
 import MapCanvas from '@/components/map/MapCanvas';
 import { StaticElements } from '@/components/map/StaticElements';
+import type { BoardMapInfo } from '@/lib/boardMap';
 import type { ViewElement } from '@/stores/boardModel';
 
 /** Snapshot data → the renderer's view shapes (read-only: seqs and authors don't matter). */
@@ -24,11 +25,11 @@ export function snapshotView(
 
 /** Read-only map of a snapshot (UI_UX_SPEC §3.8): tiles + grid + its elements, no tools. */
 export default function SnapshotPreviewMap({
-  mapId,
+  map,
   boardId,
   data,
 }: {
-  mapId: MapId;
+  map: BoardMapInfo;
   boardId: string;
   data: SnapshotData;
 }) {
@@ -38,8 +39,8 @@ export default function SnapshotPreviewMap({
       className="h-[60dvh] min-h-80 overflow-hidden rounded-panel border"
       data-testid="snapshot-preview"
     >
-      <MapCanvas mapId={mapId}>
-        <StaticElements mapId={mapId} elements={view.elements} layers={view.layers} />
+      <MapCanvas map={map}>
+        <StaticElements elements={view.elements} layers={view.layers} />
       </MapCanvas>
     </div>
   );

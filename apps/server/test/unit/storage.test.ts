@@ -7,7 +7,12 @@ import {
   assetKeyPattern,
   createLocalStorage,
   createS3Storage,
+  isPrivateKey,
+  presignGetV4,
+  SIGN_TTL_MS,
+  SIGN_WINDOW_MS,
   signV4,
+  verifyLocalSignature,
 } from '../../src/lib/storage.js';
 
 const AWS = {
@@ -98,7 +103,7 @@ describe('S3 storage', () => {
 describe('local storage', () => {
   it('writes, reads and removes under its dir only', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'rl-assets-'));
-    const local = createLocalStorage(dir);
+    const local = createLocalStorage(dir, 'test-secret');
     await local.put(KEY, Buffer.from('jpeg'), 'image/jpeg');
     expect((await local.read(KEY))?.toString()).toBe('jpeg');
     expect(local.url(KEY)).toBe(`/api/v1/assets/${KEY}`);
@@ -117,5 +122,82 @@ describe('local storage', () => {
       KEY.replace('thumbnails', 'avatars'),
     ])
       expect(assetKeyPattern.test(bad), bad).toBe(false);
+  });
+});
+
+const MAP = 'maps/0192f7a1-0000-7000-8000-000000000001/AbCdEfGhIjKlMnOpQr_-12.webp';
+
+describe('private assets — custom maps (F20)', () => {
+  it('map keys are allowed (image + 512 px preview) and private; thumbnails are not private', () => {
+    expect(assetKeyPattern.test(MAP)).toBe(true);
+    expect(assetKeyPattern.test(MAP.replace('.webp', '-512.webp'))).toBe(true);
+    expect(assetKeyPattern.test(MAP.replace('.webp', '.png'))).toBe(false);
+    expect(assetKeyPattern.test('maps/../x.webp')).toBe(false);
+    expect(isPrivateKey(MAP)).toBe(true);
+    expect(isPrivateKey(KEY)).toBe(false);
+  });
+
+  it('presigns a GET exactly like the AWS published example', () => {
+    // docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+    const url = presignGetV4({
+      ...AWS,
+      host: 'examplebucket.s3.amazonaws.com',
+      path: '/test.txt',
+      expiresSec: 86_400,
+    });
+    expect(url).toBe(
+      'https://examplebucket.s3.amazonaws.com/test.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256' +
+        '&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request' +
+        '&X-Amz-Date=20130524T000000Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host' +
+        '&X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404',
+    );
+  });
+
+  it('S3: map URLs are always signed (even with a public base); stable within a window', () => {
+    const s3 = createS3Storage({
+      endpoint: 'https://acct.r2.cloudflarestorage.com',
+      bucket: 'assets',
+      region: 'auto',
+      accessKeyId: 'id',
+      secretAccessKey: 'secret',
+      publicBaseUrl: 'https://cdn.example.com',
+    });
+    expect(s3.url(KEY)).toBe(`https://cdn.example.com/${KEY}`);
+    const t = Date.UTC(2026, 10, 19, 7, 0, 0);
+    const a = s3.signedUrl(MAP, t);
+    expect(a.url).toMatch(/^https:\/\/acct\.r2\.cloudflarestorage\.com\/assets\/maps\//);
+    expect(a.url).toContain(`X-Amz-Expires=${SIGN_TTL_MS / 1000}`);
+    expect(s3.url(MAP)).not.toContain('cdn.example.com');
+    // same window → same URL (browser cache), ≥ 6 h of life left
+    expect(s3.signedUrl(MAP, t + 60_000).url).toBe(a.url);
+    expect(a.expiresAt - t).toBeGreaterThanOrEqual(SIGN_WINDOW_MS);
+    expect(s3.signedUrl(MAP, t + SIGN_WINDOW_MS).url).not.toBe(a.url);
+    // private bucket: thumbnails get signed URLs too
+    const priv = createS3Storage({
+      endpoint: 'https://acct.r2.cloudflarestorage.com',
+      bucket: 'assets',
+      region: 'auto',
+      accessKeyId: 'id',
+      secretAccessKey: 'secret',
+    });
+    expect(priv.url(KEY)).toContain('X-Amz-Signature=');
+  });
+
+  it('local: signed links verify, and expired or tampered ones do not', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rl-assets-'));
+    const local = createLocalStorage(dir, 'secret');
+    const now = Date.UTC(2026, 10, 19, 7, 0, 0);
+    const { url, expiresAt } = local.signedUrl(MAP, now);
+    const q = new URL(url, 'http://x').searchParams;
+    const exp = q.get('exp') ?? undefined;
+    const sig = q.get('sig') ?? undefined;
+    expect(expiresAt).toBe(Number(exp) * 1000);
+    expect(verifyLocalSignature('secret', MAP, exp, sig, now)).toBe(true);
+    expect(verifyLocalSignature('secret', MAP, exp, sig, expiresAt)).toBe(false); // expired
+    expect(verifyLocalSignature('other', MAP, exp, sig, now)).toBe(false);
+    expect(verifyLocalSignature('secret', MAP.replace('Ab', 'Zz'), exp, sig, now)).toBe(false);
+    expect(verifyLocalSignature('secret', MAP, String(Number(exp) + 1), sig, now)).toBe(false);
+    expect(verifyLocalSignature('secret', MAP, undefined, sig, now)).toBe(false);
+    expect(verifyLocalSignature('secret', MAP, '1e9', sig, now)).toBe(false);
   });
 });

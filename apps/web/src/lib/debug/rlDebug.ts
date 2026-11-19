@@ -3,7 +3,7 @@
  * behind a build-time constant (see RoomWorkspace), so production bundles don't contain it.
  */
 import { flushThumbnail } from '@/hooks/useThumbnailUploader';
-import { MAPS, MARKER_KINDS, type ElementInput, type MapId } from '@rotationlab/shared';
+import { worldSizeOf, MARKER_KINDS, type ElementInput, type BoardMapId } from '@rotationlab/shared';
 import { v7 as uuid } from 'uuid';
 import type { RoomSession } from '@/lib/realtime/roomSession';
 import { getSocket } from '@/lib/realtime/socket';
@@ -51,8 +51,13 @@ function pick<T>(xs: readonly T[], i: number): T {
   return x;
 }
 
-function randomElement(boardId: string, layerId: string, mapId: MapId, i: number): ElementInput {
-  const W = MAPS[mapId].worldSize;
+function randomElement(
+  boardId: string,
+  layerId: string,
+  mapId: BoardMapId,
+  i: number,
+): ElementInput {
+  const W = worldSizeOf(mapId);
   const r = (lo: number, hi: number) => Math.round(lo + Math.random() * (hi - lo));
   const pt = (): [number, number] => [r(20_000, W - 20_000), r(20_000, W - 20_000)];
   const near = ([x, y]: [number, number], d: number): [number, number] => [
@@ -116,7 +121,7 @@ function randomElement(boardId: string, layerId: string, mapId: MapId, i: number
   }
 }
 
-export function installRlDebug(session: RoomSession, mapId: MapId): () => void {
+export function installRlDebug(session: RoomSession, mapId: BoardMapId): () => void {
   const api: RlDebug = {
     addRandomElements(n) {
       const s = useBoardStore.getState();
@@ -136,7 +141,7 @@ export function installRlDebug(session: RoomSession, mapId: MapId): () => void {
       const s = useBoardStore.getState();
       const el = id ? s.view.elements[id] : Object.values(s.view.elements)[0];
       if (!el) return null;
-      const W = MAPS[mapId].worldSize;
+      const W = worldSizeOf(mapId);
       const shift = (p: [number, number]): [number, number] => [
         Math.min(W, p[0] + 10_000),
         Math.min(W, p[1] + 10_000),

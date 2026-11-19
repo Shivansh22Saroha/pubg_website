@@ -10,9 +10,10 @@ import {
   MAX_FILL_OPACITY,
   STROKE_WIDTHS,
   ZONE_PRESETS,
+  isPubgMap,
   can,
   type ElementInput,
-  type MapId,
+  type BoardMapId,
   type RoomRole,
   type Style,
   type ZonePreset,
@@ -131,7 +132,7 @@ export function StyleBar({
   presets: injectedPresets,
 }: {
   role: RoomRole;
-  mapId: MapId;
+  mapId: BoardMapId;
   session: EditSink | null;
   nameOf: (userId: string | null) => string;
   /** zone presets for the circle tool (default: ZONE_PRESETS of the map; tests inject) */
@@ -394,7 +395,8 @@ export function StyleBar({
   };
   const closed = tool === 'circle' || tool === 'polygon';
   const vector = tool !== 'text' && tool !== 'marker';
-  const presets = injectedPresets ?? ZONE_PRESETS[mapId];
+  // zone sizes are PUBG's: a custom map has none (its scale is the uploader's guess)
+  const presets = injectedPresets ?? (isPubgMap(mapId) ? ZONE_PRESETS[mapId] : []);
   return (
     <Shell testId="style-bar" mode="tool">
       <Palette

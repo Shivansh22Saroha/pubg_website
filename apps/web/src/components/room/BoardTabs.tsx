@@ -1,10 +1,16 @@
 'use client';
 
-import { can, MAPS, type Board, type MapId, type RoomRole } from '@rotationlab/shared';
+import {
+  can,
+  CUSTOM_MAP_ID,
+  CUSTOM_MAP_LIMITS,
+  MAPS,
+  type Board,
+  type RoomRole,
+} from '@rotationlab/shared';
 import { MapIcon, MoreVertical, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { MapPicker } from '@/components/rooms/bits';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
@@ -16,18 +22,28 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input, Label } from '@/components/ui/input';
 import { ApiError } from '@/lib/api';
+import { boardMapName } from '@/lib/boardMap';
+import { useCustomMaps, useUpdateCustomMap } from '@/lib/customMaps';
 import { useCreateBoard, useDeleteBoard, useUpdateBoard } from '@/lib/rooms';
 import { cn } from '@/lib/utils';
 import { usePresenceStore } from '@/stores/presenceStore';
+import { BoardMapPicker, type MapChoice } from './BoardMapPicker';
 import { ShareDialog } from './ShareDialog';
 
 type DialogState =
-  { kind: 'new' } | { kind: 'rename'; board: Board } | { kind: 'delete'; board: Board } | null;
+  | { kind: 'new' }
+  | { kind: 'rename'; board: Board }
+  | { kind: 'delete'; board: Board }
+  | { kind: 'mapSize'; board: Board }
+  | null;
 
-/** Default name "{Map} – Plan {n}" (FEATURES F4). */
-function defaultName(mapId: MapId, boards: Board[]) {
-  const n = boards.filter((b) => b.mapId === mapId).length + 1;
-  return `${MAPS[mapId].name} – Plan ${n}`;
+const sameMap = (b: Board, c: MapChoice) =>
+  c.kind === 'pubg' ? b.mapId === c.mapId : b.customMapId === c.id;
+
+/** Default name "{Map} – Plan {n}" (FEATURES F4; custom maps by their own name). */
+function defaultName(choice: MapChoice, mapName: string, boards: Board[]) {
+  const n = boards.filter((b) => sameMap(b, choice)).length + 1;
+  return `${mapName} – Plan ${n}`.slice(0, 40);
 }
 
 /**
@@ -52,7 +68,11 @@ export function BoardTabs({
 }) {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [name, setName] = useState('');
-  const [mapId, setMapId] = useState<MapId>('erangel');
+  const [choice, setChoice] = useState<MapChoice>({ kind: 'pubg', mapId: 'erangel' });
+  const [mapName, setMapName] = useState(MAPS.erangel.name);
+  const [widthM, setWidthM] = useState('');
+  const customMaps = useCustomMaps(roomId);
+  const updateMap = useUpdateCustomMap(roomId);
   const [dragId, setDragId] = useState<string | null>(null);
   const create = useCreateBoard(roomId);
   const update = useUpdateBoard(roomId);
@@ -114,7 +134,7 @@ export function BoardTabs({
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  title={`${b.name} (${MAPS[b.mapId].name}) — ${i < 9 ? `press ${i + 1}` : ''}`}
+                  title={`${b.name} (${boardMapName(b, customMaps.data)}) — ${i < 9 ? `press ${i + 1}` : ''}`}
                   onClick={() => {
                     onSelect(b.id);
                   }}
@@ -173,6 +193,7 @@ export function BoardTabs({
                         {
                           name: `${current.name} (copy)`.slice(0, 40),
                           mapId: current.mapId,
+                          ...(current.customMapId ? { customMapId: current.customMapId } : {}),
                           duplicateFrom: current.id,
                         },
                         {
@@ -186,6 +207,18 @@ export function BoardTabs({
                   >
                     Duplicate
                   </DropdownMenuItem>
+                  {current.mapId === CUSTOM_MAP_ID && (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        const m = customMaps.data?.find((x) => x.id === current.customMapId);
+                        setName(m?.name ?? '');
+                        setWidthM(m ? String(m.widthM) : '');
+                        setDialog({ kind: 'mapSize', board: current });
+                      }}
+                    >
+                      Map name &amp; size…
+                    </DropdownMenuItem>
+                  )}
                 </>
               )}
               {canDelete && (
@@ -211,8 +244,10 @@ export function BoardTabs({
             aria-label="New board"
             title="New board"
             onClick={() => {
-              setMapId('erangel');
-              setName(defaultName('erangel', boards));
+              const first: MapChoice = { kind: 'pubg', mapId: 'erangel' };
+              setChoice(first);
+              setMapName(MAPS.erangel.name);
+              setName(defaultName(first, MAPS.erangel.name, boards));
               setDialog({ kind: 'new' });
             }}
             className="flex h-12 shrink-0 items-center px-3 text-text-muted hover:bg-surface hover:text-text"
@@ -246,7 +281,9 @@ export function BoardTabs({
               onSubmit={(e) => {
                 e.preventDefault();
                 create.mutate(
-                  { name, mapId },
+                  choice.kind === 'pubg'
+                    ? { name, mapId: choice.mapId }
+                    : { name, mapId: CUSTOM_MAP_ID, customMapId: choice.id },
                   {
                     onSuccess: ({ board }) => {
                       close();
@@ -268,13 +305,17 @@ export function BoardTabs({
                   }}
                 />
               </div>
-              <MapPicker
-                name="board-map"
-                value={mapId}
-                onChange={(m) => {
+              <BoardMapPicker
+                roomId={roomId}
+                customMaps={customMaps.data ?? []}
+                value={choice}
+                canUpload={canManage}
+                onChange={(c, newMapName) => {
                   // keep the auto-generated name in sync until the user edits it
-                  if (name === defaultName(mapId, boards)) setName(defaultName(m, boards));
-                  setMapId(m);
+                  if (name === defaultName(choice, mapName, boards))
+                    setName(defaultName(c, newMapName, boards));
+                  setChoice(c);
+                  setMapName(newMapName);
                 }}
               />
               <Button type="submit" disabled={create.isPending || name.trim().length === 0}>
@@ -305,6 +346,61 @@ export function BoardTabs({
                 }}
               />
               <Button type="submit" disabled={update.isPending || name.trim().length === 0}>
+                Save
+              </Button>
+            </form>
+          </DialogContent>
+        )}
+        {dialog?.kind === 'mapSize' && dialog.board.customMapId && (
+          <DialogContent
+            title="Map name & size"
+            description="Applies to every board on this map. The grid and measure tool use the width."
+          >
+            <form
+              method="post"
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateMap.mutate(
+                  {
+                    id: dialog.board.customMapId ?? '',
+                    body: { name: name.trim(), widthM: Number(widthM) },
+                  },
+                  { onSuccess: close, onError: fail },
+                );
+              }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-map-name">Map name</Label>
+                <Input
+                  id="custom-map-name"
+                  value={name}
+                  maxLength={CUSTOM_MAP_LIMITS.nameMax}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-map-width">Width in metres (left edge to right edge)</Label>
+                <Input
+                  id="custom-map-width"
+                  inputMode="numeric"
+                  value={widthM}
+                  onChange={(e) => {
+                    setWidthM(e.target.value.replace(/[^\d]/g, ''));
+                  }}
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={
+                  updateMap.isPending ||
+                  name.trim().length === 0 ||
+                  Number(widthM) < CUSTOM_MAP_LIMITS.widthMinM ||
+                  Number(widthM) > CUSTOM_MAP_LIMITS.widthMaxM
+                }
+              >
                 Save
               </Button>
             </form>

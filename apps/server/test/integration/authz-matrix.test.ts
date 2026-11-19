@@ -14,6 +14,7 @@ import {
   PASSWORD,
   prisma,
   setupRoom,
+  mapPng,
   thumbJpeg,
   useCleanState,
   type RoomFixture,
@@ -46,6 +47,10 @@ interface Ctx {
   /** a 256×256 JPEG, and the URL of the board's stored thumbnail (Phase 11) */
   jpeg: Buffer;
   thumbnailUrl: string;
+  /** an unused custom map in the room, a PNG to upload, and the map image's signed URL (F20) */
+  customMapId: string;
+  png: Buffer;
+  customMapImageUrl: string;
 }
 
 interface Row {
@@ -454,6 +459,48 @@ const MATRIX: Row[] = [
     request: ({ thumbnailUrl }) => ({ url: thumbnailUrl }),
     expect: everyone(200), // unguessable 128-bit key, like the S3 URLs (thumbnails.test.ts)
   },
+  // ---- custom maps (F20) -----------------------------------------------------------------
+  {
+    method: 'GET',
+    url: '/api/v1/rooms/:roomId/custom-maps',
+    request: ({ f }) => ({ url: `/api/v1/rooms/${f.roomId}/custom-maps` }),
+    expect: room(200, 200, 200),
+  },
+  {
+    method: 'POST',
+    url: '/api/v1/rooms/:roomId/custom-maps',
+    request: ({ f, png }) => ({
+      url: `/api/v1/rooms/${f.roomId}/custom-maps?name=Bermuda&widthM=2000`,
+      payload: png,
+      headers: { 'content-type': 'image/png' },
+    }),
+    expect: room(403, 201, 201),
+  },
+  {
+    method: 'PATCH',
+    url: '/api/v1/rooms/:roomId/custom-maps/:mapId',
+    request: ({ f, customMapId }) => ({
+      url: `/api/v1/rooms/${f.roomId}/custom-maps/${customMapId}`,
+      payload: { name: 'Renamed' },
+    }),
+    expect: room(403, 200, 200),
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/rooms/:roomId/custom-maps/:mapId',
+    request: ({ f, customMapId }) => ({
+      url: `/api/v1/rooms/${f.roomId}/custom-maps/${customMapId}`,
+    }),
+    expect: room(403, 204, 204),
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/assets/maps/:roomId/:file',
+    request: ({ customMapImageUrl }) => ({ url: customMapImageUrl }),
+    // the signature is the access check, like a presigned S3 URL (customMaps.test.ts covers
+    // missing / expired / tampered links)
+    expect: everyone(200),
+  },
   // ---- share links (Phase 11) ---------------------------------------------------------
   {
     method: 'GET',
@@ -561,6 +608,15 @@ async function context(): Promise<Ctx> {
   const share = await call(app, f.owner.jar, 'POST', `/api/v1/boards/${f.boardId}/share`, {
     expiresIn: 'never',
   });
+  const png = await mapPng();
+  const map = await app.inject({
+    method: 'POST',
+    url: `/api/v1/rooms/${f.roomId}/custom-maps?name=Matrix&widthM=2000`,
+    headers: { ...CSRF, 'content-type': 'image/png' },
+    cookies: f.owner.jar.cookies,
+    payload: png,
+  });
+  const customMap = map.json<{ customMap: { id: string; imageUrl: string } }>().customMap;
   const jpeg = await thumbJpeg();
   const thumb = await app.inject({
     method: 'PUT',
@@ -571,6 +627,9 @@ async function context(): Promise<Ctx> {
   });
   return {
     f,
+    png,
+    customMapId: customMap.id,
+    customMapImageUrl: customMap.imageUrl,
     jpeg,
     thumbnailUrl: thumb.json<{ thumbnailUrl: string }>().thumbnailUrl,
     shareToken: share.json<{ url: string }>().url.split('/s/')[1] ?? '',

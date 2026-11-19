@@ -9,6 +9,7 @@ import {
 } from '@rotationlab/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
+import { boardMapInfo } from './boardMap';
 import type { ExploreBoard } from './explore';
 import { keys } from './queryKeys';
 
@@ -64,11 +65,14 @@ export async function loadSharedBoard(
       schema: SharedBoardResponseSchema,
       ...(signal ? { signal } : {}),
     });
+    const map = boardMapInfo(res.board, res.customMap ? [res.customMap] : []);
+    if (!map) return { status: 'error' }; // a custom board whose map is missing
     return {
       status: 'ok',
       expiresAt: res.expiresAt,
       board: {
         mapId: res.board.mapId,
+        map,
         name: res.board.name,
         layers: res.layers,
         elements: Object.fromEntries(res.elements.map((e) => [e.id, e])),

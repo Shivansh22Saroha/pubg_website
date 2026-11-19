@@ -68,6 +68,12 @@ export default function PrivacyPage() {
           Rooms are private: only members see their boards and chat. The public demo boards at
           /explore are sample content and contain no user data.
         </p>
+        <p>
+          Map images uploaded to a room are stored privately (Cloudflare R2) and shown only to that
+          room&apos;s members, and to anyone with a share link of a board that uses them, through
+          links that expire within hours. We re-encode each image and drop its metadata (camera,
+          location). An image is erased when it&apos;s deleted or its room is.
+        </p>
       </Section>
       <Section title="Voice chat">
         <p>

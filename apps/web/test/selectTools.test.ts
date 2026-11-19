@@ -229,6 +229,7 @@ class FakeCtx {
     const preview = { begin() {}, append() {}, replace() {}, end() {} };
     return {
       worldSize: W,
+      metresPerUnit: 0.01,
       worldPerPx: () => K,
       style: () => ({ color: '#F2A900', width: 4, dashed: false, fillOpacity: 0 }),
       canCreate: () => true,

@@ -810,6 +810,9 @@ export function createRealtime(d: RealtimeDeps): {
   d.events.on('board:updated', ({ roomId, board }) =>
     io.to(ch.room(roomId)).emit('board:updated', { board }),
   );
+  d.events.on('customMaps:changed', ({ roomId }) =>
+    io.to(ch.room(roomId)).emit('customMaps:changed', { roomId }),
+  );
   d.events.on('board:deleted', ({ roomId, boardId }) => {
     io.to(ch.room(roomId)).emit('board:deleted', { boardId });
     io.in(ch.board(boardId)).socketsLeave(ch.board(boardId));

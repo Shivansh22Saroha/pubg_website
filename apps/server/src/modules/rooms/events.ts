@@ -16,6 +16,8 @@ export interface RoomEventMap {
   'board:created': [{ roomId: string; board: Board }];
   'board:updated': [{ roomId: string; board: Board }];
   'board:deleted': [{ roomId: string; boardId: string; name: string }];
+  /** a custom map was uploaded, renamed / rescaled or deleted (F20): clients refetch the list */
+  'customMaps:changed': [{ roomId: string }];
   /** a stored chat message (user or system) — realtime broadcasts it to the room */
   'chat:message': [{ roomId: string; message: ChatMessage }];
   'chat:deleted': [{ roomId: string; messageId: string }];

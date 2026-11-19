@@ -16,6 +16,73 @@ export function isMapId(value: string): value is MapId {
 /** 816 000 cm per side. PUBG calls these "8×8 km" maps; strictly it is 8.16 km. */
 export const DEFAULT_WORLD_SIZE = 816_000;
 
+/**
+ * Custom maps (FEATURES F20): an image the room uploaded. Boards on one use `mapId: 'custom'`
+ * plus a `customMapId`. Their coordinates use the same 0–DEFAULT_WORLD_SIZE square as the PUBG
+ * maps (the image is padded to a square and stretched over it), so drawing, sync, validation
+ * and the grid are unchanged; only distances differ — see `metresPerUnit`.
+ */
+export const CUSTOM_MAP_ID = 'custom';
+export const BOARD_MAP_IDS = [...MAP_IDS, CUSTOM_MAP_ID] as const;
+export type BoardMapId = (typeof BOARD_MAP_IDS)[number];
+
+export function isPubgMap(id: BoardMapId): id is MapId {
+  return id !== CUSTOM_MAP_ID;
+}
+
+export const CUSTOM_MAP_LIMITS = {
+  /** real-world width of the (square-padded) image, metres */
+  widthMinM: 50,
+  widthMaxM: 50_000,
+  defaultWidthM: 8_000,
+  /** the file the user picks (the browser shrinks it before upload) */
+  fileMaxBytes: 15 * 1024 * 1024,
+  /** what the server accepts after that */
+  uploadMaxBytes: 8 * 1024 * 1024,
+  /** longest side stored; also the browser's resize target */
+  maxSidePx: 4096,
+  minSidePx: 256,
+  previewPx: 512,
+  perRoom: 10,
+  nameMax: 40,
+} as const;
+
+/** world units are centimetres on the PUBG maps */
+export const PUBG_METRES_PER_UNIT = 0.01;
+
+/**
+ * Geometry for a custom map's board (F20): the shared coordinate square, a 4096 px "pyramid"
+ * (one image, sharp up to zoom 4), 8×8 grid. No tiles — tile paths are empty.
+ */
+export function customMapConfig(name: string): MapConfig {
+  return {
+    id: CUSTOM_MAP_ID,
+    name,
+    telemetryNames: [],
+    worldSize: DEFAULT_WORLD_SIZE,
+    gridCells: GRID_CELLS,
+    tileSize: TILE_SIZE,
+    sourceSize: CUSTOM_MAP_LIMITS.maxSidePx,
+    paddedSize: CUSTOM_MAP_LIMITS.maxSidePx,
+    maxNativeZoom: 4,
+    variants: { labels: '', clean: '' },
+    lowres: '',
+    preview: '',
+    card: '',
+    thumbnail: '',
+  };
+}
+
+/** metres per world unit on a custom map `widthM` metres wide */
+export function metresPerUnit(widthM: number): number {
+  return widthM / DEFAULT_WORLD_SIZE;
+}
+
+/** the coordinate square of any board's map (custom maps share the PUBG square) */
+export function worldSizeOf(mapId: BoardMapId): number {
+  return isPubgMap(mapId) ? MAPS[mapId].worldSize : DEFAULT_WORLD_SIZE;
+}
+
 export const GRID_CELLS = 8;
 
 // TODO(phase0): verify grid letter scheme (columns A–H, rows I–P) against the in-game map.
@@ -25,7 +92,8 @@ export const GRID_ROW_LETTERS = 'IJKLMNOP';
 export const TILE_SIZE = 256;
 
 export interface MapConfig {
-  id: MapId;
+  /** a PUBG map, or `custom` for the geometry-only config of an uploaded map (F20) */
+  id: BoardMapId;
   name: string;
   telemetryNames: readonly string[];
   /** world units (cm) per side */

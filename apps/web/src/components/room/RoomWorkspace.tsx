@@ -1,6 +1,6 @@
 'use client';
 
-import { can, MAPS, type Board } from '@rotationlab/shared';
+import { can, CUSTOM_MAP_ID, type Board } from '@rotationlab/shared';
 import {
   ArrowLeft,
   ChevronDown,
@@ -31,11 +31,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { isTouchLayout, useBreakpoint, useLandscapePhone } from '@/hooks/useBreakpoint';
 import { useMe } from '@/hooks/useMe';
-import { env } from '@/env';
 import { useRoomRealtime } from '@/hooks/useRoomRealtime';
 import { useVoice } from '@/hooks/useVoice';
 import { useThumbnailUploader } from '@/hooks/useThumbnailUploader';
 import { ApiError } from '@/lib/api';
+import { boardMapInfo } from '@/lib/boardMap';
+import { useCustomMaps } from '@/lib/customMaps';
 import { loadDebugHook } from '@/lib/debug/loadDebugHook';
 import { makeNameOf } from '@/lib/editing';
 import { prefKeys, readPref, writePref } from '@/lib/prefs';
@@ -71,8 +72,6 @@ import { setPlayers } from '@/stores/playersStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 
-const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
-
 /**
  * Room workspace (UI_UX_SPEC §3.5): board tabs, toolbar, live map of the active board with the
  * drawing tools, presence, sync state, invite / settings dialogs, members & layers panel,
@@ -107,10 +106,25 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const boards = useMemo(() => query.data?.boards ?? [], [query.data]);
   // fall back to the first board when the remembered one is gone (deleted / other room)
   const active = boards.find((b) => b.id === picked) ?? boards[0];
-  // UI_UX_SPEC §9: the 819 px low-res art shows first — start fetching it with the room data,
-  // before the map bundle has even loaded (MapCanvas's overlay uses the same URL and CORS mode)
-  if (active) {
-    preload(`${tilesBase}/${MAPS[active.mapId].lowres}`, {
+  // custom maps (F20): only fetched when a board uses one
+  const hasCustom = boards.some((b) => b.mapId === CUSTOM_MAP_ID);
+  const customMaps = useCustomMaps(roomId, hasCustom);
+  const activeMap = active ? boardMapInfo(active, customMaps.data) : null;
+  // a teammate just uploaded the map this board uses: our list predates it — fetch it once
+  const missingMapId =
+    active?.customMapId && customMaps.data && !activeMap ? active.customMapId : null;
+  const refetchedFor = useRef<string | null>(null);
+  const { refetch: refetchCustomMaps, isFetching: fetchingCustomMaps } = customMaps;
+  useEffect(() => {
+    if (!missingMapId || fetchingCustomMaps || refetchedFor.current === missingMapId) return;
+    refetchedFor.current = missingMapId;
+    void refetchCustomMaps();
+  }, [missingMapId, fetchingCustomMaps, refetchCustomMaps]);
+  // UI_UX_SPEC §9: the 819 px low-res art (a custom map's preview) shows first — start fetching
+  // it with the room data, before the map bundle has even loaded (MapCanvas's overlay uses the
+  // same URL and CORS mode)
+  if (activeMap) {
+    preload(activeMap.backgroundUrl, {
       as: 'image',
       crossOrigin: 'anonymous',
       fetchPriority: 'high',
@@ -125,7 +139,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   // Phase 11: 30 s after my last edit, refresh the board's dashboard thumbnail
   useThumbnailUploader(
     active?.id,
-    active?.mapId,
+    activeMap,
     query.data ? can(query.data.room.role, 'board.edit') : false,
   );
 
@@ -606,11 +620,27 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               <VoiceControls voice={voice} members={members} variant="dock" />
             </div>
           )}
-          {active && (
+          {active && !activeMap && (
+            <p
+              role="status"
+              className="flex h-full items-center justify-center gap-2 text-text-muted"
+            >
+              {customMaps.isError ? (
+                'Couldn’t load this board’s map — check your connection'
+              ) : customMaps.isPending || customMaps.isFetching ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden /> Loading map…
+                </>
+              ) : (
+                'This board’s map was removed'
+              )}
+            </p>
+          )}
+          {active && activeMap && (
             <BoardMapView
               key={active.id}
               boardId={active.id}
-              mapId={active.mapId}
+              map={activeMap}
               meId={me.data.id}
               names={names}
               onCursor={onCursor}

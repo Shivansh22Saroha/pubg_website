@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  MAPS,
+  worldSizeOf,
   can,
   elementAnchor,
   gridRef,
@@ -123,7 +123,7 @@ export function ElementList({
   const elements = useBoardStore((s) => s.view.elements);
   const boardId = useBoardStore((s) => s.boardId);
   const mapId = boards.find((b) => b.id === boardId)?.mapId;
-  const worldSize = mapId ? MAPS[mapId].worldSize : null;
+  const worldSize = mapId ? worldSizeOf(mapId) : null;
   const layers = useBoardStore((s) => s.view.layers);
   const selected = useSelectionStore((s) => s.ids);
   const playerNames = usePlayersStore((s) => s.byId);

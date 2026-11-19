@@ -1,6 +1,6 @@
 'use client';
 
-import { formatInviteCode, InvitePreviewSchema, MAPS } from '@rotationlab/shared';
+import { formatInviteCode, InvitePreviewSchema, isPubgMap, MAPS } from '@rotationlab/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Lock, Users } from 'lucide-react';
 import Link from 'next/link';
@@ -106,7 +106,7 @@ export function JoinCard({ code }: { code: string }) {
             <figure key={m} className="w-20">
               <MapThumb mapId={m} className="aspect-square rounded-control" />
               <figcaption className="mt-1 text-center text-xs text-text-muted">
-                {MAPS[m].name}
+                {isPubgMap(m) ? MAPS[m].name : 'Custom map'}
               </figcaption>
             </figure>
           ))}

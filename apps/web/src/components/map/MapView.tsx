@@ -2,6 +2,7 @@
 
 import type { MapId } from '@rotationlab/shared';
 import dynamic from 'next/dynamic';
+import { pubgMapInfo } from '@/lib/boardMap';
 
 // Leaflet touches `window` at import time → client-only.
 const MapCanvas = dynamic(() => import('./MapCanvas'), {
@@ -12,5 +13,5 @@ const MapCanvas = dynamic(() => import('./MapCanvas'), {
 });
 
 export function MapView({ mapId }: { mapId: MapId }) {
-  return <MapCanvas mapId={mapId} />;
+  return <MapCanvas map={pubgMapInfo(mapId)} />;
 }

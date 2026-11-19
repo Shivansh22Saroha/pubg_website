@@ -6,11 +6,11 @@ import type {
   RoomMember,
   User,
 } from '@prisma/client';
-import type { Board, Invite, Layer, MapId, Member, PublicUser } from '@rotationlab/shared';
+import type { Board, BoardMapId, Invite, Layer, Member, PublicUser } from '@rotationlab/shared';
 
-/** DB enum (ERANGEL) ↔ API id (erangel). */
-export const toMapId = (m: MapIdRow): MapId => m.toLowerCase() as MapId;
-export const fromMapId = (m: MapId): MapIdRow => m.toUpperCase() as MapIdRow;
+/** DB enum (ERANGEL, CUSTOM) ↔ API id (erangel, custom). */
+export const toMapId = (m: MapIdRow): BoardMapId => m.toLowerCase() as BoardMapId;
+export const fromMapId = (m: BoardMapId): MapIdRow => m.toUpperCase() as MapIdRow;
 
 export function toPublicUser(u: User): PublicUser {
   return {
@@ -32,6 +32,7 @@ export function toBoard(b: BoardRow): Board {
     roomId: b.roomId,
     name: b.name,
     mapId: toMapId(b.mapId),
+    customMapId: b.customMapId,
     position: b.position,
     elementCount: b.elementCount,
     updatedAt: b.updatedAt.toISOString(),

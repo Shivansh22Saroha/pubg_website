@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAP_IDS } from '../maps.js';
+import { BOARD_MAP_IDS, CUSTOM_MAP_ID, MAP_IDS } from '../maps.js';
 import { AssignableRoleSchema, RoomRoleSchema } from '../permissions.js';
 import { HexColorSchema, textField } from '../text.js';
 import { PublicUserSchema } from './auth.js';
@@ -27,6 +27,8 @@ export const DEFAULT_LAYERS = [
 ] as const;
 
 export const MapIdSchema = z.enum(MAP_IDS);
+/** a board's map: one of the PUBG maps or `custom` (FEATURES F20) */
+export const BoardMapIdSchema = z.enum(BOARD_MAP_IDS);
 
 /** Crockford base32 alphabet (no I, L, O, U). */
 export const INVITE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -62,7 +64,7 @@ export const RoomSummarySchema = z.object({
   thumbnailUrl: z.string().nullable(),
   hasPassword: z.boolean(),
   /** map of the most recently updated board (dashboard card preview) */
-  primaryMapId: MapIdSchema,
+  primaryMapId: BoardMapIdSchema,
 });
 export type RoomSummary = z.infer<typeof RoomSummarySchema>;
 
@@ -86,7 +88,9 @@ export const BoardSchema = z.object({
   id: z.uuid(),
   roomId: z.uuid(),
   name: z.string(),
-  mapId: MapIdSchema,
+  mapId: BoardMapIdSchema,
+  /** set exactly when mapId is `custom` */
+  customMapId: z.uuid().nullable(),
   position: z.number().int(),
   elementCount: z.number().int(),
   updatedAt: z.iso.datetime(),
@@ -123,7 +127,7 @@ export const InvitePreviewSchema = z.object({
     memberCount: z.number().int(),
     ownerName: z.string(),
     hasPassword: z.boolean(),
-    maps: z.array(MapIdSchema),
+    maps: z.array(BoardMapIdSchema),
   }),
   valid: z.boolean(),
 });
@@ -219,11 +223,18 @@ export const AcceptInviteBodySchema = z.strictObject({
   password: z.string().max(ROOM_LIMITS.passwordMax).optional(),
 });
 
-export const CreateBoardBodySchema = z.strictObject({
-  name: BoardNameSchema,
-  mapId: MapIdSchema,
-  duplicateFrom: z.uuid().optional(),
-});
+export const CreateBoardBodySchema = z
+  .strictObject({
+    name: BoardNameSchema,
+    mapId: BoardMapIdSchema,
+    /** required with mapId `custom`, refused otherwise (F20) */
+    customMapId: z.uuid().optional(),
+    duplicateFrom: z.uuid().optional(),
+  })
+  .refine((b) => (b.mapId === CUSTOM_MAP_ID) === (b.customMapId !== undefined), {
+    message: 'customMapId goes with mapId "custom" (and only with it)',
+    path: ['customMapId'],
+  });
 export type CreateBoardBody = z.input<typeof CreateBoardBodySchema>;
 
 export const UpdateBoardBodySchema = z

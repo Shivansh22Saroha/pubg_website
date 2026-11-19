@@ -15,6 +15,7 @@ export * from './schemas/account.js';
 export * from './schemas/admin.js';
 export * from './schemas/auth.js';
 export * from './schemas/chat.js';
+export * from './schemas/customMaps.js';
 export * from './schemas/elements.js';
 export * from './schemas/health.js';
 export * from './schemas/public.js';

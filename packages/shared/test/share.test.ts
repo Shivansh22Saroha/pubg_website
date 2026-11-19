@@ -28,11 +28,12 @@ describe('share link schemas (Phase 11)', () => {
       id: '0192f7a1-0000-7000-8000-000000000001',
       name: 'Plan',
       mapId: 'erangel',
+      customMapId: null,
       position: 0,
       elementCount: 0,
       updatedAt: '2026-11-03T10:00:00.000Z',
     };
-    const ok = { board, layers: [], elements: [], expiresAt: null };
+    const ok = { board, customMap: null, layers: [], elements: [], expiresAt: null };
     expect(SharedBoardResponseSchema.parse(ok).board).not.toHaveProperty('roomId');
     const leaky = SharedBoardResponseSchema.parse({
       ...ok,

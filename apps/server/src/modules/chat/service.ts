@@ -2,7 +2,7 @@ import { Prisma, type ChatMessage as ChatRow, type PrismaClient, type User } fro
 import {
   can,
   DELETED_BODY,
-  MAPS,
+  worldSizeOf,
   pingWithinWorld,
   type ChatMessage,
   type PingInput,
@@ -56,7 +56,7 @@ export function createChatService({ prisma, policy, events }: ChatDeps) {
     // a board of another room is indistinguishable from a missing one (Z2)
     if (!board || board.roomId !== roomId)
       throw new AppError('VALIDATION_ERROR', 'The ping’s board is not in this room');
-    if (!pingWithinWorld(ping, MAPS[toMapId(board.mapId)].worldSize))
+    if (!pingWithinWorld(ping, worldSizeOf(toMapId(board.mapId))))
       throw new AppError('VALIDATION_ERROR', 'The ping is outside the map');
   }
 

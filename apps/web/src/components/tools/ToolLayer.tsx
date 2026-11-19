@@ -53,6 +53,7 @@ import {
 import { SelectTool } from './selectTools';
 import { MeasureLayer } from './MeasureLayer';
 import { SelectionLayer } from './SelectionLayer';
+import { useMetresPerUnit } from '@/components/map/boardMapContext';
 import { createTools, TextTool, type AnyTool } from './tools';
 import {
   IMPLEMENTED_TOOLS,
@@ -102,6 +103,7 @@ export function ToolLayer({
   names: Record<string, string>;
 }) {
   const map = useMap();
+  const metresPerUnit = useMetresPerUnit();
   const tool = useToolStore((s) => s.tool);
   const [inline, setInline] = useState<Inline | null>(null);
   const [menu, setMenu] = useState<LongPress | null>(null);
@@ -180,6 +182,7 @@ export function ToolLayer({
 
     const ctx: ToolContext = {
       worldSize,
+      metresPerUnit,
       worldPerPx: () => worldPerPx(map, tileWorld),
       style,
       arrowDoubleHeaded: () => useToolStore.getState().arrowDoubleHeaded,
@@ -682,7 +685,7 @@ export function ToolLayer({
       useSelectionStore.getState().clear();
       container.style.cursor = '';
     };
-  }, [map, config]);
+  }, [map, config, metresPerUnit]);
 
   // the role changed under us (e.g. demoted to viewer): end drafts, drop the selection
   useEffect(() => {

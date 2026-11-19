@@ -136,13 +136,9 @@ export const EnvSchema = z
         message: 'required when EMAIL_ENABLED=true',
       });
     }
-    const s3 = [
-      'S3_ENDPOINT',
-      'S3_BUCKET',
-      'S3_ACCESS_KEY_ID',
-      'S3_SECRET_ACCESS_KEY',
-      'PUBLIC_ASSETS_BASE_URL',
-    ] as const;
+    // S3 / R2 (thumbnails, custom maps): the four credentials together; a public base URL
+    // is optional (unset = private bucket, signed URLs only)
+    const s3 = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const;
     const s3Set = s3.filter((k) => e[k] !== undefined);
     if (s3Set.length > 0 && s3Set.length < s3.length) {
       for (const k of s3.filter((key) => e[key] === undefined)) {
@@ -150,9 +146,16 @@ export const EnvSchema = z
           code: 'custom',
           path: [k],
           message:
-            'S3 storage needs all of S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY and PUBLIC_ASSETS_BASE_URL',
+            'S3 storage needs all of S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY',
         });
       }
+    }
+    if (e.PUBLIC_ASSETS_BASE_URL !== undefined && s3Set.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['PUBLIC_ASSETS_BASE_URL'],
+        message: 'PUBLIC_ASSETS_BASE_URL only makes sense with S3 storage (S3_*)',
+      });
     }
     if (e.COOKIE_SECURE && e.COOKIE_DOMAIN) {
       ctx.addIssue({

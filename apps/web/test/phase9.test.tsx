@@ -1,6 +1,6 @@
 import type { DemoBoard } from '@rotationlab/shared';
 import { cleanup, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { tourReducer, placeCard, TOUR_STEPS, type TourState } from '@/components/room/tourModel';
 import { elementLabel } from '@/components/tools/ElementList';
 import { toolsFor } from '@/components/tools/gating';
@@ -9,6 +9,9 @@ import { breakpointFor, isLandscapePhone, isTouchLayout } from '@/hooks/useBreak
 import { exploreBoards } from '@/lib/explore';
 import { securityTxt } from '@/lib/securityTxt';
 import { devPagesEnabled, serverEnv } from '@/lib/serverEnv';
+
+// lib/boardMap reads the tiles base (F20); tests have no app env
+vi.mock('@/env', () => ({ env: { NEXT_PUBLIC_TILES_BASE_URL: '/tiles' } }));
 
 describe('breakpoints (UI_UX_SPEC §7)', () => {
   it('desktop ≥ 1280, compact 1024–1279, tablet 768–1023, phone < 768', () => {
@@ -128,10 +131,12 @@ describe('room tour (UF-3 step 4)', () => {
 });
 
 const demo = (mapId: DemoBoard['board']['mapId'], name: string): DemoBoard => ({
+  customMap: null,
   board: {
     id: crypto.randomUUID(),
     name,
     mapId,
+    customMapId: null,
     position: 0,
     elementCount: 1,
     updatedAt: '2026-10-26T00:00:00.000Z',

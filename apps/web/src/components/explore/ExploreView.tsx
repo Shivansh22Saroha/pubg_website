@@ -1,6 +1,5 @@
 'use client';
 
-import { MAPS } from '@rotationlab/shared';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -61,7 +60,7 @@ export function ExploreView() {
                 i === index && 'bg-surface-2 text-text shadow-[inset_0_-2px_0_var(--accent)]',
               )}
             >
-              {MAPS[b.mapId].name}
+              {b.map.name}
             </button>
           ))}
         </div>

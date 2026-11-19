@@ -1,6 +1,5 @@
 'use client';
 
-import { MAPS } from '@rotationlab/shared';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
@@ -36,7 +35,7 @@ export function SharedBoardView({ token }: { token: string }) {
     <>
       <div className="flex flex-wrap items-center gap-2 border-b bg-bg px-4 py-2">
         <h1 className="truncate text-sm font-medium" data-testid="shared-board-name">
-          {board ? `${board.name} · ${MAPS[board.mapId].name}` : 'Shared board'}
+          {board ? `${board.name} · ${board.map.name}` : 'Shared board'}
         </h1>
         {board && (
           <MeasureButton
