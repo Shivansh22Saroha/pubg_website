@@ -7,6 +7,11 @@ import type { ToolContext, ToolPointer } from '@/components/tools/types';
 import {
   composeExport,
   exportFileName,
+  exportGridLabels,
+  exportTiles,
+  exportTileZoom,
+  wholeMapRect,
+  worldToExportRect,
   FOOTER_PX,
   footerText,
   selectExportNodes,
@@ -291,5 +296,52 @@ describe('account deletion default per room', () => {
       ),
     ).toBe('e1');
     expect(defaultChoice([m('v', 'VIEWER', '2026-01-02')], 'me')).toBe('delete');
+  });
+});
+
+describe('high-quality export geometry (F12)', () => {
+  const W = 816_000;
+  it('picks the tiles whose pixels are at least as fine as the export, capped at the deepest', () => {
+    // whole map at 4096 px: z4 tiles are 4096 px across the map
+    expect(exportTileZoom(4096 / W, W, 5)).toBe(4);
+    expect(exportTileZoom(4097 / W, W, 5)).toBe(5);
+    expect(exportTileZoom(100_000 / W, W, 5)).toBe(5); // zoomed past the source art
+    expect(exportTileZoom(10 / W, W, 5)).toBe(0);
+  });
+  it('lists only the tiles covering the area, clipped to the map', () => {
+    const all = exportTiles(wholeMapRect(W), W, W, 2);
+    expect(all).toHaveLength(16);
+    const corner = exportTiles({ x0: 10, y0: 10, x1: 300_000, y1: 100 }, W, W, 2);
+    expect(corner.map((t) => [t.x, t.y])).toEqual([
+      [0, 0],
+      [1, 0],
+    ]);
+    expect(corner[1]?.world).toEqual({ x0: W / 4, y0: 0, x1: W / 2, y1: W / 4 });
+    // art padded past the map edge: no tiles beyond worldSize
+    expect(exportTiles({ x0: 0, y0: 0, x1: 900_000, y1: 1 }, 400_000, 1_000_000, 1)).toHaveLength(
+      1,
+    );
+  });
+  it('places areas in export pixels with edges on whole output pixels (no seams)', () => {
+    const rect = { x0: 0, y0: 0, x1: 1000, y1: 1000 };
+    const a = worldToExportRect({ x0: 0, y0: 0, x1: 333, y1: 333 }, rect, 100, 2);
+    const b = worldToExportRect({ x0: 333, y0: 0, x1: 666, y1: 333 }, rect, 100, 2);
+    expect(a.x + a.w).toBe(b.x);
+    expect((a.w * 2) % 1).toBe(0);
+  });
+  it('puts the grid letters in the whole-map margin, one per square', () => {
+    const rect = wholeMapRect(W);
+    const labels = exportGridLabels(rect, 2048, 2048, W, 8, 'ABCDEFGH', 'IJKLMNOP');
+    expect(
+      labels
+        .map((l) => l.text)
+        .sort()
+        .join(''),
+    ).toBe('ABCDEFGHIJKLMNOP');
+    const a = labels.find((l) => l.text === 'A');
+    const i = labels.find((l) => l.text === 'I');
+    const margin = (2048 * W * 0.03) / (rect.x1 - rect.x0);
+    expect(a && a.y + a.h).toBeLessThanOrEqual(margin);
+    expect(i && i.x + i.w).toBeLessThanOrEqual(margin);
   });
 });

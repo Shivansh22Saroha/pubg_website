@@ -167,9 +167,9 @@ export function footerText(parts: {
   date: Date;
   credit: string;
 }) {
-  return [parts.room, parts.board, parts.map, parts.date.toLocaleDateString(), parts.credit].join(
-    ' · ',
-  );
+  return [parts.room, parts.board, parts.map, parts.date.toLocaleDateString(), parts.credit]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function rectIn(el: Element, origin: DOMRect): Rect {
@@ -246,6 +246,131 @@ export async function renderExport(s: ExportSources): Promise<Blob> {
       else reject(new Error('Export failed'));
     }, 'image/png');
   });
+}
+
+// ---- high-quality export (FEATURES F12): a hidden map at the export size --------------------
+
+/** An area of the map in world units (cm): left / top / right / bottom. */
+export interface WorldRect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** Exports are rendered at 2× CSS pixels on every screen (sharp on 1× and 2× displays). */
+export const EXPORT_SCALE = 2;
+/** "Whole map": 2048 CSS px × 2 = a 4096 px square — fits every browser's canvas limit. */
+export const WHOLE_MAP_CSS_PX = 2048;
+/** "Whole map" leaves this share of the map as a dark margin on each side for the grid letters */
+export const WHOLE_MAP_MARGIN = 0.03;
+
+export function wholeMapRect(worldSize: number): WorldRect {
+  const m = worldSize * WHOLE_MAP_MARGIN;
+  return { x0: -m, y0: -m, x1: worldSize + m, y1: worldSize + m };
+}
+
+/**
+ * The tile zoom whose pixels are at least as fine as the export's (output px per world unit),
+ * capped at the deepest tiles there are. Zoomed in past them, the source art is the limit.
+ */
+export function exportTileZoom(
+  outPxPerWorld: number,
+  tileWorld: number,
+  maxNativeZoom: number,
+): number {
+  const z = Math.ceil(Math.log2((outPxPerWorld * tileWorld) / 256) - 1e-9);
+  return Math.max(0, Math.min(maxNativeZoom, z));
+}
+
+/** Tiles of zoom `z` that cover `rect` (clipped to the map), with the world area of each. */
+export function exportTiles(
+  rect: WorldRect,
+  worldSize: number,
+  tileWorld: number,
+  z: number,
+): { x: number; y: number; z: number; world: WorldRect }[] {
+  const n = 2 ** z;
+  const span = tileWorld / n;
+  const lo = (v: number) => Math.max(0, Math.floor(v / span));
+  const hi = (v: number) =>
+    Math.min(Math.ceil(worldSize / span) - 1, n - 1, Math.ceil(v / span) - 1);
+  const out: { x: number; y: number; z: number; world: WorldRect }[] = [];
+  for (let y = lo(Math.max(0, rect.y0)); y <= hi(Math.min(worldSize, rect.y1)); y++)
+    for (let x = lo(Math.max(0, rect.x0)); x <= hi(Math.min(worldSize, rect.x1)); x++)
+      out.push({
+        x,
+        y,
+        z,
+        world: { x0: x * span, y0: y * span, x1: (x + 1) * span, y1: (y + 1) * span },
+      });
+  return out;
+}
+
+/**
+ * A world area → CSS-px rect in an export of `rect` that is `cssWidth` wide, with edges snapped
+ * to whole output pixels so neighbouring tiles meet without hairline seams.
+ */
+export function worldToExportRect(
+  area: WorldRect,
+  rect: WorldRect,
+  cssWidth: number,
+  scale: number,
+): Rect {
+  const k = cssWidth / (rect.x1 - rect.x0);
+  const snap = (v: number) => Math.round(v * scale) / scale;
+  const x0 = snap((area.x0 - rect.x0) * k);
+  const y0 = snap((area.y0 - rect.y0) * k);
+  const x1 = snap((area.x1 - rect.x0) * k);
+  const y1 = snap((area.y1 - rect.y0) * k);
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+const LABEL_PX = 18;
+
+/**
+ * Grid letters as the live map places them (GridLabels): column letters along the top edge,
+ * row letters along the left, just outside the map or stuck to the image edge.
+ */
+export function exportGridLabels(
+  rect: WorldRect,
+  cssWidth: number,
+  cssHeight: number,
+  worldSize: number,
+  cells: number,
+  columnLetters: string,
+  rowLetters: string,
+): (Rect & { text: string })[] {
+  const k = cssWidth / (rect.x1 - rect.x0);
+  const px = (v: number) => (v - rect.x0) * k;
+  const py = (v: number) => (v - rect.y0) * k;
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  const top = clamp(py(0) - LABEL_PX - 2, 4, cssHeight - LABEL_PX);
+  const left = clamp(px(0) - LABEL_PX - 2, 4, cssWidth - LABEL_PX);
+  const cell = worldSize / cells;
+  const out: (Rect & { text: string })[] = [];
+  for (let i = 0; i < cells; i++) {
+    const c = (i + 0.5) * cell;
+    const x = px(c);
+    const y = py(c);
+    if (x > 0 && x < cssWidth)
+      out.push({
+        x: x - LABEL_PX / 2,
+        y: top,
+        w: LABEL_PX,
+        h: LABEL_PX,
+        text: columnLetters.charAt(i),
+      });
+    if (y > 0 && y < cssHeight)
+      out.push({
+        x: left,
+        y: y - LABEL_PX / 2,
+        w: LABEL_PX,
+        h: LABEL_PX,
+        text: rowLetters.charAt(i),
+      });
+  }
+  return out;
 }
 
 export function downloadBlob(blob: Blob, filename: string) {

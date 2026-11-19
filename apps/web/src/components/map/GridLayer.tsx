@@ -28,6 +28,19 @@ function lines(
   return group;
 }
 
+/** Major and minor line groups on `renderer` (not yet on a map). */
+export function gridLineGroups(worldSize: number, cells: number, renderer: L.Renderer) {
+  const majorPositions = gridLines(worldSize, cells);
+  // same W/80 lattice as the major lines, minus every 10th (those are major) — always aligned
+  const minorPositions = gridLines(worldSize, cells * SUB_CELLS).filter(
+    (_, i) => i % SUB_CELLS !== 0,
+  );
+  return {
+    major: lines(worldSize, majorPositions, MAJOR_STYLE, renderer),
+    minor: lines(worldSize, minorPositions, MINOR_STYLE, renderer),
+  };
+}
+
 /** Major 1-square lines always; minor 1/10 lines at high zoom. Drawn on one canvas in its own pane. */
 export function GridLayer({
   worldSize,
@@ -42,13 +55,8 @@ export function GridLayer({
 
   useEffect(() => {
     const renderer = L.canvas({ pane: GRID_PANE, padding: 0.5 });
-    const majorPositions = gridLines(worldSize, cells);
-    // same W/80 lattice as the major lines, minus every 10th (those are major) — always aligned
-    const minorPositions = gridLines(worldSize, cells * SUB_CELLS).filter(
-      (_, i) => i % SUB_CELLS !== 0,
-    );
-    const major = lines(worldSize, majorPositions, MAJOR_STYLE, renderer).addTo(map);
-    const minor = lines(worldSize, minorPositions, MINOR_STYLE, renderer);
+    const { major, minor } = gridLineGroups(worldSize, cells, renderer);
+    major.addTo(map);
 
     const sync = () => {
       if (map.getZoom() >= minorGridMinZoom(maxNativeZoom)) minor.addTo(map);

@@ -396,9 +396,15 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             },
           },
           {
-            label: 'Export PNG',
+            label: 'Export view as PNG',
             onSelect: () => {
-              useWorkspaceStore.getState().requestExport();
+              useWorkspaceStore.getState().requestExport('view');
+            },
+          },
+          {
+            label: 'Export whole map as PNG',
+            onSelect: () => {
+              useWorkspaceStore.getState().requestExport('map');
             },
           },
         ]
@@ -542,10 +548,18 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                 <DropdownMenuItem
                   disabled={!active}
                   onSelect={() => {
-                    useWorkspaceStore.getState().requestExport();
+                    useWorkspaceStore.getState().requestExport('view');
                   }}
                 >
-                  Export PNG
+                  Export view as PNG
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!active}
+                  onSelect={() => {
+                    useWorkspaceStore.getState().requestExport('map');
+                  }}
+                >
+                  Export whole map as PNG
                 </DropdownMenuItem>
                 {active && (
                   <DropdownMenuItem
