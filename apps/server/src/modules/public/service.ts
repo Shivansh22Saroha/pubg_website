@@ -1,5 +1,7 @@
 import type { DemoBoard } from '@rotationlab/shared';
 import type { PrismaClient } from '@prisma/client';
+import type { AssetStorage } from '../../lib/storage.js';
+import { toPublicCustomMap } from '../customMaps/service.js';
 import { toPublicElement } from '../elements/service.js';
 import { toBoard, toLayer } from '../rooms/mappers.js';
 
@@ -12,9 +14,12 @@ import { toBoard, toLayer } from '../rooms/mappers.js';
 export function createPublicService({
   prisma,
   demoBoardIds,
+  storage,
 }: {
   prisma: PrismaClient;
   demoBoardIds: readonly string[];
+  /** signs a custom map's image URLs (F20) */
+  storage: AssetStorage;
 }) {
   return {
     async demoBoards(): Promise<DemoBoard[]> {
@@ -22,6 +27,7 @@ export function createPublicService({
       const rows = await prisma.board.findMany({
         where: { id: { in: [...demoBoardIds] }, room: { deletedAt: null } },
         include: {
+          customMap: true,
           layers: { orderBy: { position: 'asc' } },
           elements: { orderBy: [{ z: 'asc' }, { seq: 'asc' }] },
         },
@@ -35,6 +41,7 @@ export function createPublicService({
         return [
           {
             board,
+            customMap: row.customMap ? toPublicCustomMap(row.customMap, storage) : null,
             layers: row.layers.map(toLayer),
             elements: row.elements.map(toPublicElement),
           },

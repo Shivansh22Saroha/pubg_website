@@ -66,6 +66,15 @@ export function createBoardService(d: BoardServiceDeps) {
           : null;
         if (body.duplicateFrom && !source)
           throw new AppError('NOT_FOUND', 'Board to duplicate not found');
+        // a custom map must belong to this room (F20); a duplicate keeps its source's map
+        const customMapId = source ? source.customMapId : (body.customMapId ?? null);
+        if (!source && customMapId) {
+          const map = await tx.customMap.findFirst({
+            where: { id: customMapId, roomId },
+            select: { id: true },
+          });
+          if (!map) throw new AppError('NOT_FOUND', 'Custom map not found');
+        }
 
         const id = newId();
         const created = await tx.board.create({
@@ -74,6 +83,7 @@ export function createBoardService(d: BoardServiceDeps) {
             roomId,
             name: body.name,
             mapId: source?.mapId ?? fromMapId(body.mapId),
+            customMapId,
             position: count,
             createdBy: user.id,
           },

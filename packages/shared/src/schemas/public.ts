@@ -7,8 +7,20 @@ import { BoardSchema, LayerSchema } from './rooms.js';
  * `/explore`. Only boards listed in `DEMO_BOARD_IDS` are ever served, and nothing that points
  * back at a room or a user: no room id, no author ids.
  */
+/** what a read-only viewer needs to draw a custom map (F20): no room, no author */
+export const PublicCustomMapSchema = z.object({
+  name: z.string(),
+  widthM: z.number().int(),
+  imageUrl: z.string(),
+  previewUrl: z.string(),
+  urlsExpireAt: z.number().int(),
+});
+export type PublicCustomMap = z.infer<typeof PublicCustomMapSchema>;
+
 export const DemoBoardSchema = z.object({
   board: BoardSchema.omit({ roomId: true }),
+  /** the board's custom map when mapId is `custom`, else null */
+  customMap: PublicCustomMapSchema.nullable(),
   layers: z.array(LayerSchema),
   elements: z.array(ElementSchema.extend({ createdBy: z.null(), updatedBy: z.null() })),
 });

@@ -1,16 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadSharedBoard } from '@/lib/share';
 
+// lib/boardMap reads the tiles base (F20); tests have no app env
+vi.mock('@/env', () => ({ env: { NEXT_PUBLIC_TILES_BASE_URL: '/tiles' } }));
+
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const err = (status: number, code: string) =>
   json(status, { error: { code, message: code, requestId: 'r' } });
 const TOKEN = 'AbCdEfGhIjKlMnOpQr_-12';
 const BOARD = {
+  customMap: null,
   board: {
     id: '0192f7a1-0000-7000-8000-000000000001',
     name: 'Drop A',
     mapId: 'miramar',
+    customMapId: null,
     position: 0,
     elementCount: 1,
     updatedAt: '2026-11-03T10:00:00.000Z',
@@ -56,6 +61,39 @@ describe('loadSharedBoard (Phase 11)', () => {
     if (res.status !== 'ok') return;
     expect(res.board.mapId).toBe('miramar');
     expect(Object.keys(res.board.elements)).toEqual([BOARD.elements[0]!.id]);
+  });
+
+  it('a board on a custom map carries its image and scale (F20)', async () => {
+    const custom = {
+      ...BOARD,
+      board: {
+        ...BOARD.board,
+        mapId: 'custom',
+        customMapId: '0192f7a1-0000-7000-8000-0000000000c1',
+      },
+      customMap: {
+        name: 'Bermuda',
+        widthM: 2040,
+        imageUrl: 'https://r2.example/maps/a.webp?sig',
+        previewUrl: 'https://r2.example/maps/a-512.webp?sig',
+        urlsExpireAt: Date.now() + 3_600_000,
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(json(200, custom))),
+    );
+    const res = await loadSharedBoard(TOKEN);
+    expect(res.status).toBe('ok');
+    if (res.status !== 'ok') return;
+    expect(res.board.map).toMatchObject({ kind: 'custom', name: 'Bermuda', widthM: 2040 });
+    expect(res.board.map.metresPerUnit).toBeCloseTo(2040 / 816_000);
+    // a custom board whose map didn't come along can't be drawn: error, not a blank map
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(json(200, { ...custom, customMap: null }))),
+    );
+    expect((await loadSharedBoard(TOKEN)).status).toBe('error');
   });
 
   it('404 → gone, 429 → limited, anything else → error (never a refresh loop)', async () => {

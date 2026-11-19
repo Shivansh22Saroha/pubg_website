@@ -42,9 +42,11 @@ import { shareRoutes } from './modules/share/routes.js';
 import { adminRoutes } from './modules/admin/routes.js';
 import { createAdminStats } from './modules/admin/stats.js';
 import { createGoogleClient, type GoogleClient } from './modules/auth/google.js';
+import { customMapRoutes } from './modules/customMaps/routes.js';
+import { createCustomMapService } from './modules/customMaps/service.js';
 import { thumbnailRoutes } from './modules/thumbnails/routes.js';
 import { createThumbnailService } from './modules/thumbnails/service.js';
-import { createAssetStorage, type AssetStorage } from './lib/storage.js';
+import { assetSigningSecret, createAssetStorage, type AssetStorage } from './lib/storage.js';
 import { createShareService } from './modules/share/service.js';
 import { createBoardService } from './modules/boards/service.js';
 import { inviteRoutes } from './modules/invites/routes.js';
@@ -149,7 +151,7 @@ export async function buildApp({
   logStream,
   realtime: withRealtime = true,
   mailer,
-  assets = createAssetStorage(config),
+  assets = createAssetStorage(config, assetSigningSecret(config.JWT_SECRET)),
   google: googleOverride,
 }: AppDeps) {
   const app = Fastify({
@@ -333,7 +335,25 @@ export async function buildApp({
   await app.register(adminRoutes, { prefix: '/api/v1', stats: createAdminStats(prisma) });
   await app.register(publicRoutes, {
     prefix: '/api/v1',
-    service: createPublicService({ prisma, demoBoardIds: config.DEMO_BOARD_IDS }),
+    service: createPublicService({
+      prisma,
+      demoBoardIds: config.DEMO_BOARD_IDS,
+      storage: assets,
+    }),
+  });
+  const customMaps = createCustomMapService({
+    prisma,
+    policy,
+    storage: assets,
+    log: app.log,
+    events,
+  });
+  await app.register(customMapRoutes, {
+    prefix: '/api/v1',
+    customMaps,
+    storage: assets,
+    redis,
+    rateLimits,
   });
   await app.register(thumbnailRoutes, {
     prefix: '/api/v1',
@@ -342,7 +362,12 @@ export async function buildApp({
   });
   await app.register(shareRoutes, {
     prefix: '/api/v1',
-    share: createShareService({ prisma, policy, appOrigin: config.APP_ORIGIN }),
+    share: createShareService({
+      prisma,
+      policy,
+      appOrigin: config.APP_ORIGIN,
+      storage: assets,
+    }),
   });
 
   // ---- realtime (Socket.IO on the same HTTP server, path /realtime) -------------------

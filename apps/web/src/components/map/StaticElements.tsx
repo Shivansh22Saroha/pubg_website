@@ -1,40 +1,43 @@
 'use client';
 
-import { MAPS, tileWorldSize, type Layer, type MapId } from '@rotationlab/shared';
+import { type Layer } from '@rotationlab/shared';
 import L from 'leaflet';
 import { env } from '@/env';
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import { ELEMENTS_PANE, textScale } from '@/components/map/ElementLayer';
 import { ElementRenderer } from '@/components/map/elementRenderer';
+import { useBoardMapInfo } from '@/components/map/boardMapContext';
 import type { ViewElement } from '@/stores/boardModel';
 
 /** loot item icons are deployed next to the tiles (Phase 12) */
 const ICON_BASE = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 /**
  * The same ElementRenderer the live board uses, fed from fixed data instead of the board store
- * (snapshot previews, the /explore demo boards). Hidden layers stay hidden.
+ * (snapshot previews, the /explore demo boards, share links). Hidden layers stay hidden. The map
+ * comes from the surrounding MapCanvas.
  */
 export function StaticElements({
-  mapId,
   elements,
   layers,
 }: {
-  mapId: MapId;
   elements: Record<string, ViewElement>;
   layers: Layer[];
 }) {
   const map = useMap();
+  const info = useBoardMapInfo();
+  const tileWorld = info?.tileWorld;
+  const maxNativeZoom = info?.maxNativeZoom ?? 5;
   useEffect(() => {
-    const config = MAPS[mapId];
+    if (tileWorld === undefined) return;
     if (!map.getPane(ELEMENTS_PANE)) map.createPane(ELEMENTS_PANE).style.zIndex = '400';
     const canvas = L.canvas({ pane: ELEMENTS_PANE, padding: 0.5 });
-    const renderer = new ElementRenderer(L, map, canvas, tileWorldSize(config), ICON_BASE);
+    const renderer = new ElementRenderer(L, map, canvas, tileWorld, ICON_BASE);
     const container = map.getContainer();
     const draw = () => {
       container.style.setProperty(
         '--rl-text-scale',
-        String(textScale(map.getZoom(), config.maxNativeZoom)),
+        String(textScale(map.getZoom(), maxNativeZoom)),
       );
       renderer.sync(elements, layers);
     };
@@ -49,6 +52,6 @@ export function StaticElements({
       renderer.destroy();
       canvas.remove();
     };
-  }, [map, mapId, elements, layers]);
+  }, [map, tileWorld, maxNativeZoom, elements, layers]);
   return null;
 }

@@ -51,6 +51,7 @@ Give a team **one shared, persistent, zoomable map** where everyone can draw, pl
 12. **Export** — PNG of current viewport with drawings.
 13. **Responsive** — full use on desktop; view + chat + basic drawing on tablet; view + chat on phone.
 14. **Voice chat** (added 2026-11, user feedback) — talk with teammates inside a room: peer-to-peer, up to 8 people per room, everyone joins muted, mute / deafen / push-to-talk. Discord stays fine for bigger calls.
+15. **Custom maps** (added 2026-11, user feedback) — owners / editors upload their own map image to a room (with its real width in metres, so distances are right) and plan on it like a built-in map; images stay private to the room.
 
 ### 4.2 Out of scope — v1 (see TODO.md for later)
 - Automatic zone simulator with real phase shrink logic
@@ -58,7 +59,7 @@ Give a team **one shared, persistent, zoomable map** where everyone can draw, pl
 - Public room discovery / matchmaking
 - Social login (Google/Discord) — planned v1.1
 - Native mobile apps
-- Sanhok, Vikendi and other maps — design must allow adding them by config only
+- Sanhok, Vikendi and other maps as built-in tiled maps — design must allow adding them by config only (meanwhile a room can upload any map image, scope item 15)
 
 ## 5. Functional requirements
 

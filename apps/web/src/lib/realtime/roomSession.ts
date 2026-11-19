@@ -553,6 +553,10 @@ export class RoomSession {
     this.on('summon', ({ userId, boardId }) => {
       if (userId !== this.meId) this.cb.onSummon(userId, boardId);
     });
+    this.on('customMaps:changed', ({ roomId }) => {
+      if (roomId === this.roomId)
+        void this.queryClient.invalidateQueries({ queryKey: keys.customMaps(roomId) });
+    });
     this.on('board:created', ({ board }) => {
       this.updateRoom((p) =>
         p.boards.some((b) => b.id === board.id) ? p : { ...p, boards: [...p.boards, board] },

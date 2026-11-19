@@ -3,17 +3,20 @@
 import {
   DemoBoardsResponseSchema,
   MAP_IDS,
+  type BoardMapId,
   type DemoBoard,
   type Layer,
-  type MapId,
 } from '@rotationlab/shared';
 import { useQuery } from '@tanstack/react-query';
 import type { ViewElement } from '@/stores/boardModel';
 import { api } from './api';
+import { pubgMapInfo, type BoardMapInfo } from './boardMap';
 
 /** What /explore shows per map: the demo board for it, or the bare map when none is set up. */
 export interface ExploreBoard {
-  mapId: MapId;
+  mapId: BoardMapId;
+  /** the resolved map (a share link's board may be on a custom map, F20) */
+  map: BoardMapInfo;
   name: string;
   elements: Record<string, ViewElement>;
   layers: Layer[];
@@ -26,9 +29,11 @@ export interface ExploreBoard {
 export function exploreBoards(items: readonly DemoBoard[]): ExploreBoard[] {
   return MAP_IDS.map((mapId) => {
     const item = items.find((i) => i.board.mapId === mapId);
-    if (!item) return { mapId, name: '', elements: {}, layers: [] };
+    const map = pubgMapInfo(mapId);
+    if (!item) return { mapId, map, name: '', elements: {}, layers: [] };
     return {
       mapId,
+      map,
       name: item.board.name,
       layers: item.layers,
       elements: Object.fromEntries(item.elements.map((e) => [e.id, e])),

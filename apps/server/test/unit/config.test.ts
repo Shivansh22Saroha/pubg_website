@@ -58,16 +58,6 @@ describe('loadConfig', () => {
       expect(String(e)).not.toContain('tiny-secret-value');
     }
   });
-});
-
-describe('thumbnail storage config (Phase 11)', () => {
-  const s3 = {
-    S3_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
-    S3_BUCKET: 'rotationlab-assets',
-    S3_ACCESS_KEY_ID: 'id',
-    S3_SECRET_ACCESS_KEY: 'secret',
-    PUBLIC_ASSETS_BASE_URL: 'https://assets.example.com',
-  };
 
   it('voice relay: both Cloudflare TURN values or neither (never echoing them)', () => {
     expect(loadConfig(base).CF_TURN_KEY_ID).toBe('');
@@ -84,6 +74,16 @@ describe('thumbnail storage config (Phase 11)', () => {
     expect(msg).toMatch(/CF_TURN_KEY_ID/);
     expect(msg).not.toContain('super-secret-token');
   });
+});
+
+describe('asset storage config (thumbnails, custom maps)', () => {
+  const s3 = {
+    S3_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+    S3_BUCKET: 'rotationlab-assets',
+    S3_ACCESS_KEY_ID: 'id',
+    S3_SECRET_ACCESS_KEY: 'secret',
+    PUBLIC_ASSETS_BASE_URL: 'https://assets.example.com',
+  };
 
   it('defaults to local disk; empty S3 values count as unset', () => {
     const cfg = loadConfig({ ...base, S3_ENDPOINT: '', S3_BUCKET: '' });
@@ -92,16 +92,20 @@ describe('thumbnail storage config (Phase 11)', () => {
     expect(cfg.S3_REGION).toBe('auto');
   });
 
-  it('accepts all five S3 values together', () => {
+  it('accepts the four S3 credentials, with or without a public base URL', () => {
     expect(loadConfig({ ...base, ...s3 }).S3_BUCKET).toBe('rotationlab-assets');
+    const { PUBLIC_ASSETS_BASE_URL: _p, ...privateBucket } = s3;
+    expect(loadConfig({ ...base, ...privateBucket }).PUBLIC_ASSETS_BASE_URL).toBeUndefined();
   });
 
   it('refuses a partial S3 setup and names what is missing (never the values)', () => {
-    const { S3_SECRET_ACCESS_KEY: _s, PUBLIC_ASSETS_BASE_URL: _p, ...partial } = s3;
-    expect(() => loadConfig({ ...base, ...partial })).toThrow(
-      /S3_SECRET_ACCESS_KEY[\s\S]*PUBLIC_ASSETS_BASE_URL|PUBLIC_ASSETS_BASE_URL[\s\S]*S3_SECRET_ACCESS_KEY/,
-    );
+    const { S3_SECRET_ACCESS_KEY: _s, ...partial } = s3;
+    expect(() => loadConfig({ ...base, ...partial })).toThrow(/S3_SECRET_ACCESS_KEY/);
     expect(() => loadConfig({ ...base, ...partial })).not.toThrow(/secret|\bid\b/);
     expect(() => loadConfig({ ...base, ...s3, S3_ENDPOINT: 'not a url' })).toThrow(/S3_ENDPOINT/);
+    // a public base URL alone has nothing to serve from
+    expect(() =>
+      loadConfig({ ...base, PUBLIC_ASSETS_BASE_URL: 'https://assets.example.com' }),
+    ).toThrow(/PUBLIC_ASSETS_BASE_URL/);
   });
 });

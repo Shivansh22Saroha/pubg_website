@@ -50,8 +50,9 @@ export function gridLines(worldSize: number, divisions: number): number[] {
 }
 
 /** Straight-line distance between two world points, in metres. */
-export function distanceMetres(a: Pt, b: Pt): number {
-  return Math.hypot(b[0] - a[0], b[1] - a[1]) / 100;
+/** `metresPerUnit`: 0.01 on PUBG maps (centimetres), custom maps pass their own scale */
+export function distanceMetres(a: Pt, b: Pt, metresPerUnit = 0.01): number {
+  return Math.hypot(b[0] - a[0], b[1] - a[1]) * metresPerUnit;
 }
 
 /** Total length of a polyline, in metres. */

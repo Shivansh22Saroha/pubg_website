@@ -1,6 +1,6 @@
 'use client';
 
-import { MAPS, tileWorldSize, type MapId } from '@rotationlab/shared';
+import type { BoardMapInfo } from '@/lib/boardMap';
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import MapCanvas from '@/components/map/MapCanvas';
@@ -18,12 +18,11 @@ import { useMeasureStore } from '@/stores/measureStore';
  * given only what it uses (pixel scale + the local measure line). While measuring, a press
  * adds a point instead of panning; two fingers still pan / pinch.
  */
-function ExploreMeasure({ mapId, active }: { mapId: MapId; active: boolean }) {
+function ExploreMeasure({ info, active }: { info: BoardMapInfo; active: boolean }) {
   const map = useMap();
+  const { tileWorld, worldSize } = info;
   useEffect(() => {
     if (!active) return;
-    const config = MAPS[mapId];
-    const tileWorld = tileWorldSize(config);
     const ctx = {
       worldPerPx: () => worldPerPx(map, tileWorld),
       setMeasure: (line) => {
@@ -35,7 +34,7 @@ function ExploreMeasure({ mapId, active }: { mapId: MapId; active: boolean }) {
     const container = map.getContainer();
     const touches = new Set<number>();
     const pointer = (e: PointerEvent | MouseEvent) => ({
-      world: clientToWorld(map, e, config.worldSize),
+      world: clientToWorld(map, e, worldSize),
       screen: [e.clientX, e.clientY] as [number, number],
       shiftKey: e.shiftKey,
       button: e.button,
@@ -87,7 +86,7 @@ function ExploreMeasure({ mapId, active }: { mapId: MapId; active: boolean }) {
       container.removeEventListener('dblclick', dbl, true);
       window.removeEventListener('keydown', key);
     };
-  }, [map, mapId, active]);
+  }, [map, tileWorld, worldSize, active]);
   return null;
 }
 
@@ -100,10 +99,10 @@ export default function ExploreMap({
   measuring: boolean;
 }) {
   return (
-    <MapCanvas mapId={board.mapId} minimap>
-      <StaticElements mapId={board.mapId} elements={board.elements} layers={board.layers} />
+    <MapCanvas map={board.map} minimap>
+      <StaticElements elements={board.elements} layers={board.layers} />
       <MeasureLayer />
-      <ExploreMeasure mapId={board.mapId} active={measuring} />
+      <ExploreMeasure info={board.map} active={measuring} />
     </MapCanvas>
   );
 }

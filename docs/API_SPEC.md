@@ -45,9 +45,13 @@ PublicUser = { id, username, displayName, ign: string|null, avatarColor }
 Me         = PublicUser & { email, emailVerified: boolean, createdAt }
 RoomSummary= { id, name, description, role: 'OWNER'|'EDITOR'|'VIEWER', memberCount, onlineCount,
                boardCount, lastActivityAt, thumbnailUrl: string|null /* Phase 11: the primaryMapId board's thumbnail */, hasPassword: boolean,
-               primaryMapId: 'erangel'|'miramar'|'rondo' /* map of the most recently updated board */ }
+               primaryMapId: 'erangel'|'miramar'|'rondo'|'custom' /* map of the most recently updated board */ }
 Member     = { user: PublicUser, role, joinedAt, online: boolean }
-Board      = { id, roomId, name, mapId: 'erangel'|'miramar'|'rondo', position, elementCount, updatedAt }
+Board      = { id, roomId, name, mapId: 'erangel'|'miramar'|'rondo'|'custom',
+               customMapId: string|null /* set exactly when mapId is 'custom' (F20) */, position, elementCount, updatedAt }
+CustomMap  = { id, roomId, name, widthM /* real-world width of the square image, metres */,
+               imageUrl, previewUrl /* signed, expiring URLs (≤ 4096 px / 512 px WebP) */,
+               urlsExpireAt /* epoch ms; ≥ 6 h ahead */, createdBy: string|null, createdAt }
 Layer      = { id, boardId, name, color, position, visible, locked, seq }
 Element    = { id, boardId, layerId, type, geometry, style, props, z, seq, createdBy, updatedBy, updatedAt }
 ChatMessage= { id, roomId, author: PublicUser|null, kind: 'USER'|'SYSTEM', body,
@@ -127,7 +131,7 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 | Method & path | Role | Body | Success |
 |---|---|---|---|
 | `GET /rooms/:roomId/boards` | member | – | `{ items: Board[] }` |
-| `POST /rooms/:roomId/boards` | EDITOR+ | `{ name, mapId, duplicateFrom?: boardId }` | `201 { board }` + socket `board:created` |
+| `POST /rooms/:roomId/boards` | EDITOR+ | `{ name, mapId, customMapId?, duplicateFrom?: boardId }` — `customMapId` required with `mapId: 'custom'` and refused otherwise (`VALIDATION_ERROR`); a custom map of another room → `404`; a duplicate keeps its source's map | `201 { board }` + socket `board:created` |
 | `PATCH /boards/:boardId` | EDITOR+ | `{ name?, position? }` | `{ board }` + socket `board:updated` |
 | `DELETE /boards/:boardId` | OWNER | – | `204` + socket `board:deleted` (can't delete last board) |
 | `GET /boards/:boardId/state` | member | – | `{ board, layers: Layer[], elements: Element[], seq }` (fallback for socket; used by PNG export/SSR thumbnail) |
@@ -140,6 +144,17 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 Snapshot notes (Phase 8): saving / restoring needs `board.manage` (OWNER / EDITOR); listing and reading any member; snapshots of boards you can't see are `404`. The 51st manual snapshot → `422 LIMIT_REACHED`. Restore runs in one transaction (auto snapshot "Before restore of '{name}'" → layers + elements replaced with the snapshot's ids at a new seq → op log dropped so a `sinceSeq` resync becomes a full load → audit row) and only then emits `board:reset` and a system chat message. A `layer:clear` of a non-empty layer first saves an auto snapshot "Before clearing '{layer}'". Auto snapshots: at most 10 per board (the one being restored is never pruned).
 
 Layer and element mutations go through **Socket.IO only** (§7).
+
+### 5a. Custom maps (FEATURES F20)
+| Method & path | Role | Body | Success |
+|---|---|---|---|
+| `GET /rooms/:roomId/custom-maps` | member | – | `{ items: CustomMap[] }` (oldest first) |
+| `POST /rooms/:roomId/custom-maps?name=…&widthM=…` | EDITOR+ | the image as the raw body: `image/jpeg`, `image/png` or `image/webp`, ≤ 8 MB (the browser shrinks the picked file, ≤ 15 MB, first) | `201 { customMap }` + socket `customMaps:changed` |
+| `PATCH /rooms/:roomId/custom-maps/:mapId` | EDITOR+ | `{ name?, widthM? }` (one at least) | `{ customMap }` + socket `customMaps:changed` |
+| `DELETE /rooms/:roomId/custom-maps/:mapId` | EDITOR+ | – | `204` + socket `customMaps:changed`; a map a board still uses → `409 CONFLICT` |
+| `GET /assets/maps/:roomId/:file?exp=&sig=` | public, **signed link** | – | local storage backend only: the WebP; a missing / expired / tampered signature → `404` |
+
+Upload rules: `name` 1–40 chars (trimmed, NFC); `widthM` whole metres 50–50 000 written as digits only (`2000`, not `2e3` or `2000.5`). The bytes are sniffed (magic numbers, not the declared type) and decoded by sharp with a pixel cap; the longer side must be ≥ 256 px. Stored: EXIF-rotated, shrunk to ≤ 4096 px, padded to a centred square, re-encoded as WebP (no metadata), plus a 512 px preview, under fresh random keys `maps/<roomId>/<128-bit>.webp`. ≤ 10 per room (`422 LIMIT_REACHED`, checked again under a room lock). Other content types → `415`; anything unreadable → `400 VALIDATION_ERROR`. The image is private: responses only ever carry signed URLs (S3 presigned GET, or an HMAC-signed API link on local disk), issued per 6 h window and valid 12 h, so the same URL repeats for hours (browser cache) and the client refetches the list every 30 min. Share links (`/public/share/:token`) and demo boards carry the board's map as `customMap: { name, widthM, imageUrl, previewUrl, urlsExpireAt } | null` — no room or author ids.
 
 ### 5b. Share links (Phase 11)
 | Method & path | Role | Body | Success |
@@ -230,6 +245,7 @@ Implementation notes (Phase 5A/5B):
 | `chat:typing` | `{ userId }` |
 | `voice:peers` | `{ roomId, peers: VoicePeer[] }` where `VoicePeer = { peerId, userId, muted }` — the room's whole voice channel, to everyone in the room on every change, and to a socket right after its `room:join` |
 | `voice:signal` | `{ roomId, from, data }` (see `voice:signal` above) |
+| `customMaps:changed` | `{ roomId }` — a custom map was uploaded, renamed / rescaled or deleted: refetch the list (a new width changes every distance on its boards) |
 | `voice:ended` | `{ roomId, reason: 'elsewhere' }` — this socket was taken out of voice because the same user joined from another tab |
 | `presence:update` | `{ roomId, users: Presence[] }` where `Presence = { userId, boardId, idle, color }` |
 | `cursor:batch` | `{ boardId, cursors: [{ userId, x, y }] }` — every 50 ms (`CURSOR_FLUSH_MS`), the latest position of each cursor on that board that moved since the last flush; one message per recipient per tick (Phase 10, replaces a per-move `cursor:move` broadcast). Includes the recipient's own cursor: ignore it. Volatile |

@@ -80,6 +80,8 @@ export interface PreviewSink {
 
 export interface ToolContext {
   readonly worldSize: number;
+  /** metres per world unit: 0.01 on PUBG maps, a custom map's own scale (F20) */
+  readonly metresPerUnit: number;
   /** world units per screen pixel at the current zoom */
   worldPerPx(): number;
   /** the style bar's current style for this tool */

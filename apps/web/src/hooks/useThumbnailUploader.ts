@@ -1,9 +1,8 @@
 'use client';
 
-import { MAPS, ThumbnailResponseSchema, tileWorldSize, type MapId } from '@rotationlab/shared';
+import { ThumbnailResponseSchema } from '@rotationlab/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { env } from '@/env';
 import { api } from '@/lib/api';
 import { onLocalEdit } from '@/lib/localEdits';
 import { keys } from '@/lib/queryKeys';
@@ -12,8 +11,6 @@ import { useBoardStore } from '@/stores/boardStore';
 
 /** FEATURES F4: generated this long after the user's last edit of the board */
 export const THUMBNAIL_DELAY_MS = 30_000;
-
-const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 
 /** E2E hook (window.__rlDebug.flushThumbnail): run the armed upload now instead of in 30 s */
 let flushArmed: (() => Promise<boolean>) | null = null;
@@ -27,12 +24,15 @@ export const flushThumbnail = (): Promise<boolean> => flushArmed?.() ?? Promise.
  */
 export function useThumbnailUploader(
   boardId: string | undefined,
-  mapId: MapId | undefined,
+  /** the board's map background (PUBG low-res art / a custom map's preview) and CRS span */
+  map: { backgroundUrl: string; tileWorld: number } | null,
   canEdit: boolean,
 ) {
   const qc = useQueryClient();
+  const backgroundUrl = map?.backgroundUrl;
+  const tileWorld = map?.tileWorld;
   useEffect(() => {
-    if (!boardId || !mapId || !canEdit) return;
+    if (!boardId || !backgroundUrl || !tileWorld || !canEdit) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const upload = async (): Promise<boolean> => {
@@ -40,10 +40,9 @@ export function useThumbnailUploader(
       flushArmed = null;
       const s = useBoardStore.getState();
       if (s.boardId !== boardId || !s.ready) return false;
-      const map = MAPS[mapId];
       const blob = await renderThumbnail({
-        backgroundUrl: `${tilesBase}/${map.lowres}`,
-        worldSize: tileWorldSize(map),
+        backgroundUrl,
+        worldSize: tileWorld,
         elements: Object.values(s.view.elements),
         layers: s.view.layers,
       });
@@ -75,5 +74,5 @@ export function useThumbnailUploader(
       clearTimeout(timer);
       flushArmed = null;
     };
-  }, [boardId, mapId, canEdit, qc]);
+  }, [boardId, backgroundUrl, tileWorld, canEdit, qc]);
 }

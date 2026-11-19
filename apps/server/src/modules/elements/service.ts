@@ -4,7 +4,7 @@ import {
   ELEMENT_LIMITS,
   elementJsonBytes,
   elementWithinWorld,
-  MAPS,
+  worldSizeOf,
   ROOM_LIMITS,
   type BoardOp,
   type BoardSubscribeAck,
@@ -359,7 +359,7 @@ export function createBoardOpsService(d: {
 
       const clearedLayers: { layerName: string; count: number }[] = [];
       try {
-        validate(boardId, MAPS[toMapId(board.mapId)].worldSize, todo);
+        validate(boardId, worldSizeOf(toMapId(board.mapId)), todo);
         const result = await prisma.$transaction(async (tx) => {
           const [locked] = await tx.$queryRaw<{ last_seq: bigint; element_count: number }[]>`
             SELECT last_seq, element_count FROM boards WHERE id = ${boardId}::uuid FOR UPDATE`;

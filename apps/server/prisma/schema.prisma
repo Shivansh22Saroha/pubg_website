@@ -40,6 +40,7 @@ model User {
   chatMessages     ChatMessage[]
   snapshots        Snapshot[]
   shareLinks       ShareLink[]
+  customMaps       CustomMap[]
 
   @@map("users")
 }
@@ -92,6 +93,8 @@ enum MapId {
   ERANGEL
   MIRAMAR
   RONDO
+  /// an uploaded image (FEATURES F20): boards.custom_map_id says which
+  CUSTOM
 }
 
 model Room {
@@ -111,6 +114,7 @@ model Room {
   members        RoomMember[]
   invites        RoomInvite[]
   boards         Board[]
+  customMaps     CustomMap[]
   bans           RoomBan[]
   chatMessages   ChatMessage[]
 
@@ -160,10 +164,13 @@ model Board {
   lastSeq      BigInt        @default(0) @map("last_seq")
   elementCount Int           @default(0) @map("element_count")
   thumbnailKey String?       @map("thumbnail_key")
+  /// set exactly when map_id = CUSTOM (CHECK in the migration)
+  customMapId  String?       @map("custom_map_id") @db.Uuid
   createdBy    String?       @map("created_by") @db.Uuid
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   room         Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  customMap    CustomMap?    @relation(fields: [customMapId], references: [id], onDelete: NoAction)
   layers       Layer[]
   elements     Element[]
   ops          BoardOp[]
@@ -172,7 +179,30 @@ model Board {
   shareLink    ShareLink?
 
   @@index([roomId, position])
+  @@index([customMapId])
   @@map("boards")
+}
+
+/// an image a room uploaded to plan on (FEATURES F20); files live in asset storage
+model CustomMap {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId     String   @map("room_id") @db.Uuid
+  name       String   @db.VarChar(40)
+  /// real-world width of the square-padded image, metres (50–50 000)
+  widthM     Int      @map("width_m")
+  /// maps/<roomId>/<random>.webp — the full image (≤ 4096 px square)
+  imageKey   String   @map("image_key")
+  /// maps/<roomId>/<random>-512.webp
+  previewKey String   @map("preview_key")
+  sizePx     Int      @map("size_px")
+  createdBy  String?  @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  creator    User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  boards     Board[]
+
+  @@index([roomId, createdAt])
+  @@map("custom_maps")
 }
 
 model Layer {

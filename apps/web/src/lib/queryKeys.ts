@@ -9,6 +9,7 @@ export const keys = {
   room: (id: string) => ['room', id] as const,
   invites: (id: string) => ['room', id, 'invites'] as const,
   bans: (id: string) => ['room', id, 'bans'] as const,
+  customMaps: (id: string) => ['room', id, 'customMaps'] as const,
   boardState: (id: string) => ['board', id, 'state'] as const,
   share: (boardId: string) => ['board', boardId, 'share'] as const,
   sharedBoard: (token: string) => ['public', 'share', token] as const,

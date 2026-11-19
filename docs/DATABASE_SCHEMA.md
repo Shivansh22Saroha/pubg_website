@@ -22,7 +22,7 @@ users / rooms 1──* audit_logs
 | Enum | Values |
 |---|---|
 | `room_role` | `OWNER`, `EDITOR`, `VIEWER` |
-| `map_id` | `ERANGEL`, `MIRAMAR`, `RONDO` |
+| `map_id` | `ERANGEL`, `MIRAMAR`, `RONDO`, `CUSTOM` (an uploaded image, F20) |
 | `element_type` | `STROKE`, `LINE`, `ARROW`, `CIRCLE`, `POLYGON`, `TEXT`, `MARKER` |
 | `chat_kind` | `USER`, `SYSTEM` |
 
@@ -121,6 +121,7 @@ PK `(room_id, user_id)`. Written by `DELETE /rooms/:roomId/members/:userId { ban
 | room_id | uuid | FK → rooms CASCADE |
 | name | varchar(40) | NOT NULL |
 | map_id | map_id | NOT NULL |
+| custom_map_id | uuid | NULL, FK → custom_maps NO ACTION (a used map can't be deleted → `409`); CHECK `(map_id = 'CUSTOM') = (custom_map_id IS NOT NULL)`; indexed |
 | position | int | NOT NULL (tab order) |
 | last_seq | bigint | NOT NULL default 0 |
 | element_count | int | NOT NULL default 0, CHECK ≤ 5000 |
@@ -128,6 +129,20 @@ PK `(room_id, user_id)`. Written by `DELETE /rooms/:roomId/members/:userId { ban
 | created_by | uuid | FK → users SET NULL |
 | created_at / updated_at | timestamptz | NOT NULL |
 Index `(room_id, position)`. App-level limit 20 boards per room.
+
+### 3.7b `custom_maps` (F20)
+| Column | Type | Constraints |
+|---|---|---|
+| id | uuid | PK |
+| room_id | uuid | FK → rooms CASCADE |
+| name | varchar(40) | NOT NULL, CHECK length 1–40 |
+| width_m | int | NOT NULL, CHECK 50–50000 (real width of the square image → metres per world unit = `width_m / 816000`) |
+| image_key | text | NOT NULL (`maps/<roomId>/<random>.webp`, private) |
+| preview_key | text | NOT NULL (`…-512.webp`) |
+| size_px | int | NOT NULL, CHECK 256–4096 (side of the stored square) |
+| created_by | uuid | FK → users SET NULL |
+| created_at | timestamptz | NOT NULL |
+Index `(room_id, created_at)`. App-level limit 10 per room (checked under a `FOR UPDATE` lock on the room). Files are deleted with the row; the room purge job deletes every map's files of a purged room.
 
 ### 3.8 `layers`
 | Column | Type | Constraints |

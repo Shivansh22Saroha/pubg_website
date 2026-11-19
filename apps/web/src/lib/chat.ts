@@ -1,6 +1,6 @@
 import {
   gridRef,
-  MAPS,
+  worldSizeOf,
   MessagesResponseSchema,
   type Board,
   type ChatMessage,
@@ -32,7 +32,7 @@ export function pingLabel(
 ): PingLabel {
   const board = ping.boardId ? boards.find((b) => b.id === ping.boardId) : undefined;
   if (!board) return { text: '📍 board deleted', disabled: true };
-  const ref = gridRef([ping.x, ping.y], MAPS[board.mapId].worldSize);
+  const ref = gridRef([ping.x, ping.y], worldSizeOf(board.mapId));
   return { text: `📍 ${ref?.label ?? '?'} · ${board.name}`, disabled: false };
 }
 

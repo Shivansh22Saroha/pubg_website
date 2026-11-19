@@ -11,6 +11,8 @@ import { randomToken, sha256Hex } from '../../lib/crypto.js';
 import { AppError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
 import type { AuthUser } from '../../lib/policy.js';
+import type { AssetStorage } from '../../lib/storage.js';
+import { toPublicCustomMap } from '../customMaps/service.js';
 import { toPublicElement } from '../elements/service.js';
 import { toBoard, toLayer } from '../rooms/mappers.js';
 import type { RoomPolicy } from '../rooms/policy.js';
@@ -41,10 +43,13 @@ export function createShareService({
   prisma,
   policy,
   appOrigin,
+  storage,
 }: {
   prisma: PrismaClient;
   policy: RoomPolicy;
   appOrigin: string;
+  /** signs a custom map's image URLs (F20) */
+  storage: AssetStorage;
 }) {
   return {
     async status(user: AuthUser, boardId: string): Promise<ShareLink | null> {
@@ -118,6 +123,7 @@ export function createShareService({
           board: {
             include: {
               room: { select: { deletedAt: true } },
+              customMap: true,
               layers: { orderBy: { position: 'asc' } },
               elements: { orderBy: [{ z: 'asc' }, { seq: 'asc' }] },
             },
@@ -129,6 +135,8 @@ export function createShareService({
       const { roomId: _roomId, ...board } = toBoard(row.board);
       return {
         board,
+        // the link opens the board, so it opens its map image too (signed, expiring)
+        customMap: row.board.customMap ? toPublicCustomMap(row.board.customMap, storage) : null,
         layers: row.board.layers.map(toLayer),
         elements: row.board.elements.map(toPublicElement),
         expiresAt: row.expiresAt?.toISOString() ?? null,

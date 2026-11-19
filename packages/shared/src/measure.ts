@@ -12,12 +12,13 @@ export interface MeasureSummary {
 
 const minutes = (seconds: number) => (seconds <= 0 ? 0 : Math.max(1, Math.round(seconds / 60)));
 
-export function measure(points: readonly Pt[]): MeasureSummary {
+/** `metresPerUnit`: 0.01 on PUBG maps; a custom map's own scale otherwise (F20) */
+export function measure(points: readonly Pt[], metresPerUnit = 0.01): MeasureSummary {
   const segments: number[] = [];
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1];
     const b = points[i];
-    if (a && b) segments.push(distanceMetres(a, b));
+    if (a && b) segments.push(distanceMetres(a, b, metresPerUnit));
   }
   const total = segments.reduce((s, m) => s + m, 0);
   return {

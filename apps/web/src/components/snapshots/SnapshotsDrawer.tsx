@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/api';
+import { boardMapInfo } from '@/lib/boardMap';
+import { useCustomMaps } from '@/lib/customMaps';
 import {
   useCreateSnapshot,
   useDeleteSnapshot,
@@ -185,6 +187,8 @@ function PreviewDialog({
   onRestored: () => void;
 }) {
   const detail = useSnapshotDetail(snapshot.id);
+  const customMaps = useCustomMaps(board.roomId, board.mapId === 'custom');
+  const mapInfo = boardMapInfo(board, customMaps.data);
   const restore = useRestoreSnapshot(board.id);
   const remove = useDeleteSnapshot(board.id);
   const [confirm, setConfirm] = useState<'restore' | 'delete' | null>(null);
@@ -201,8 +205,8 @@ function PreviewDialog({
         description={`${snapshot.elementCount} element${snapshot.elementCount === 1 ? '' : 's'} · ${when(snapshot.createdAt)}${snapshot.isAuto ? ' · automatic' : ''}`}
         className="max-w-4xl"
       >
-        {detail.data ? (
-          <SnapshotPreviewMap mapId={board.mapId} boardId={board.id} data={detail.data.data} />
+        {detail.data && mapInfo ? (
+          <SnapshotPreviewMap map={mapInfo} boardId={board.id} data={detail.data.data} />
         ) : (
           <p className="p-6 text-sm text-text-muted">Loading preview…</p>
         )}

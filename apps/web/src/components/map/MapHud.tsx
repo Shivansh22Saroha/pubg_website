@@ -8,6 +8,7 @@ import { Hint } from '@/components/ui/hint';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { fromLatLng } from '@/lib/coords';
 import { cn } from '@/lib/utils';
+import { useMetresPerUnit } from './boardMapContext';
 import { MANUAL_VIEW_EVENT } from './FollowController';
 
 interface MapHudProps {
@@ -15,7 +16,8 @@ interface MapHudProps {
   worldSize: number;
   labels: boolean;
   grid: boolean;
-  onToggleLabels: () => void;
+  /** absent on custom maps (no labels variant, F20) */
+  onToggleLabels?: () => void;
   onToggleGrid: () => void;
   onFit: () => void;
   /** the Vehicles toggle + filter (MapCanvas owns its state) */
@@ -98,10 +100,11 @@ export function MapHud({
     L.DomEvent.disableScrollPropagation(el);
   }, []);
 
+  const mpu = useMetresPerUnit();
   const ref = cursor ? gridRef(cursor, worldSize) : null;
   const readout =
     cursor && ref
-      ? `${ref.label} · ${formatMetres(cursor[0] / 100)}, ${formatMetres(cursor[1] / 100)}`
+      ? `${ref.label} · ${formatMetres(cursor[0] * mpu)}, ${formatMetres(cursor[1] * mpu)}`
       : '—';
 
   const panel = 'pointer-events-auto glass rounded-panel';
@@ -118,15 +121,17 @@ export function MapHud({
         {readout}
       </output>
       <div ref={controlsRef} className={cn(panel, 'flex items-center gap-0.5 p-1')}>
-        <HudButton
-          label="Map labels"
-          shortcut="N"
-          hint="Show or hide place names"
-          pressed={labels}
-          onClick={onToggleLabels}
-        >
-          <MapLabelsIcon className="size-[18px]" />
-        </HudButton>
+        {onToggleLabels && (
+          <HudButton
+            label="Map labels"
+            shortcut="N"
+            hint="Show or hide place names"
+            pressed={labels}
+            onClick={onToggleLabels}
+          >
+            <MapLabelsIcon className="size-[18px]" />
+          </HudButton>
+        )}
         <HudButton
           label="Grid"
           shortcut="Shift+G"

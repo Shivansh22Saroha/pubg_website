@@ -25,6 +25,8 @@ const apps: App[] = [];
 
 /** thumbnails of this test file land in a throw-away dir, never apps/server/data */
 export const assetsDir = mkdtempSync(path.join(tmpdir(), 'rl-assets-'));
+/** signs private local asset links in tests (custom maps, F20) */
+export const ASSET_SECRET = 'test-asset-secret';
 
 /** Fresh app per call (config overrides allowed). Logs are captured, never printed. */
 export async function makeApp(
@@ -43,7 +45,7 @@ export async function makeApp(
     prisma,
     redis,
     logStream: logs,
-    assets: createLocalStorage(assetsDir),
+    assets: createLocalStorage(assetsDir, ASSET_SECRET),
     ...opts,
   });
   apps.push(app);
@@ -365,4 +367,21 @@ export function thumbJpeg(
     },
   });
   return (opts.format === 'png' ? img.png() : img.jpeg({ quality: 70 })).toBuffer();
+}
+
+/** a small landscape PNG to upload as a custom map (F20): left half red, right half blue */
+export function mapPng(width = 400, height = 300): Promise<Buffer> {
+  const half = Math.floor(width / 2);
+  return sharp({
+    create: { width, height, channels: 3, background: { r: 0, g: 0, b: 255 } },
+  })
+    .composite([
+      {
+        input: { create: { width: half, height, channels: 3, background: { r: 255, g: 0, b: 0 } } },
+        left: 0,
+        top: 0,
+      },
+    ])
+    .png()
+    .toBuffer();
 }

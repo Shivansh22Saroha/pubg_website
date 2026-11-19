@@ -1,6 +1,6 @@
 'use client';
 
-import { MAPS, type RoomSummary } from '@rotationlab/shared';
+import { isPubgMap, MAPS, type RoomSummary } from '@rotationlab/shared';
 import { Clock, Lock, MoreVertical, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -52,7 +52,7 @@ export function RoomCard({ room, priority = false }: { room: RoomSummary; priori
             className="absolute inset-0 bg-[linear-gradient(180deg,transparent_45%,rgba(0,0,0,0.75))]"
           />
           <span className="absolute bottom-2.5 left-3 rounded-full border border-white/10 bg-black/45 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
-            {MAPS[room.primaryMapId].name}
+            {isPubgMap(room.primaryMapId) ? MAPS[room.primaryMapId].name : 'Custom map'}
           </span>
         </div>
         <div className="flex flex-col gap-2 p-4">

@@ -400,7 +400,7 @@ export class CircleTool extends BaseTool {
       center,
       r,
       style: this.ctx.style(),
-      label: formatMetres(r / 100),
+      label: formatMetres(r * this.ctx.metresPerUnit),
     });
     this.ctx.preview.replace(circleOutline(center, r, this.ctx.worldSize));
   }

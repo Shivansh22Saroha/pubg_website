@@ -1,24 +1,21 @@
 'use client';
 
-import { MAPS, type MapId } from '@rotationlab/shared';
 import L from 'leaflet';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { env } from '@/env';
+import type { BoardMapInfo } from '@/lib/boardMap';
 import { keyPan, MINIMAP_PX, minimapToWorld, viewportRect, type PxRect } from '@/lib/minimap';
 import { prefKeys, readPref, writePref } from '@/lib/prefs';
 import { cn } from '@/lib/utils';
 import { MANUAL_VIEW_EVENT } from './FollowController';
 
-const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
-
 /**
  * Minimap (Phase 11, MAP-5, UI_UX_SPEC §3.5): bottom-right, 160×160, collapsible — the map's
- * low-res image with the main view's rectangle. Click or drag on it to move the view (a manual
+ * low-res image (a custom map's 512 px preview) with the main view's rectangle. Click or drag on it to move the view (a manual
  * move: it ends follow mode); arrow keys pan while it has focus. Not rendered on phones.
  */
-export function Minimap({ map, mapId }: { map: L.Map; mapId: MapId }) {
-  const config = MAPS[mapId];
+export function Minimap({ map, info }: { map: L.Map; info: BoardMapInfo }) {
+  const config = info.config;
   // the low-res art spans the world square, like MapCanvas's placeholder ImageOverlay
   const span = config.worldSize;
   const [rect, setRect] = useState<PxRect | null>(null);
@@ -145,7 +142,7 @@ export function Minimap({ map, mapId }: { map: L.Map; mapId: MapId }) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- static tile asset */}
           <img
-            src={`${tilesBase}/${config.lowres}`}
+            src={info.backgroundUrl}
             alt=""
             draggable={false}
             className="pointer-events-none size-full"

@@ -19,14 +19,23 @@ export async function purgeDeletedRooms(
   assets?: AssetStorage,
 ): Promise<number> {
   const where = { deletedAt: { lt: new Date(now.getTime() - PURGE_ROOMS_AFTER_MS) } };
-  // their boards' thumbnails go too (Phase 11); a failed object delete never blocks the purge
+  // their boards' thumbnails (Phase 11) and custom map images (F20) go too; a failed object
+  // delete never blocks the purge
   const keys = assets
-    ? (
-        await prisma.board.findMany({
-          where: { room: where, thumbnailKey: { not: null } },
-          select: { thumbnailKey: true },
-        })
-      ).flatMap((b) => (b.thumbnailKey ? [b.thumbnailKey] : []))
+    ? [
+        ...(
+          await prisma.board.findMany({
+            where: { room: where, thumbnailKey: { not: null } },
+            select: { thumbnailKey: true },
+          })
+        ).flatMap((b) => (b.thumbnailKey ? [b.thumbnailKey] : [])),
+        ...(
+          await prisma.customMap.findMany({
+            where: { room: where },
+            select: { imageKey: true, previewKey: true },
+          })
+        ).flatMap((m) => [m.imageKey, m.previewKey]),
+      ]
     : [];
   const { count } = await prisma.room.deleteMany({ where });
   if (assets) await Promise.allSettled(keys.map((key) => assets.remove(key)));

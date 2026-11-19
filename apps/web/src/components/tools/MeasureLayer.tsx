@@ -4,6 +4,7 @@ import { formatMeasure, formatMetres, measure, type Pt } from '@rotationlab/shar
 import L from 'leaflet';
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
+import { useMetresPerUnit } from '@/components/map/boardMapContext';
 import { toLatLng } from '@/lib/coords';
 import { useMeasureStore } from '@/stores/measureStore';
 
@@ -23,6 +24,8 @@ function label(text: string, className: string): L.DivIcon {
  */
 export function MeasureLayer() {
   const map = useMap();
+  // metres per world unit: 0.01 on PUBG maps, a custom map's own scale (F20)
+  const mpu = useMetresPerUnit();
 
   useEffect(() => {
     if (!map.getPane(MEASURE_PANE)) map.createPane(MEASURE_PANE).style.zIndex = '655';
@@ -54,7 +57,7 @@ export function MeasureLayer() {
           fillOpacity: 1,
         }).addTo(group);
 
-      const summary = measure(pts);
+      const summary = measure(pts, mpu);
       summary.segments.forEach((m, i) => {
         const a = pts[i];
         const b = pts[i + 1];
@@ -85,7 +88,7 @@ export function MeasureLayer() {
       renderer.remove();
       useMeasureStore.setState({ line: null });
     };
-  }, [map]);
+  }, [map, mpu]);
 
   return null;
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import { MAPS, type MapId, type Pt, type RoomRole } from '@rotationlab/shared';
+import type { Pt, RoomRole } from '@rotationlab/shared';
 import { useMemo } from 'react';
 import { FollowPill } from '@/components/room/FollowPill';
 import { StyleBar } from '@/components/tools/StyleBar';
 import { ToolLayer } from '@/components/tools/ToolLayer';
 import { isTouchLayout, useBreakpoint } from '@/hooks/useBreakpoint';
+import type { BoardMapInfo } from '@/lib/boardMap';
 import { makeNameOf } from '@/lib/editing';
 import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useBoardStore } from '@/stores/boardStore';
@@ -41,7 +42,7 @@ function EmptyHint() {
  */
 export default function BoardMap({
   boardId,
-  mapId,
+  map,
   meId,
   names,
   onCursor,
@@ -51,7 +52,8 @@ export default function BoardMap({
   boardName,
 }: {
   boardId: string;
-  mapId: MapId;
+  /** the board's map: PUBG or custom (F20) */
+  map: BoardMapInfo;
   meId: string;
   /** userId → display name, for cursor pills and "Changed by …" */
   names: Record<string, string>;
@@ -61,19 +63,19 @@ export default function BoardMap({
   roomName: string;
   boardName: string;
 }) {
-  const config = MAPS[mapId];
+  const { config } = map;
   const nameOf = useMemo(() => makeNameOf(meId, names), [meId, names]);
   return (
     <MapCanvas
       minimap
-      mapId={mapId}
+      map={map}
       onCursor={onCursor}
       overlay={
         <>
           {role !== 'VIEWER' && <EmptyHint />}
           <FollowPill names={names} />
           <RewindFlash />
-          <StyleBar role={role} mapId={mapId} session={session} nameOf={nameOf} />
+          <StyleBar role={role} mapId={map.mapId} session={session} nameOf={nameOf} />
         </>
       }
     >
@@ -91,7 +93,7 @@ export default function BoardMap({
       <PingLayer config={config} boardId={boardId} />
       <LaserLayer meId={meId} />
       <FollowController boardId={boardId} session={session} />
-      <ExportController roomName={roomName} boardName={boardName} mapName={config.name} />
+      <ExportController roomName={roomName} boardName={boardName} mapName={map.name} />
     </MapCanvas>
   );
 }

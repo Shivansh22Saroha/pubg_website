@@ -150,7 +150,12 @@ Note the **`{z}/{y}/{x}`** order — this is what `sharp`'s `layout: 'google'` w
 `gridRef(x, y)`: column = `'ABCDEFGH'[floor(x / (W/8))]`, row = `'IJKLMNOP'[floor(y / (W/8))]` → e.g. `"F-M"`. With W = 816 000 a square is 102 000 cm (1.02 km). Sub-square = 1/10 of a square (10 200 cm ≈ 102 m), shown as `F-M 4,7`; minor grid lines use the same W/80 spacing so they stay aligned with the major squares. Verify letter scheme in game before release; it is a constant in `maps.ts`.
 
 ### 5.5 Distance
-`metres = hypot(dx, dy) / 100`. Travel-time estimates use `SPEEDS = { foot: 6, vehicle: 22 }` m/s (configurable estimates, labelled "approx." in UI).
+`metres = hypot(dx, dy) × metresPerUnit` — `0.01` for PUBG maps, `widthM / 816000` for a custom map (`distanceMetres` / `measure` take it as an argument; the map view provides it through `BoardMapContext`). Travel-time estimates use `SPEEDS = { foot: 6, vehicle: 22 }` m/s (configurable estimates, labelled "approx." in UI).
+
+### 5.6 Custom maps (F20)
+A custom map uses the same `0 … 816000` square, so storage, validation, sync, the grid and the CRS are unchanged: the server fits the uploaded image into ≤ 4096 px, pads it to a centred square (dark fill) and the web draws it as one Leaflet `ImageOverlay` over `[[0,0],[816000,816000]]` instead of tiles (`customMapConfig`: `sourceSize = paddedSize = 4096`, `maxNativeZoom 4`). Only the scale differs: the uploader gives the real width of the image's longer side in metres, and every distance uses `metresPerUnit = widthM / 816000` — so changing the width later rescales all measurements without touching geometry. PUBG-only features are off on custom maps: the labels variant, vehicle spawns and zone presets. A board points at its map with `boards.custom_map_id`; the web resolves a board to a `BoardMapInfo` (`lib/boardMap.ts`, PUBG or custom) that carries the geometry, scale, images and backdrop.
+
+Images are private to the room: keys `maps/<roomId>/<random>.webp` (+ `-512` preview), never public. Every response carries **signed URLs** — S3 SigV4 presigned GET on R2, or `GET /api/v1/assets/maps/…?exp=&sig=` (HMAC derived from `JWT_SECRET`) on the local disk backend. Signatures are issued per 6 h window and valid 12 h, so a URL stays the same for hours (browser cache) and the list is refetched every 30 min.
 
 ## 6. Tile pipeline (`packages/map-tiles`)
 

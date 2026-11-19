@@ -236,6 +236,8 @@ export interface ServerToClientEvents {
   'board:created': (p: { board: z.infer<typeof BoardSchema> }) => void;
   'board:updated': (p: { board: z.infer<typeof BoardSchema> }) => void;
   'board:deleted': (p: { boardId: string }) => void;
+  /** the room's custom maps changed (F20): refetch `GET /rooms/:id/custom-maps` */
+  'customMaps:changed': (p: { roomId: string }) => void;
   'presence:update': (p: { roomId: string; users: Presence[] }) => void;
   /**
    * Live cursors (Phase 10): every CURSOR_FLUSH_MS the server sends each board the latest

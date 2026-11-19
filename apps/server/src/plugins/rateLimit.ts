@@ -23,6 +23,8 @@ export const LIMITS = {
   verifyResendHourly: { max: 3, windowSec: 3600 },
   /** verify / reset token submissions */
   emailToken: { max: 10, timeWindow: '1 minute' },
+  /** FEATURES F20: custom map uploads (each one decodes up to 36 MP with sharp), per user */
+  customMapUploadHourly: { max: 20, windowSec: 3600 },
   /** socket tickets: one per (re)connect; generous for reconnect storms, per user */
   socketTicket: { max: 60, windowSec: 60 },
 } as const;

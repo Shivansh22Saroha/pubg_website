@@ -1,6 +1,6 @@
 'use client';
 
-import { MAPS, type MapId, type RoomRole } from '@rotationlab/shared';
+import { isPubgMap, MAPS, type BoardMapId, type MapId, type RoomRole } from '@rotationlab/shared';
 import { useState } from 'react';
 import { env } from '@/env';
 import { cn } from '@/lib/utils';
@@ -9,7 +9,8 @@ const tilesBase = env.NEXT_PUBLIC_TILES_BASE_URL.replace(/\/$/, '');
 
 /**
  * Map image from the tile build — 256 px `thumb` or 512 px `card` — with a labelled
- * fallback when tiles aren't installed.
+ * fallback when tiles aren't installed. A custom map (F20) has no tile art: the board
+ * thumbnail, or the "Custom map" label.
  */
 export function MapThumb({
   mapId,
@@ -18,7 +19,7 @@ export function MapThumb({
   priority = false,
   src,
 }: {
-  mapId: MapId;
+  mapId: BoardMapId;
   className?: string;
   variant?: 'thumb' | 'card';
   /** a board thumbnail (Phase 11); falls back to the map image when missing or broken */
@@ -26,18 +27,20 @@ export function MapThumb({
   /** above the fold and likely the LCP (the first dashboard card): fetch first, never lazy */
   priority?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [tileFailed, setFailed] = useState(false);
   const [customFailed, setCustomFailed] = useState(false);
   const custom = src && !customFailed ? src : null;
+  const label = isPubgMap(mapId) ? MAPS[mapId].name : 'Custom map';
+  const tile = isPubgMap(mapId)
+    ? `${tilesBase}/${variant === 'card' ? MAPS[mapId].card : MAPS[mapId].thumbnail}`
+    : null;
+  const failed = tileFailed || (!custom && !tile);
   return (
     <div className={cn('relative overflow-hidden bg-surface-2', className)}>
       {!failed && (
         // eslint-disable-next-line @next/next/no-img-element -- static tile asset, no optimisation wanted
         <img
-          src={
-            custom ??
-            `${tilesBase}/${variant === 'card' ? MAPS[mapId].card : MAPS[mapId].thumbnail}`
-          }
+          src={custom ?? tile ?? ''}
           alt=""
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
@@ -51,7 +54,7 @@ export function MapThumb({
       )}
       {failed && (
         <span className="absolute inset-0 flex items-center justify-center font-display text-sm font-bold text-text-muted">
-          {MAPS[mapId].name}
+          {label}
         </span>
       )}
     </div>

@@ -40,6 +40,7 @@ class Fake {
   ctx(): ToolContext {
     return {
       worldSize: W,
+      metresPerUnit: 0.01,
       worldPerPx: () => K,
       style: () => STYLE,
       canCreate: () => this.allowed,
