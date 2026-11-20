@@ -32,7 +32,8 @@ test('chat: send with Enter, Shift+Enter newline, counter after 400, delete own;
   const { ctxA, ctxB, a, b } = await twoUsersInRoom(browser);
   const input = a.getByRole('textbox', { name: 'Message' });
 
-  await a.locator('.leaflet-container').click({ position: { x: 20, y: 300 } });
+  // a spot clear of the floating tool column (F22)
+  await a.locator('.leaflet-container').click({ position: { x: 200, y: 300 } });
   await a.keyboard.press('/');
   await expect(input).toBeFocused();
   await a.keyboard.type('go school');

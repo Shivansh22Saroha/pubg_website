@@ -52,6 +52,8 @@ describe('resolveShortcut (UI_UX_SPEC §8)', () => {
     expect(resolveShortcut(key('3'), false)).toEqual({ kind: 'board', index: 2 });
     expect(resolveShortcut(key('0'), false)).toBeNull();
     expect(resolveShortcut(key(']'), false)).toEqual({ kind: 'panel' });
+    expect(resolveShortcut(key('h'), false)).toEqual({ kind: 'fullMap' });
+    expect(resolveShortcut(key('H'), false)).toEqual({ kind: 'fullMap' });
     expect(resolveShortcut(key('/'), false)).toEqual({ kind: 'chat' });
     expect(resolveShortcut(key('?', { shiftKey: true }), false)).toEqual({ kind: 'help' });
     expect(resolveShortcut(key('P', { shiftKey: true }), false)).toBeNull();
@@ -89,6 +91,7 @@ describe('resolveShortcut (UI_UX_SPEC §8)', () => {
       'Esc',
       '?',
       ']',
+      'H',
       '/',
       '1 – 9',
       'Shift G',

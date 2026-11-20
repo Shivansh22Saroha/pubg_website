@@ -49,7 +49,7 @@ test('Spotter in the room: the top-bar button opens it; Esc on the map is left a
   await panel.getByLabel('Your question').press('Enter');
   await expect(panel.getByRole('log')).toContainText('press "Invite" in the top bar');
 
-  await a.locator('.leaflet-container').click({ position: { x: 40, y: 40 } });
+  await a.locator('.leaflet-container').click({ position: { x: 200, y: 200 } }); // clear of the floating chrome
   await a.keyboard.press('Escape');
   await expect(panel).toBeVisible();
   await panel.getByRole('button', { name: 'Close Spotter' }).click();

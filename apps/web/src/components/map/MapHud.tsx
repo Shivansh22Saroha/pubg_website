@@ -109,7 +109,10 @@ export function MapHud({
 
   const panel = 'pointer-events-auto glass rounded-panel';
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-2 p-3">
+    <div
+      data-testid="map-hud"
+      className="pointer-events-none absolute right-[var(--chrome-right,0px)] bottom-[var(--chrome-bottom,0px)] left-[var(--chrome-left,0px)] z-20 flex items-end justify-between gap-2 p-3 transition-[right] duration-300"
+    >
       <output
         data-testid="hud-readout"
         aria-label="Cursor position"

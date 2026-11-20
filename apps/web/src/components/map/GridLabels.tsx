@@ -5,6 +5,7 @@ import type L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toLatLng } from '@/lib/coords';
+import { useWorkspaceStore, type ChromeInsets } from '@/stores/workspaceStore';
 
 interface Placed {
   letter: string;
@@ -23,7 +24,15 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 /** Target view of a running zoom animation (Leaflet only updates the real view when it ends). */
 type View = { center: L.LatLng; zoom: number } | null;
 
-function compute(map: L.Map, worldSize: number, cells: number, view: View = null): Layout {
+const NO_CHROME: ChromeInsets = { top: 0, left: 0, right: 0, bottom: 0 };
+
+function compute(
+  map: L.Map,
+  worldSize: number,
+  cells: number,
+  view: View = null,
+  chrome: ChromeInsets = NO_CHROME,
+): Layout {
   const size = map.getSize();
   const cell = worldSize / cells;
   const toPoint = (ll: L.LatLng) =>
@@ -39,15 +48,17 @@ function compute(map: L.Map, worldSize: number, cells: number, view: View = null
   for (let i = 0; i < cells; i++) {
     const c = (i + 0.5) * cell;
     const p = toPoint(toLatLng([c, c]));
-    if (p.x > 0 && p.x < size.x) cols.push({ letter: GRID_COLUMN_LETTERS.charAt(i), pos: p.x });
-    if (p.y > 0 && p.y < size.y) rows.push({ letter: GRID_ROW_LETTERS.charAt(i), pos: p.y });
+    if (p.x > chrome.left + LABEL && p.x < size.x - chrome.right)
+      cols.push({ letter: GRID_COLUMN_LETTERS.charAt(i), pos: p.x });
+    if (p.y > chrome.top + LABEL && p.y < size.y - chrome.bottom)
+      rows.push({ letter: GRID_ROW_LETTERS.charAt(i), pos: p.y });
   }
   // sit just outside the map's top/left edge, but stick to the viewport edge when scrolled past
   return {
     cols,
     rows,
-    top: clamp(origin.y - LABEL - 2, 4, size.y - LABEL),
-    left: clamp(origin.x - LABEL - 2, 4, size.x - LABEL),
+    top: clamp(origin.y - LABEL - 2, chrome.top + 4, size.y - LABEL),
+    left: clamp(origin.x - LABEL - 2, chrome.left + 4, size.x - LABEL),
   };
 }
 
@@ -61,7 +72,11 @@ export function GridLabels({
   worldSize: number;
   cells: number;
 }) {
-  const [layout, setLayout] = useState<Layout>(() => compute(map, worldSize, cells));
+  // the floating room chrome covers the screen edges: letters sit just inside it
+  const chrome = useWorkspaceStore((s) => s.chrome);
+  const [layout, setLayout] = useState<Layout>(() =>
+    compute(map, worldSize, cells, null, useWorkspaceStore.getState().chrome),
+  );
   const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
@@ -69,14 +84,14 @@ export function GridLabels({
     const update = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        setLayout(compute(map, worldSize, cells));
+        setLayout(compute(map, worldSize, cells, null, chrome));
       });
     };
     // jump to the animation's target and let CSS ease along with Leaflet's 250 ms zoom
     const zoomAnim = (e: L.ZoomAnimEvent) => {
       cancelAnimationFrame(frame);
       setAnimating(true);
-      setLayout(compute(map, worldSize, cells, { center: e.center, zoom: e.zoom }));
+      setLayout(compute(map, worldSize, cells, { center: e.center, zoom: e.zoom }, chrome));
     };
     const zoomEnd = () => {
       setAnimating(false);
@@ -92,7 +107,7 @@ export function GridLabels({
       map.off('zoomanim', zoomAnim);
       map.off('zoomend', zoomEnd);
     };
-  }, [map, worldSize, cells]);
+  }, [map, worldSize, cells, chrome]);
 
   const chip = cn(
     'absolute flex size-[18px] items-center justify-center rounded-[4px] bg-overlay font-display text-xs font-bold text-text',

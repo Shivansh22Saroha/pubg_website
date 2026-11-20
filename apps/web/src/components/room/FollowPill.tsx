@@ -8,7 +8,7 @@ export function FollowPill({ names }: { names: Record<string, string> }) {
   const leaderId = useFollowStore((s) => s.leaderId);
   if (!leaderId) return null;
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-3 z-[1000] flex justify-center px-4">
+    <div className="pointer-events-none absolute top-[calc(var(--chrome-top,0px)+0.75rem)] right-[var(--chrome-right,0px)] left-[var(--chrome-left,0px)] z-[1000] flex justify-center px-4">
       <p
         role="status"
         data-testid="follow-pill"

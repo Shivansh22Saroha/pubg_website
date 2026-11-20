@@ -239,6 +239,7 @@ export function Toolbar({
   breakpoint = 'desktop',
   orientation = 'vertical',
   compact = false,
+  floating = false,
 }: {
   role: RoomRole;
   session: EditSink | null;
@@ -246,6 +247,8 @@ export function Toolbar({
   breakpoint?: Breakpoint;
   orientation?: 'vertical' | 'horizontal';
   compact?: boolean;
+  /** desktop redesign: a frosted column floating over the full-screen map */
+  floating?: boolean;
 }) {
   const tool = useToolStore((s) => s.tool);
   const setTool = useToolStore((s) => s.setTool);
@@ -278,10 +281,12 @@ export function Toolbar({
       data-tour="toolbar"
       data-orientation={orientation}
       className={cn(
-        'flex shrink-0 items-center gap-1 bg-[linear-gradient(90deg,var(--surface),var(--bg))]',
-        horizontal
-          ? 'h-14 w-full flex-row overflow-x-auto overscroll-x-contain border-t px-2 pointer-coarse:h-16'
-          : 'w-14 flex-col overflow-y-auto border-r py-2',
+        'flex shrink-0 items-center gap-1',
+        floating
+          ? 'glass-panel max-h-full w-14 flex-col overflow-y-auto py-2'
+          : horizontal
+            ? 'h-14 w-full flex-row overflow-x-auto overscroll-x-contain border-t bg-[linear-gradient(90deg,var(--surface),var(--bg))] px-2 pointer-coarse:h-16'
+            : 'w-14 flex-col overflow-y-auto border-r bg-[linear-gradient(90deg,var(--surface),var(--bg))] py-2',
         // phone: the bar's buttons spread across the width, clear of the home indicator
         compact &&
           horizontal &&

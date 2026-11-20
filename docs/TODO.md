@@ -177,6 +177,7 @@ _Status 2026-11-03: met — unit 130 + 71 + 231, integration 556, E2E 57 (+4 in 
 | More maps from the same repo: Sanhok, Vikendi, Karakin, Taego, Deston (config + tiles only) | P2 |
 | Hindi UI translation | P3 |
 | ~~Custom map upload~~ — done 2026-11: an image per room with its width in metres, private signed URLs, R2 (FEATURES F20) | P2 |
+| Room redesign (F22): ~~release 1 floating glass + Full map + measure icon~~ (2026-11), release 2 profile photos, release 3 route options / replay / radial menu / compass | P1 |
 | ~~Recall towers~~ — done 2026-11: green hearts on Rondo from PUBG API Blue Chip uses, Recalls toggle (FEATURES F21) | P2 |
 | ~~Voice chat~~ — done 2026-11 as a peer-to-peer mesh, ≤ 8 per room (FEATURES F19); an SFU for bigger channels stays P3 | P3 |
 | ~~Item icons for markers~~ — Phase 12 loot markers; PUBG has no usable vehicle icons (`Assets/Vehicle` = 5760×3240 renders) | P2 |

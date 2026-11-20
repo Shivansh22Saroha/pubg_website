@@ -109,11 +109,13 @@ export const EraserIcon: ToolIcon = (p) => (
   </Svg>
 );
 
-/** Measure: a ruler with ticks and a distance arrow */
+/** Measure: two map points joined by a dashed measuring line — the distance between them */
 export const MeasureIcon: ToolIcon = (p) => (
   <Svg {...p}>
-    <rect x={2.5} y={8.5} width={19} height={7} rx={1.5} transform="rotate(-35 12 12)" />
-    <path d="m8.2 11.9 1.4 2M11.1 9.9l1.4 2M14 7.9l1.4 2" />
+    <circle cx={5} cy={18} r={2.4} />
+    <circle cx={19} cy={6} r={2.4} />
+    <path d="M7 16.4 17 7.6" strokeDasharray="2.2 2.8" />
+    <path d="m4 10.5 2-2M9.5 21l2-2M13 4l2-2M18.5 14.5l2-2" strokeOpacity={0.5} />
   </Svg>
 );
 

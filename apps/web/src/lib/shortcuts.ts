@@ -19,6 +19,7 @@ export type ShortcutAction =
   | { kind: 'labels' }
   | { kind: 'chat' }
   | { kind: 'panel' }
+  | { kind: 'fullMap' }
   | { kind: 'help' };
 
 export interface KeyLike {
@@ -82,6 +83,7 @@ export function resolveShortcut(e: KeyLike, mac: boolean): ShortcutAction | null
   if (key === 'n') return { kind: 'labels' };
   if (key === '/') return { kind: 'chat' };
   if (key === ']') return { kind: 'panel' };
+  if (key === 'h') return { kind: 'fullMap' };
   if (/^[1-9]$/.test(key)) return { kind: 'board', index: Number(key) - 1 };
   const tool = TOOL_KEYS[key];
   return tool ? { kind: 'tool', tool } : null;
@@ -133,6 +135,7 @@ export function shortcutHelp(mac: boolean): { group: string; items: [string, str
         ['` (hold)', 'Push to talk (in voice, when on)'],
         ['/', 'Focus chat'],
         [']', 'Toggle right panel'],
+        ['H', 'Full map view (hide panels)'],
         ['?', 'This help'],
       ],
     },

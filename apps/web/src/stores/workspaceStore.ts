@@ -5,8 +5,21 @@ import { create } from 'zustand';
 
 export type PanelTab = 'chat' | 'layers' | 'members';
 
+/** px the floating room chrome covers on each side of the map (map overlays stay clear of it) */
+export interface ChromeInsets {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
 interface WorkspaceState {
   panelOpen: boolean;
+  /** "Full map" (H): the floating panels slide away for a clear view of the map */
+  fullMap: boolean;
+  setFullMap: (on: boolean | ((on: boolean) => boolean)) => void;
+  chrome: ChromeInsets;
+  setChrome: (c: ChromeInsets) => void;
   tab: PanelTab;
   /** 📍 pressed: the next map click attaches a ping (crosshair, Esc cancels) */
   pingPick: boolean;
@@ -41,6 +54,21 @@ export type ExportArea = 'view' | 'map';
 /** UI state of the room screen shared by the panel, the map overlays and the top bar. */
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   panelOpen: true,
+  fullMap: false,
+  setFullMap: (on) => {
+    set((s) => ({ fullMap: typeof on === 'function' ? on(s.fullMap) : on }));
+  },
+  chrome: { top: 0, left: 0, right: 0, bottom: 0 },
+  setChrome: (c) => {
+    set((s) =>
+      s.chrome.top === c.top &&
+      s.chrome.left === c.left &&
+      s.chrome.right === c.right &&
+      s.chrome.bottom === c.bottom
+        ? s
+        : { chrome: c },
+    );
+  },
   tab: 'chat',
   pingPick: false,
   draftPing: null,
