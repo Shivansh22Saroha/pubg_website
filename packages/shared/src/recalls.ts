@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAP_IDS } from './maps.js';
+import { MAP_IDS, type MapId } from './maps.js';
 import { clusterSpawns } from './vehicleSpawns.js';
 
 /**
@@ -10,6 +10,12 @@ import { clusterSpawns } from './vehicleSpawns.js';
  * PUBG telemetry uses the same centimetre coordinates. PC data: BGMI's towers may differ, which
  * the UI says next to the toggle.
  */
+
+/**
+ * Maps whose recall file is published (`apps/web/public/recalls/<id>.json`). The web app only
+ * requests files for these, so other maps cause no 404s. Add a map here when its file lands.
+ */
+export const RECALL_MAP_IDS: readonly MapId[] = ['rondo'];
 
 /** two uses closer than this (cm) are the same tower (the use radius around a tower is small) */
 export const RECALL_MERGE_RADIUS = 1500;

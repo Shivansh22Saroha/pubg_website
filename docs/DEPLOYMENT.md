@@ -94,7 +94,7 @@ Implemented (Phase 10): the existing `check` and `fresh-clone-boot` jobs, plus `
 - Rollback is rehearsed (Phase 10, §9): a release whose server never turns healthy is detected and the previous tag restored. **Migrations are not rolled back** — they must stay additive (§7).
 
 ### `.github/workflows/vehicle-spawns.yml` (manual)
-- Actions tab → "Vehicle spawns" → Run workflow (input: matches per map). Needs the repo secret `PUBG_API_KEY`. Regenerates `apps/web/public/spawns/<map>.json` from the PUBG API (FEATURES F18) and pushes them to a new `data/vehicle-spawns-<run>` branch; open a PR from it and merge as usual — Vercel serves the files. Permissions: `contents: write` (that branch only). Re-run after a PUBG map update.
+- Actions tab → "Vehicle spawns and recalls" → Run workflow (inputs: matches per map, days of samples 1–14). Needs the repo secret `PUBG_API_KEY`. Regenerates `apps/web/public/spawns/<map>.json` and `apps/web/public/recalls/<map>.json` from the PUBG API (FEATURES F18, F21) and pushes them to a new `data/vehicle-spawns-<run>` branch; open a PR from it and merge as usual — Vercel serves the files. Permissions: `contents: write` (that branch only). Re-run after a PUBG map update.
 
 ## 6. Server setup checklist (fresh VM, Ubuntu 24.04 LTS)
 - [ ] Create non-root deploy user, SSH key auth only, disable password login & root SSH.

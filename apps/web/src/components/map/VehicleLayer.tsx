@@ -1,10 +1,9 @@
 'use client';
 
 import type { VehicleKind, VehicleSpawn } from '@rotationlab/shared';
-import L from 'leaflet';
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
-import { toLatLng, worldPerPx } from '@/lib/coords';
+import { PointCanvas } from './pointCanvas';
 
 export const VEHICLE_PANE = 'vehicles';
 
@@ -23,15 +22,6 @@ export const VEHICLE_GLYPHS: Record<VehicleKind, string> = {
   boat: 'M3 14h18l-3 4.5H6ZM12 14V4.5l6.5 7.5H12',
   glider: 'M2 11h20M12 6.5v9.5M9 16h6M10.5 6.5h3',
 };
-
-/** at least this many screen px per km before icons switch to the large badges */
-const BADGE_PX_PER_KM = 260;
-
-/** fraction of the view drawn beyond each edge, so a short pan doesn't show empty edges */
-const PAD = 0.3;
-
-/** Leaflet's own (untyped) helper the vector renderer uses for its zoom animation */
-type ZoomAnimMap = L.Map & { _getNewPixelOrigin(center: L.LatLng, zoom: number): L.Point };
 
 /**
  * One vehicle badge, drawn once per kind / size / pixel ratio and then stamped with
@@ -67,128 +57,10 @@ function drawSprite(kind: VehicleKind, large: boolean, dpr: number): HTMLCanvasE
 }
 
 /**
- * Vehicle spawn points on one canvas in their own pane (above the grid, below drawings).
- * Every point is a vehicle icon (car, bike, boat, glider). Zoomed out: small badges in the
- * kind's colour with a dark glyph. Zoomed in: larger dark badges with a coloured glyph. The
- * canvas covers the view plus a margin and is redrawn after every move / zoom; during a zoom
- * (animated, wheel or pinch) it stays on screen and is scaled with the map, the same way
- * Leaflet's vector renderer does, so the icons never blink out. Not interactive — it never
- * takes clicks from the tools.
+ * Vehicle spawn points (see PointCanvas). Every point is a vehicle icon (car, bike, boat,
+ * glider). Zoomed out: small badges in the kind's colour with a dark glyph. Zoomed in: larger
+ * dark badges with a coloured glyph.
  */
-class SpawnCanvas extends L.Layer {
-  private canvas: HTMLCanvasElement | null = null;
-  private sprites = new Map<string, HTMLCanvasElement>();
-  /** the view the canvas was last drawn for (the zoom transform is relative to it) */
-  private drawn: { center: L.LatLng; zoom: number } | null = null;
-
-  constructor(
-    private spawns: readonly VehicleSpawn[],
-    private tileWorld: number,
-  ) {
-    super({ pane: VEHICLE_PANE });
-  }
-
-  override onAdd(map: L.Map) {
-    const animated = (map as L.Map & { _zoomAnimated?: boolean })._zoomAnimated === true;
-    const c = L.DomUtil.create(
-      'canvas',
-      `rl-vehicle-spawns leaflet-zoom-${animated ? 'animated' : 'hide'}`,
-    );
-    c.style.position = 'absolute';
-    c.style.pointerEvents = 'none';
-    c.setAttribute('aria-hidden', 'true');
-    c.dataset.testid = 'vehicle-layer';
-    c.dataset.count = String(this.spawns.length);
-    map.getPane(VEHICLE_PANE)?.appendChild(c);
-    this.canvas = c;
-    map.on('moveend resize viewreset', this.redraw);
-    map.on('zoom', this.onZoom);
-    if (animated) map.on('zoomanim', this.onZoomAnim);
-    this.redraw();
-    return this;
-  }
-
-  override onRemove(map: L.Map) {
-    map.off('moveend resize viewreset', this.redraw);
-    map.off('zoom', this.onZoom);
-    map.off('zoomanim', this.onZoomAnim);
-    this.canvas?.remove();
-    this.canvas = null;
-    return this;
-  }
-
-  private onZoomAnim = (e: L.ZoomAnimEvent) => {
-    this.transform(e.center, e.zoom);
-  };
-
-  private onZoom = () => {
-    const map = this._map as L.Map | undefined;
-    if (map) this.transform(map.getCenter(), map.getZoom());
-  };
-
-  /** scale / shift the last drawing to where the map is heading (Leaflet Renderer maths) */
-  private transform(center: L.LatLng, zoom: number) {
-    const map = this._map as ZoomAnimMap | undefined;
-    if (!map || !this.canvas || !this.drawn) return;
-    const scale = map.getZoomScale(zoom, this.drawn.zoom);
-    const offset = map
-      .getSize()
-      .multiplyBy(0.5 + PAD)
-      .multiplyBy(-scale)
-      .add(map.project(this.drawn.center, zoom))
-      .subtract(map._getNewPixelOrigin(center, zoom));
-    L.DomUtil.setTransform(this.canvas, offset, scale);
-  }
-
-  private sprite(kind: VehicleKind, large: boolean, dpr: number) {
-    const key = `${kind}:${large ? 'L' : 'S'}:${dpr}`;
-    let sp = this.sprites.get(key);
-    if (!sp) {
-      sp = drawSprite(kind, large, dpr);
-      this.sprites.set(key, sp);
-    }
-    return sp;
-  }
-
-  private redraw = () => {
-    const map = this._map as L.Map | undefined;
-    const c = this.canvas;
-    if (!map || !c) return;
-    const size = map.getSize();
-    const w = Math.round(size.x * (1 + 2 * PAD));
-    const h = Math.round(size.y * (1 + 2 * PAD));
-    const ox = size.x * PAD;
-    const oy = size.y * PAD;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    if (c.width !== w * dpr || c.height !== h * dpr) {
-      c.width = w * dpr;
-      c.height = h * dpr;
-      c.style.width = `${w}px`;
-      c.style.height = `${h}px`;
-    }
-    L.DomUtil.setTransform(c, map.containerPointToLayerPoint([-ox, -oy]), 1);
-    this.drawn = { center: map.getCenter(), zoom: map.getZoom() };
-    const ctx = c.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, c.width, c.height);
-
-    const large = 100_000 / worldPerPx(map, this.tileWorld) >= BADGE_PX_PER_KM;
-    const half = large ? 13 : 9; // sprite radius + margin, CSS px
-    for (const s of this.spawns) {
-      const p = map.latLngToContainerPoint(toLatLng([s.x, s.y]));
-      const x = p.x + ox;
-      const y = p.y + oy;
-      if (x < -half || y < -half || x > w + half || y > h + half) continue;
-      ctx.drawImage(
-        this.sprite(s.kind, large, dpr),
-        Math.round((x - half) * dpr),
-        Math.round((y - half) * dpr),
-      );
-    }
-  };
-}
-
 export function VehicleLayer({
   spawns,
   kinds,
@@ -201,7 +73,18 @@ export function VehicleLayer({
   const map = useMap();
   useEffect(() => {
     const shown = spawns.filter((s) => kinds.includes(s.kind));
-    const layer = new SpawnCanvas(shown, tileWorld).addTo(map);
+    const layer = new PointCanvas(
+      shown.map((s) => ({ x: s.x, y: s.y, key: s.kind })),
+      tileWorld,
+      {
+        pane: VEHICLE_PANE,
+        className: 'rl-vehicle-spawns',
+        testId: 'vehicle-layer',
+        sprite: (key, large, dpr) => drawSprite(key as VehicleKind, large, dpr),
+        // sprite radius + margin, CSS px
+        half: (large) => (large ? 13 : 9),
+      },
+    ).addTo(map);
     return () => {
       layer.remove();
     };

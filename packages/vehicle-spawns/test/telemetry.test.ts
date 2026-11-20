@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeTelemetry, firstRides } from '../scripts/telemetry.js';
+import { describeTelemetry, firstRides, recallUses } from '../scripts/telemetry.js';
 
 const ride = (
   uid: number | string | undefined,
@@ -111,5 +111,46 @@ describe('first rides from telemetry', () => {
         ),
       ).toEqual([]);
     });
+  });
+});
+
+describe('recall towers from telemetry', () => {
+  const use = (itemId: string, x: unknown, y: unknown, _T = 'LogItemUse') => ({
+    _T,
+    character: { name: 'p', location: { x, y, z: 3300 } },
+    item: { itemId, category: 'Use' },
+  });
+
+  it('records every Blue Chip use at the player position, rounded', () => {
+    expect(
+      recallUses(
+        [
+          use('Item_Bluechip_C', 293_948.4, 448_577.6),
+          use('Item_Heal_Bandage_C', 1, 1), // other items
+          use('Item_Bluechip_C', 5, 5, 'LogItemPickup'), // picking a chip up isn't a use
+          use('Item_Special_Bluechip_C', 6, 6, 'LogItemEquip'), // carrying one isn't either
+          use('Item_Bluechip_C', 421_876, 442_410),
+        ],
+        'm1',
+      ),
+    ).toEqual([
+      { x: 293_948, y: 448_578, matchId: 'm1' },
+      { x: 421_876, y: 442_410, matchId: 'm1' },
+    ]);
+  });
+
+  it('ignores malformed events', () => {
+    expect(
+      recallUses(
+        [
+          use('Item_Bluechip_C', 'a', 1),
+          { _T: 'LogItemUse', item: { itemId: 'Item_Bluechip_C' } },
+          null,
+          7,
+        ],
+        'm2',
+      ),
+    ).toEqual([]);
+    expect(recallUses('nope', 'm2')).toEqual([]);
   });
 });
