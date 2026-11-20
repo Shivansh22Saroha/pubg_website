@@ -24,12 +24,12 @@ export function Wordmark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'flex items-center gap-2 font-display text-[26px] leading-none font-semibold tracking-[0.04em]',
+        'flex items-center gap-2 font-display text-[20px] leading-none font-bold tracking-[0.01em]',
         className,
       )}
     >
       <BrandMark className="size-6" />
-      <span className="pt-[4px]">{PRODUCT_NAME}</span>
+      <span>{PRODUCT_NAME}</span>
     </span>
   );
 }
@@ -59,28 +59,28 @@ export function SiteHeader({
   return (
     <header
       className={cn(
-        'sticky top-0 z-20 border-b border-white/10',
-        overlay ? 'bg-black/80 backdrop-blur-md' : 'bg-black',
+        'sticky top-0 z-20 border-b border-[var(--edge)] backdrop-blur-xl backdrop-saturate-150',
+        overlay ? 'bg-[var(--glass)]' : 'bg-bg/70',
       )}
     >
       <div
-        className={cn('flex h-16 items-stretch gap-3 pl-4 sm:gap-6 sm:pl-8', !wide && 'mx-auto')}
+        className={cn('flex h-16 items-stretch gap-3 px-4 sm:gap-6 sm:px-8', !wide && 'mx-auto')}
       >
         <Link href="/" className="flex min-w-0 items-center rounded-control">
-          <Wordmark className="max-[400px]:text-[21px]" />
+          <Wordmark className="max-[400px]:text-[17px]" />
         </Link>
         <nav aria-label="Primary" className="hidden items-stretch gap-1 lg:flex">
           {NAV.map((n) => (
             <Link
               key={n.href}
               href={n.href}
-              className="flex items-center px-3 pt-[4px] font-display text-[21px] leading-none tracking-[0.03em] text-text uppercase transition-colors hover:text-accent"
+              className="my-auto flex h-10 items-center rounded-[10px] px-3 text-sm font-semibold text-text-muted transition-colors hover:bg-white/[0.06] hover:text-text"
             >
               {n.label}
             </Link>
           ))}
         </nav>
-        <nav aria-label="Account" className="ml-auto flex items-stretch">
+        <nav aria-label="Account" className="ml-auto flex items-stretch gap-1">
           {children && <div className="flex items-center gap-2 pr-3">{children}</div>}
           <NavAuth />
         </nav>
@@ -92,10 +92,10 @@ export function SiteHeader({
 /** Footer of the public pages: the KRAFTON attribution and BGMI notice (brand.ts), legal links. */
 export function SiteFooter() {
   return (
-    <footer className="bgmi-dots border-t border-white/10 bg-black px-4 py-12 text-xs leading-relaxed text-text-muted">
+    <footer className="border-t border-[var(--edge)] bg-bg/60 px-4 py-12 text-xs leading-relaxed text-text-muted backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex max-w-xl flex-col gap-4">
-          <Wordmark className="text-[24px] text-text" />
+          <Wordmark className="text-[20px] text-text" />
           <div className="space-y-1">
             <p>{ATTRIBUTION_TEXT}</p>
             <p>{BGMI_NOTICE}</p>
@@ -103,7 +103,7 @@ export function SiteFooter() {
         </div>
         <nav
           aria-label="Legal"
-          className="flex flex-wrap gap-x-6 gap-y-2 font-display text-[19px] leading-none tracking-[0.03em] uppercase"
+          className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-text"
         >
           <Link href="/privacy" className="hover:text-accent">
             Privacy

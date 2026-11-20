@@ -119,7 +119,7 @@ export function RegisterForm({ redirectTo }: { redirectTo: string }) {
       noValidate
       className="flex flex-col gap-4"
     >
-      <h1 className="font-display text-[30px] leading-none font-bold">Create your account</h1>
+      <h1 className="font-display text-[24px] leading-tight font-bold">Create your account</h1>
       <GoogleButton next={redirectTo} />
 
       <div className="flex flex-col gap-1.5">

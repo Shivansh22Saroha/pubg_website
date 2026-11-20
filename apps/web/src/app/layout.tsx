@@ -1,6 +1,6 @@
 import { PRODUCT_NAME } from '@rotationlab/shared';
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono, Teko } from 'next/font/google';
+import { Chakra_Petch, Inter, JetBrains_Mono } from 'next/font/google';
 import { connection } from 'next/server';
 import type { ReactNode } from 'react';
 import '@/env';
@@ -8,11 +8,12 @@ import { Spotter } from '@/components/spotter/Spotter';
 import { serverEnv } from '@/lib/serverEnv';
 import './globals.css';
 
-// BGMI theme: a condensed caps display face for headings, nav and buttons (UI_UX_SPEC §2.3)
-const teko = Teko({
+// Glass theme (2026-11, UI_UX_SPEC §2.3): a squared techy display face for headings, numbers and
+// the room title — set in normal case; Inter for everything else
+const chakra = Chakra_Petch({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-teko',
+  weight: ['500', '600', '700'],
+  variable: '--font-display-face',
   display: 'swap',
 });
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -40,7 +41,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // dynamically rendered page (a prerendered one would carry no nonce and be blocked)
   await connection();
   return (
-    <html lang="en" className={`dark ${teko.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="en"
+      className={`dark ${chakra.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+    >
       <body className="min-h-dvh bg-bg text-text">
         {serverEnv().MAINTENANCE && (
           <p

@@ -32,7 +32,7 @@ export function AdminDashboard() {
     <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="font-display text-[44px] leading-none font-bold">Admin</h1>
+          <h1 className="font-display text-[32px] leading-none font-bold">Admin</h1>
           <p className="mt-1 text-sm text-text-muted">
             {s
               ? `Updated ${dateTime.format(new Date(s.generatedAt))} · refreshes every minute`
@@ -160,8 +160,8 @@ function Tile({
       className={cn('surface-raised rounded-panel px-4 py-3', lead && 'border-l-4 border-l-accent')}
     >
       <p className="text-xs font-semibold text-text-muted">{label}</p>
-      <p className="mt-1 font-display text-[44px] leading-none font-bold tabular-nums">
-        <span className="block pt-[4px]">{fmt.format(value)}</span>
+      <p className="mt-1 font-display text-[32px] leading-none font-bold tabular-nums">
+        <span className="block">{fmt.format(value)}</span>
       </p>
       {hint && <p className="mt-1 text-xs text-text-muted">{hint}</p>}
     </div>

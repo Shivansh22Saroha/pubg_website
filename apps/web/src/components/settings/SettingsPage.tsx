@@ -80,7 +80,7 @@ export function SettingsPage() {
   if (!me.data) return null;
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
-      <h1 className="font-display text-[32px] leading-tight font-bold">Settings</h1>
+      <h1 className="font-display text-[26px] leading-tight font-bold">Settings</h1>
       <Profile me={me.data} />
       <Account me={me.data} />
       <Sessions />

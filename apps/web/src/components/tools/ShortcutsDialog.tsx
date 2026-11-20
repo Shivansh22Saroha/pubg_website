@@ -23,9 +23,7 @@ export function ShortcutsDialog({
           <div className="grid gap-6 sm:grid-cols-[1fr_1.7fr_1.3fr]">
             {groups.map((g) => (
               <section key={g.group} aria-label={g.group}>
-                <h3 className="mb-2 text-xs font-semibold tracking-wide text-text-muted uppercase">
-                  {g.group}
-                </h3>
+                <h3 className="mb-2 text-xs font-semibold text-text-muted">{g.group}</h3>
                 <dl className="flex flex-col gap-1.5 text-sm">
                   {g.items.map(([keys, action]) => (
                     <div key={keys} className="flex items-baseline justify-between gap-3">

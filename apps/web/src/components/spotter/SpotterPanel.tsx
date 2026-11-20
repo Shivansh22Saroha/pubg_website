@@ -115,27 +115,25 @@ export function SpotterPanel({
         }
       }}
       className={cn(
-        'rl-spotter-in fixed right-4 z-[950] flex w-[min(380px,calc(100vw-32px))] max-sm:right-2 max-sm:w-[calc(100vw-16px)] flex-col overflow-hidden border border-white/10 bg-[#0b0b0b] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.95)]',
+        'rl-spotter-in fixed right-4 z-[950] flex w-[min(380px,calc(100vw-32px))] max-sm:right-2 max-sm:w-[calc(100vw-16px)] flex-col overflow-hidden rounded-[20px] glass',
         placement === 'bottom' && 'bottom-[88px] h-[min(560px,calc(100dvh-112px))]',
         placement === 'top' && 'top-[128px] h-[min(540px,calc(100dvh-144px))]',
         placement === 'room' && 'top-[56px] h-[min(560px,calc(100dvh-72px))]',
       )}
     >
-      <header className="flex items-center gap-3 bg-accent py-2 pr-2 pl-4 text-accent-fg">
+      <header className="flex items-center gap-3 border-b border-[var(--edge)] bg-accent/95 py-2 pr-2 pl-4 text-accent-fg">
         <SpotterIcon className="size-6" />
         <div className="min-w-0 flex-1">
-          <h2 id="spotter-title" className="font-display text-[26px] leading-none uppercase">
-            <span className="block pt-[3px]">Spotter</span>
+          <h2 id="spotter-title" className="font-display text-[20px] leading-none">
+            <span className="block">Spotter</span>
           </h2>
-          <p className="text-[11px] font-semibold tracking-[0.04em] text-accent-fg/75 uppercase">
-            Site help &amp; BGMI tactics
-          </p>
+          <p className="text-xs font-medium text-accent-fg/75">Site help &amp; BGMI tactics</p>
         </div>
         <button
           type="button"
           aria-label="Close Spotter"
           onClick={onClose}
-          className="flex size-10 items-center justify-center text-accent-fg hover:bg-black/10 focus-visible:outline-accent-fg"
+          className="flex size-10 items-center justify-center rounded-full text-accent-fg hover:bg-black/10 focus-visible:outline-accent-fg"
         >
           <X className="size-5" />
         </button>
@@ -146,7 +144,7 @@ export function SpotterPanel({
         role="log"
         aria-live="polite"
         aria-label="Conversation with Spotter"
-        className="bgmi-dots flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
+        className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
       >
         {messages.map((m) => (
           <li
@@ -155,10 +153,10 @@ export function SpotterPanel({
           >
             <p
               className={cn(
-                'max-w-[88%] px-3 py-2 text-[14px] leading-relaxed whitespace-pre-line',
+                'max-w-[88%] rounded-[14px] px-3 py-2 text-[14px] leading-relaxed whitespace-pre-line',
                 m.from === 'you'
-                  ? 'bg-accent text-accent-fg'
-                  : 'border-l-[3px] border-accent bg-[#161616] text-text',
+                  ? 'rounded-br-[4px] bg-accent text-accent-fg'
+                  : 'rounded-bl-[4px] border border-[var(--edge)] bg-white/[0.05] text-text',
               )}
             >
               <span className="sr-only">{m.from === 'you' ? 'You: ' : 'Spotter: '}</span>
@@ -167,9 +165,9 @@ export function SpotterPanel({
             {m.link && (
               <Link
                 href={m.link.href}
-                className="font-display text-[18px] leading-none text-accent uppercase underline-offset-4 hover:underline"
+                className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
               >
-                <span className="pt-[3px]">{m.link.label} ›</span>
+                <span>{m.link.label} ›</span>
               </Link>
             )}
             {m.chips && m.chips.length > 0 && (
@@ -185,7 +183,7 @@ export function SpotterPanel({
                       onClick={() => {
                         ask(intent.question, intent);
                       }}
-                      className="border border-white/25 bg-black px-2.5 py-1.5 text-left text-[12.5px] text-text transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+                      className="rounded-full border border-[var(--edge-strong)] bg-white/[0.04] px-3 py-1.5 text-left text-[12.5px] text-text transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
                     >
                       {intent.question}
                     </button>
@@ -207,7 +205,7 @@ export function SpotterPanel({
       <form
         method="post"
         onSubmit={submit}
-        className="flex gap-2 border-t border-white/10 bg-black p-3"
+        className="flex gap-2 border-t border-[var(--edge)] p-3"
       >
         <label htmlFor="spotter-input" className="sr-only">
           Your question
@@ -222,13 +220,13 @@ export function SpotterPanel({
           onChange={(e) => {
             setDraft(e.target.value);
           }}
-          className="h-11 min-w-0 flex-1 border border-white/15 bg-[#111] px-3 text-[14px] text-text placeholder:text-text-muted focus-visible:border-accent"
+          className="h-11 min-w-0 flex-1 rounded-full border border-[var(--edge-strong)] bg-white/[0.04] px-4 text-[14px] text-text placeholder:text-text-muted focus-visible:border-accent"
         />
         <button
           type="submit"
           aria-label="Send"
           disabled={!draft.trim() || thinking}
-          className="flex size-11 shrink-0 items-center justify-center bg-accent text-accent-fg hover:brightness-110 disabled:bg-[#222] disabled:text-text-muted"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg hover:bg-accent-hi disabled:bg-surface-3 disabled:text-text-muted"
         >
           <SendHorizontal className="size-5" />
         </button>

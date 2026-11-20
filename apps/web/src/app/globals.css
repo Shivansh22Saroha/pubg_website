@@ -2,22 +2,26 @@
 
 /* Design tokens — UI_UX_SPEC §2. Dark theme is the only theme in v1. */
 :root {
-  /* BGMI theme (2026-11, UI_UX_SPEC §2.1): true black, neutral (not blue) greys, the BGMI gold.
-     Contrast: text 18:1, muted 7.6:1 on surface; accent-fg on accent 11:1. */
-  --bg: #050505;
-  --surface: #0e0e0e;
-  --surface-2: #161616;
-  --surface-3: #1f1f1f;
-  --overlay: rgba(8, 8, 8, 0.86);
-  --border: #262626;
-  --border-strong: #3b3b3b;
+  /* Glass theme (2026-11, UI_UX_SPEC §2.1; from the approved room demo): night graphite with a
+     faint green cast, frosted glass surfaces, warm amber. Contrast: text 16:1 on surface, muted
+     7.1:1 on surface and ≥ 6:1 on glass over the map; accent-fg on accent 10:1. */
+  --bg: #090b0a;
+  --surface: #101312;
+  --surface-2: #171b19;
+  --surface-3: #1f2422;
+  --overlay: rgba(13, 16, 15, 0.9);
+  --glass: rgba(13, 16, 15, 0.72);
+  --edge: rgba(255, 255, 255, 0.08);
+  --edge-strong: rgba(255, 255, 255, 0.16);
+  --border: #252b28;
+  --border-strong: #38403c;
   --highlight: rgba(255, 255, 255, 0.05);
-  --text: #f5f5f5;
-  --text-muted: #a3a3a3;
-  --accent: #ffb400;
-  --accent-hi: #ffc933;
-  --accent-glow: rgba(255, 180, 0, 0.3);
-  --accent-fg: #0a0a0a;
+  --text: #eef2ef;
+  --text-muted: #9ba6a0;
+  --accent: #f5b942;
+  --accent-hi: #f8c862;
+  --accent-glow: rgba(245, 185, 66, 0.3);
+  --accent-fg: #1b1405;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -77,13 +81,13 @@
   --color-draw-white: #f8fafc;
 
   /* Typography — §2.3 (font variables come from next/font in layout.tsx) */
-  --font-display: var(--font-teko), 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-face), 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 
   /* Radius & elevation — §2.4 (spacing uses Tailwind's 4 px scale: 1,2,3,4,6,8,12) */
-  --radius-control: 8px;
-  --radius-panel: 12px;
+  --radius-control: 10px;
+  --radius-panel: 16px;
   --radius-hero: 18px;
   --shadow-panel:
     inset 0 1px 0 var(--highlight), 0 16px 40px -12px rgba(0, 0, 0, 0.7),
@@ -132,32 +136,34 @@
 
 @utility section-label {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 1.15em;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
-/* Raised surface: hairline top highlight + soft depth. Used for cards and side panels. */
+/* Cards and page panels (glass theme): frosted glass over the page's ambient backdrop. */
 @utility surface-raised {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-raise);
+  background-color: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid var(--edge);
+  box-shadow:
+    0 24px 60px -28px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 var(--highlight);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
 
-/* HUD glass: chrome that floats over the map (style bar, HUD, minimap, menus, popovers).
-   (Restored 2026-11-12 — the BGMI theme pass dropped it by accident, leaving these see-through.) */
+/* HUD glass: chrome that floats over the map (style bar, HUD, minimap, menus, popovers). */
 @utility glass {
   background-color: var(--overlay);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  border: 1px solid var(--edge-strong);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
-/* Floating room chrome (2026-11 redesign): frosted panels that float over a full-screen map. */
+/* Floating room chrome: frosted panels that float over a full-screen map. */
 @utility glass-panel {
-  background-color: rgba(10, 10, 10, 0.74);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: var(--glass);
+  border: 1px solid var(--edge);
   border-radius: 18px;
   box-shadow:
     0 24px 60px -24px rgba(0, 0, 0, 0.75),
@@ -207,56 +213,31 @@
   animation: rl-drop-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* App backdrop for non-map pages: the map grid, very faint, fading out from the top. */
+/* App backdrop for non-map pages: two soft glows (amber, teal) for the glass to frost, over the
+   map grid, very faint. Fixed, so cards frost the same light while the page scrolls. */
 @utility app-backdrop {
   background-color: var(--bg);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 180, 0, 0.06), transparent 70%),
-    linear-gradient(to bottom, transparent, var(--bg) 70%),
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    radial-gradient(ellipse 60% 45% at 18% -5%, rgba(245, 185, 66, 0.13), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 92% 30%, rgba(94, 234, 212, 0.07), transparent 70%),
+    linear-gradient(to bottom, transparent, var(--bg) 85%),
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
   background-size:
+    auto,
     auto,
     auto,
     96px 96px,
     96px 96px;
+  background-attachment: fixed;
 }
 
-/* BGMI type: the display face is a condensed caps face — always set in capitals */
+/* Display face (Chakra Petch): normal case, semibold, a touch of tracking */
 @layer base {
   .font-display {
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     font-weight: 600;
   }
-}
-
-/* BGMI button cut: the bottom-right corner clipped off, like the game's UI plates. Focus can't
-   use an outline (clip-path would cut it), so it's an inset double ring instead. */
-@utility bgmi-cut {
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
-  &:focus-visible {
-    outline: none;
-    box-shadow:
-      inset 0 0 0 2px var(--accent-fg),
-      inset 0 0 0 4px #fff;
-  }
-}
-
-/* halftone dots — the printed-poster texture of the game's site bands */
-@utility bgmi-dots {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1.4px);
-  background-size: 6px 6px;
-}
-/* gold plate: flat BGMI gold with a halftone fade into the right-hand edge */
-@utility bgmi-halftone {
-  background-color: var(--accent);
-  background-image:
-    linear-gradient(100deg, var(--accent) 68%, transparent 96%),
-    radial-gradient(rgba(0, 0, 0, 0.3) 1px, transparent 1.5px);
-  background-size:
-    100% 100%,
-    5px 5px;
 }
 
 /* ---- landing hero: the one animated moment (a rotation drawn across Erangel) ---------------- */

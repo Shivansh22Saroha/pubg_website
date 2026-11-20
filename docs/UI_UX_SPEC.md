@@ -37,6 +37,8 @@ Contrast: text on `--surface` ≥ 7:1; muted text ≥ 4.5:1 (≈ 6.4:1 after the
 
 **BGMI theme (2026-11, supersedes the values above where they differ):** true-black base `--bg #050505`, neutral greys `--surface #0E0E0E` / `--surface-2 #161616` / `--surface-3 #1F1F1F`, borders `#262626` / `#3B3B3B`, text `#F5F5F5`, muted `#A3A3A3` (7.6:1 on surface), accent = BGMI gold `#FFB400` (hi `#FFC933`), `--accent-fg #0A0A0A` (11:1 on gold). The game site's look, with RotationLab's own name and mark — never the BGMI / KRAFTON logos or wordmark. Utilities: `bgmi-cut` (bottom-right corner clipped off; focus is an inset double ring because clip-path cuts outlines), `bgmi-halftone` (flat gold with a halftone fade into the right edge), `bgmi-dots` (halftone texture for black bands).
 
+**Glass theme (2026-11-21, supersedes the BGMI values; from the approved room demo, user decision):** night graphite `--bg #090B0A`, `--surface #101312` / `--surface-2 #171B19` / `--surface-3 #1F2422`, borders `#252B28` / `#38403C`, glass edges `--edge rgba(255,255,255,0.08)` / `--edge-strong 0.16`, `--glass rgba(13,16,15,0.72)`, text `#EEF2EF`, muted `#9BA6A0` (7.1:1 on surface), accent amber `#F5B942` (hi `#F8C862`, glow 0.3), `--accent-fg #1B1405`. Non-map pages sit on `app-backdrop`: two soft glows (amber top-left, teal right) over the faint grid, fixed; cards (`surface-raised`) are frosted glass over it (78 % surface, 18 px blur, `--edge` hairline). Radius: 10 px controls, 16 px panels, 20 px dialogs, 24 px hero cards.
+
 Surfaces (premium pass): `surface-raised` (cards, side panels: surface + border + inset highlight) and `glass` (anything floating over the map). Section labels are sentence case, not all caps. Radius: 8 px controls, 12 px panels, 18 px hero surfaces (dialogs, landing frames).
 
 ### 2.2 Drawing palette (10 swatches, in order)
@@ -48,7 +50,7 @@ User presence colors: assigned from a separate 12-color list, never the same as 
 ### 2.3 Typography
 | Role | Font | Size / weight |
 |---|---|---|
-| Display / headings | **Teko** (Google Fonts; was Rajdhani until the 2026-11 BGMI theme) | always uppercase (`.font-display`), letter-spacing 0.02em; condensed, so sizes run larger: landing H1 124/700, section H2 64/700, nav 21/600, buttons 17–26/600; section labels uppercase 0.04em |
+| Display / headings | **Chakra Petch** (Google Fonts; glass theme 2026-11-21 — was Teko caps, Rajdhani before that) | normal case, 600–700, letter-spacing 0.01em: landing H1 80/700, section H2 44/700, page H1 24–32/700, panel titles 16–20/600. Nav, buttons and tabs are Inter 13–15/600, sentence case |
 | Body / UI | **Inter** | 14/400 body, 13/500 controls, 12/500 captions |
 | Numbers / coords | **JetBrains Mono** | 12/500 |
 
@@ -60,7 +62,7 @@ User presence colors: assigned from a separate 12-color list, never the same as 
 
 ### 2.5 Icons & buttons
 `lucide-react`, 18 px in toolbars, 16 px inline. Custom SVG marker set (see §6.4).
-Buttons (BGMI theme): **accent** = gold plate — `bgmi-cut` + `bgmi-halftone`, square corners, Teko caps; **outline** = store-badge style — black, 1.5 px light border, 8 px radius, Teko caps, gold on hover; **ghost** / **destructive** unchanged.
+Buttons (glass theme): **accent** = solid amber, 11 px radius, Inter 13/600 sentence case, soft amber glow + inset top highlight, `--accent-hi` on hover; **outline** = frosted glass (white 4 %, `--edge-strong` hairline, blur), lighter on hover; **ghost** = white 6 % on hover; **destructive** = danger-strong, 11 px radius. Tabs are a segmented glass control (white 4 % track, active segment white 10 %). Inputs / selects: white 4 % fill, `--edge-strong` hairline, 10 px radius. The Spotter launcher is an amber pill; its panel is glass with rounded chat bubbles. (The BGMI `bgmi-cut` / `bgmi-halftone` / `bgmi-dots` utilities are gone.)
 
 ## 3. Screens
 

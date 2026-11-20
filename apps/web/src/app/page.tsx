@@ -61,11 +61,11 @@ export default function HomePage() {
         >
           <HeroMap />
           <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-16 text-center md:py-0">
-            {/* the lockup: a heavy white frame around the line, like a game title card */}
-            <div className="w-fit max-w-full border-[6px] border-white bg-black/55 px-6 pt-5 pb-3 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] backdrop-blur-[2px] sm:border-8 sm:px-12">
+            {/* the lockup: a frosted glass card over the live map, like the room's panels */}
+            <div className="glass-panel w-fit max-w-full rounded-[24px] px-7 py-6 sm:px-12 sm:py-8">
               <h1
                 id="hero"
-                className="font-display text-[60px] leading-[0.82] font-bold tracking-[0.01em] sm:text-[96px] lg:text-[124px]"
+                className="font-display text-[42px] leading-[0.95] font-bold tracking-[-0.01em] sm:text-[64px] lg:text-[80px]"
               >
                 <span className="block">Plan your </span>
                 <span className="block">rotations </span>
@@ -77,12 +77,12 @@ export default function HomePage() {
               Erangel, Miramar and Rondo.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
-              <CreateRoomCta className="h-14 px-8 text-[26px]" />
+              <CreateRoomCta className="h-12 px-6 text-[15px]" />
               <Link
                 href="/explore"
                 className={buttonVariants({
                   variant: 'outline',
-                  className: 'h-14 px-8 text-[26px]',
+                  className: 'h-12 px-6 text-[15px]',
                 })}
               >
                 Explore maps
@@ -90,12 +90,12 @@ export default function HomePage() {
             </div>
             <ul
               aria-label="What the map shows"
-              className="mt-12 flex flex-wrap justify-center gap-x-6 gap-y-2 font-display text-[19px] leading-none tracking-[0.03em] text-text/80 uppercase"
+              className="mt-12 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm font-medium text-text/80"
             >
               {LEGEND.map((l) => (
                 <li key={l.label} className="flex items-center gap-2">
                   <span aria-hidden className={`inline-block shrink-0 ${l.swatch}`} />
-                  <span className="pt-[3px]">{l.label}</span>
+                  <span>{l.label}</span>
                 </li>
               ))}
             </ul>
@@ -105,7 +105,7 @@ export default function HomePage() {
         <section aria-labelledby="features" className="mx-auto max-w-6xl px-4 pt-10 pb-24">
           <h2
             id="features"
-            className="max-w-2xl font-display text-[44px] leading-[0.9] font-bold sm:text-[64px]"
+            className="max-w-2xl font-display text-[32px] leading-[1.05] font-bold sm:text-[44px]"
           >
             Everything your squad says on comms, on one map.
           </h2>
@@ -116,7 +116,7 @@ export default function HomePage() {
                 className={`grid items-center gap-8 md:gap-14 ${i % 2 ? 'md:grid-cols-[1fr_1.35fr]' : 'md:grid-cols-[1.35fr_1fr]'}`}
               >
                 <div
-                  className={`overflow-hidden border border-white/15 shadow-panel ${i % 2 ? 'md:order-2' : ''}`}
+                  className={`overflow-hidden rounded-[18px] border border-[var(--edge-strong)] shadow-panel ${i % 2 ? 'md:order-2' : ''}`}
                 >
                   <Image
                     src={f.image}
@@ -129,8 +129,8 @@ export default function HomePage() {
                   />
                 </div>
                 <div className={i % 2 ? 'md:order-1' : ''}>
-                  <h3 className="border-l-4 border-accent pl-3 font-display text-[34px] leading-[0.95] font-bold sm:text-[42px]">
-                    <span className="block pt-[4px]">{f.title}</span>
+                  <h3 className="border-l-4 border-accent pl-3 font-display text-[24px] leading-tight font-bold sm:text-[28px]">
+                    <span className="block">{f.title}</span>
                   </h3>
                   <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-text-muted">
                     {f.body}
@@ -142,13 +142,16 @@ export default function HomePage() {
         </section>
 
         <section aria-labelledby="cta" className="mx-auto w-full max-w-6xl px-4 pb-24">
-          <div className="bgmi-dots relative overflow-hidden border border-white/15 bg-black px-6 py-12 sm:px-12">
-            <div aria-hidden className="absolute inset-y-0 left-0 w-2 bg-accent" />
+          <div className="surface-raised relative overflow-hidden rounded-[24px] px-6 py-12 sm:px-12">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-24 -left-24 size-72 rounded-full bg-accent/15 blur-3xl"
+            />
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2
                   id="cta"
-                  className="font-display text-[44px] leading-[0.9] font-bold sm:text-[56px]"
+                  className="font-display text-[32px] leading-[1.05] font-bold sm:text-[40px]"
                 >
                   Next scrim, plan it here.
                 </h2>
@@ -158,7 +161,7 @@ export default function HomePage() {
               </div>
               <CreateRoomCta
                 label="Open a room"
-                className="h-14 self-start px-8 text-[26px] sm:self-auto"
+                className="h-12 self-start px-6 text-[15px] sm:self-auto"
               />
             </div>
           </div>
