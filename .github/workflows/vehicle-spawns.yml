@@ -41,7 +41,7 @@ jobs:
       - name: Probe recall telemetry
         env:
           PUBG_API_KEY: ${{ secrets.PUBG_API_KEY }}
-          PROBE_MATCHES: '20'
+          PROBE_MATCHES: '40'
         working-directory: packages/vehicle-spawns
         run: npx tsx scripts/probe.ts
 
