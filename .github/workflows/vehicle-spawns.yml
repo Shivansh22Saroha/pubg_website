@@ -1,7 +1,8 @@
-name: Vehicle spawns
+name: Vehicle spawns and recalls
 
-# Rebuilds apps/web/public/spawns/<map>.json from PUBG's official API (packages/vehicle-spawns):
-# where each vehicle is first entered in a sample of recent PC matches = its spawn point.
+# Rebuilds apps/web/public/spawns/<map>.json and apps/web/public/recalls/<map>.json from PUBG's
+# official API (packages/vehicle-spawns): where each vehicle is first entered in a sample of recent
+# PC matches = its spawn point; where a Blue Chip is used = a recall tower.
 # Run by hand from the Actions tab. Needs the repo secret PUBG_API_KEY (developer.pubg.com).
 # It pushes the result to a new data/vehicle-spawns-<run> branch; review and merge it through a
 # pull request like any other change (the files are validated on load by the web app).
@@ -11,6 +12,10 @@ on:
       matches_per_map:
         description: Matches to read per map (more = more complete, slower)
         default: '250'
+        required: true
+      sample_days:
+        description: Days of match samples to read (1-14; more days = more matches per map)
+        default: '1'
         required: true
 
 permissions:
@@ -42,20 +47,22 @@ jobs:
         env:
           PUBG_API_KEY: ${{ secrets.PUBG_API_KEY }}
           MATCHES_PER_MAP: ${{ inputs.matches_per_map }}
+          SAMPLE_DAYS: ${{ inputs.sample_days }}
         run: |
           case "$MATCHES_PER_MAP" in ''|*[!0-9]*) echo "matches_per_map must be a number"; exit 1;; esac
+          case "$SAMPLE_DAYS" in ''|*[!0-9]*) echo "sample_days must be a number"; exit 1;; esac
           pnpm --filter vehicle-spawns generate | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Push to a data branch
         run: |
-          if git diff --quiet -- apps/web/public/spawns && [ -z "$(git ls-files --others -- apps/web/public/spawns)" ]; then
-            echo "No changes to the spawn files." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          if git diff --quiet -- apps/web/public/spawns apps/web/public/recalls && [ -z "$(git ls-files --others -- apps/web/public/spawns apps/web/public/recalls)" ]; then
+            echo "No changes to the data files." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
           fi
           branch="data/vehicle-spawns-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git add apps/web/public/spawns
-          git commit -m "Vehicle spawns from PUBG API (run ${GITHUB_RUN_ID})"
+          git add apps/web/public/spawns apps/web/public/recalls
+          git commit -m "Vehicle spawns and recalls from PUBG API (run ${GITHUB_RUN_ID})"
           git push origin "$branch"
           echo "Pushed **$branch** — open a pull request from it." >> "$GITHUB_STEP_SUMMARY"
