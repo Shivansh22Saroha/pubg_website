@@ -14,6 +14,7 @@ All notable changes are documented here. Format based on [Keep a Changelog](http
 ## [Unreleased]
 
 ### Security
+- 2026-11-20 — `effect` (Prisma 6's config loader dependency) pinned to 3.22.5 with a pnpm override: GHSA-7589-6fvf-x4pw (ReDoS in `Schema.TemplateLiteral`, high, ≤ 3.22.0) was published today and failed the CI `security` job. Prisma doesn't use that API; same major, so no behaviour change.
 - 2026-11-19 — Custom map uploads: 20 / hour / user, 8 MB body on that route only, 36 MP decode cap, re-encoded under random keys; private signed URLs (SECURITY V10, V11).
 - 2026-11-18 — Accepted advisory `GHSA-fc5q-39xc-vjpf` (picomatch ReDoS, high, no patched version yet) in `pnpm.auditConfig.ignoreGhsas`: reached only through `@sentry/nextjs`'s build-time Rollup plugin matching our own globs (SECURITY §9). It was failing the CI `security` job on every branch. `next` 16.4.3 also has two moderate advisories (GHSA-mfr8-8qww-v76h, GHSA-vc7v-qv4w-wrv8) in `'use cache'` / `unstable_cache`, which the app doesn't use; patched in 16.4.5 — upgrade separately.
 
