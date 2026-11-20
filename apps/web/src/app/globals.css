@@ -782,3 +782,22 @@
     animation: none;
   }
 }
+
+/* ---- plan tools (F24) ------------------------------------------------------------------------ */
+/* quick marker drop ring: each kind pops out from the pointer (scale + fade; Tailwind owns the
+   buttons' translate) */
+@keyframes rl-radial-in {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+.rl-radial-glyph {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+.rl-radial-glyph .rl-marker {
+  position: static;
+}

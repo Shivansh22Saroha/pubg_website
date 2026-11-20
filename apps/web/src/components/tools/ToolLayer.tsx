@@ -5,8 +5,10 @@ import {
   ELEMENT_LIMITS,
   ElementInputSchema,
   elementWithinWorld,
+  MARKER_DEFAULT_COLORS,
   tileWorldSize,
   type MapConfig,
+  type MarkerKind,
   type Pt,
   type RoomRole,
 } from '@rotationlab/shared';
@@ -41,6 +43,7 @@ import { GhostLayer } from './GhostLayer';
 import { InlineEditor } from './InlineEditor';
 import { LONG_PRESS_MS, LONG_PRESS_SLOP_PX, LongPressMenu, type LongPress } from './LongPressMenu';
 import { PreviewSender } from './previewSender';
+import { RadialMenu, type RadialAt } from './RadialMenu';
 import {
   deleteChanges,
   duplicateChanges,
@@ -113,7 +116,10 @@ export function ToolLayer({
   const ctxRef = useRef<{
     editInline: (id: string) => void;
     deleteIds: (ids: string[]) => void;
+    dropMarker: (kind: MarkerKind, at: Pt) => boolean;
   } | null>(null);
+  /** F24 quick marker drop: right-click / long-press on an empty spot */
+  const [radial, setRadial] = useState<RadialAt | null>(null);
   const live = useRef({ session, role, roomName, names, meId, breakpoint });
   useEffect(() => {
     live.current = { session, role, roomName, names, meId, breakpoint };
@@ -329,6 +335,17 @@ export function ToolLayer({
         if (!ctx.canEdit()) return;
         if (actions().commit(deleteChanges(scene().elements, ids))) selection().clear();
       },
+      dropMarker: (kind, at) => {
+        const markerStyle = styleFor(useToolStore.getState(), 'marker');
+        const color = MARKER_DEFAULT_COLORS[kind] ?? activeLayer()?.color ?? markerStyle.color;
+        const number = nextMarkerNumber(useBoardStore.getState().view.elements, kind);
+        return ctx.commit({
+          type: 'MARKER',
+          geometry: { at: [at[0], at[1]] },
+          style: { ...markerStyle, color },
+          props: { kind, ...(number !== undefined && { number }) },
+        });
+      },
     };
 
     // ---- cursor ---------------------------------------------------------------------------
@@ -394,8 +411,16 @@ export function ToolLayer({
           longPress = null;
           if (!can(live.current.role, 'board.edit')) return;
           const s = scene();
-          const hit = pickTop(s, clientToWorld(map, at, worldSize));
-          if (!hit || !isEditable(s, hit.id)) return;
+          const world = clientToWorld(map, at, worldSize);
+          const hit = pickTop(s, world);
+          if (!hit) {
+            // F24: an empty spot opens the quick marker drop ring instead
+            if (press?.id === id && press.claimed) return;
+            if ('vibrate' in navigator) navigator.vibrate(10);
+            setRadial({ x: at.clientX, y: at.clientY, at: world });
+            return;
+          }
+          if (!isEditable(s, hit.id)) return;
           current()?.cancel(); // no drag-move after the menu opens
           if (press?.id === id && container.hasPointerCapture(id))
             container.releasePointerCapture(id);
@@ -536,10 +561,18 @@ export function ToolLayer({
       }
     };
 
-    // the OS long-press menu (copy / save image) would cover ours
+    // the OS long-press menu (copy / save image) would cover ours; a mouse right-click on the
+    // map opens the quick marker drop ring (F24) for editors, unless a drawing is in progress
     const onContextMenu = (e: MouseEvent) => {
+      if (fromOverlay(e)) return;
       const touch = touches.size > 0 || (e as Partial<PointerEvent>).pointerType === 'touch';
-      if (touch && !fromOverlay(e)) e.preventDefault();
+      if (touch) {
+        e.preventDefault();
+        return;
+      }
+      if (!can(live.current.role, 'board.edit') || current()?.busy) return;
+      e.preventDefault();
+      setRadial({ x: e.clientX, y: e.clientY, at: clientToWorld(map, e, worldSize) });
     };
 
     const setTool = (id: ToolId) => {
@@ -725,6 +758,18 @@ export function ToolLayer({
       <GhostLayer />
       <SelectionLayer config={config} meId={meId} />
       <MeasureLayer />
+      {radial && (
+        <RadialMenu
+          menu={radial}
+          onClose={() => {
+            setRadial(null);
+          }}
+          onPick={(kind, at) => {
+            setRadial(null);
+            ctxRef.current?.dropMarker(kind, at);
+          }}
+        />
+      )}
       {menu && (
         <LongPressMenu
           menu={menu}

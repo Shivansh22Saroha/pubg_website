@@ -35,7 +35,8 @@ export interface PendingOp {
   op: LocalOp;
 }
 
-export type ViewElement = Element & { pending?: true };
+/** `pending`: not acked yet; `dim`: drawn faded (a route is picked in the Plan tab, F24) */
+export type ViewElement = Element & { pending?: true; dim?: true };
 
 // ---- undo / redo (ARCHITECTURE §7.5) ---------------------------------------------------------
 

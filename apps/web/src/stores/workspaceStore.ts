@@ -3,7 +3,7 @@
 import type { PingInput } from '@rotationlab/shared';
 import { create } from 'zustand';
 
-export type PanelTab = 'chat' | 'layers' | 'members';
+export type PanelTab = 'chat' | 'layers' | 'members' | 'plan';
 
 /** px the floating room chrome covers on each side of the map (map overlays stay clear of it) */
 export interface ChromeInsets {

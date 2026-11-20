@@ -14,6 +14,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoleBadge } from '@/components/rooms/bits';
 import { ElementList } from '@/components/tools/ElementList';
 import { LayersPanel } from '@/components/tools/LayersPanel';
+import { PlanPanel } from './PlanPanel';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
@@ -26,7 +27,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useWorkspaceStore, type PanelTab } from '@/stores/workspaceStore';
 
-/** Right panel (UI_UX_SPEC §3.5): Chat · Layers · Members. */
+/** Right panel (UI_UX_SPEC §3.5): Chat · Layers · Members · Plan (F24). */
 export function SidePanel({
   roomId,
   role,
@@ -61,6 +62,9 @@ export function SidePanel({
         </TabsTrigger>
         <TabsTrigger value="layers">Layers</TabsTrigger>
         <TabsTrigger value="members">Members</TabsTrigger>
+        <TabsTrigger value="plan" data-testid="tab-plan">
+          Plan
+        </TabsTrigger>
       </TabsList>
       {/* forceMount keeps the chat (scroll position, draft) alive while another tab shows */}
       <TabsContent value="chat" forceMount className="min-h-0 flex-1 data-[state=inactive]:hidden">
@@ -108,6 +112,14 @@ export function SidePanel({
       </TabsContent>
       <TabsContent value="members" className="overflow-y-auto p-2">
         <MembersList roomId={roomId} role={role} meId={meId} members={members} />
+      </TabsContent>
+      {/* forceMount: a replay keeps playing while another tab shows */}
+      <TabsContent
+        value="plan"
+        forceMount
+        className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden"
+      >
+        <PlanPanel members={members} meId={meId} />
       </TabsContent>
     </Tabs>
   );

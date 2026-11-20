@@ -1,5 +1,7 @@
 'use client';
 
+import { CompassBar } from './CompassBar';
+import { RouteLayer } from './RouteLayer';
 import 'leaflet/dist/leaflet.css';
 import type { Pt } from '@rotationlab/shared';
 import type L from 'leaflet';
@@ -250,12 +252,14 @@ export default function MapCanvas({
                 <RecallLayer towers={recallData.file.towers} tileWorld={tileWorld} />
               )}
             </Pane>
+            <RouteLayer />
             {children}
           </MapContainer>
         </div>
         {map && grid && <GridLabels map={map} worldSize={worldSize} cells={gridCells} />}
         {overlay}
         {map && minimap && !phone && <Minimap map={map} info={info} />}
+        <CompassBar />
         {map && (
           <MapHud
             map={map}

@@ -9,7 +9,9 @@ import { withTransform } from '@/components/tools/scene';
 import { withPlayerLabels } from '@/lib/linkedPlayers';
 import { useBoardStore } from '@/stores/boardStore';
 import type { ViewElement } from '@/stores/boardModel';
+import { usePlanStore } from '@/stores/planStore';
 import { usePlayersStore } from '@/stores/playersStore';
+import { byCreation } from '@/lib/plans';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { prefersReducedMotion } from '@/lib/motion';
 import { FX_PANE, playEntrance } from './elementFx';
@@ -52,6 +54,38 @@ export function ElementLayer({ config, meId }: { config: MapConfig; meId?: strin
     };
 
     const labelCache = new WeakMap<ViewElement, { name: string | undefined; out: ViewElement }>();
+    const dimCache = new WeakMap<ViewElement, ViewElement>();
+    /**
+     * F24 plan tools: during a replay only the first `replayStep` elements (creation order) are
+     * on the map; while a route is picked, everything else is drawn faded.
+     */
+    const planView = (
+      elements: Readonly<Record<string, ViewElement>>,
+    ): Readonly<Record<string, ViewElement>> => {
+      const { replayStep, focusRouteId } = usePlanStore.getState();
+      let out = elements;
+      if (replayStep !== null) {
+        const shown = Object.values(elements).sort(byCreation).slice(0, replayStep);
+        out = Object.fromEntries(shown.map((el) => [el.id, el]));
+      }
+      if (focusRouteId && focusRouteId in out) {
+        const faded: Record<string, ViewElement> = {};
+        for (const [id, el] of Object.entries(out)) {
+          if (id === focusRouteId) {
+            faded[id] = el;
+            continue;
+          }
+          let d = dimCache.get(el);
+          if (!d) {
+            d = { ...el, dim: true };
+            dimCache.set(el, d);
+          }
+          faded[id] = d;
+        }
+        out = faded;
+      }
+      return out;
+    };
     let frame = 0;
     const sync = () => {
       cancelAnimationFrame(frame);
@@ -64,7 +98,7 @@ export function ElementLayer({ config, meId }: { config: MapConfig; meId?: strin
         // linked own-player markers show their member's IGN (Phase 12)
         const named = withPlayerLabels(view.elements, usePlayersStore.getState().byId, labelCache);
         const { ready } = useBoardStore.getState();
-        const stats = renderer.sync(withTransform(named, transform), layers, {
+        const stats = renderer.sync(planView(withTransform(named, transform)), layers, {
           animate: ready && primed && !prefersReducedMotion(),
           meId,
         });
@@ -94,12 +128,16 @@ export function ElementLayer({ config, meId }: { config: MapConfig; meId?: strin
     const offPlayers = usePlayersStore.subscribe((s, prev) => {
       if (s.byId !== prev.byId) sync();
     });
+    const offPlan = usePlanStore.subscribe((s, prev) => {
+      if (s.replayStep !== prev.replayStep || s.focusRouteId !== prev.focusRouteId) sync();
+    });
     map.on('zoomend', onZoom);
     return () => {
       cancelAnimationFrame(frame);
       unsubscribe();
       offSelection();
       offPlayers();
+      offPlan();
       map.off('zoomend', onZoom);
       for (const cancel of running) cancel();
       renderer.destroy();

@@ -58,6 +58,7 @@ export const MAX_ENTERING = 12;
 export function sameLook(a: ViewElement, b: ViewElement): boolean {
   return (
     a.type === b.type &&
+    a.dim === b.dim &&
     a.layerId === b.layerId &&
     a.z === b.z &&
     JSON.stringify(a.geometry) === JSON.stringify(b.geometry) &&
@@ -65,6 +66,9 @@ export function sameLook(a: ViewElement, b: ViewElement): boolean {
     JSON.stringify(a.props) === JSON.stringify(b.props)
   );
 }
+
+/** how far faded elements are drawn while a route is picked (F24) */
+export const DIM_OPACITY = 0.22;
 
 const ll = ([x, y]: Pt): LatLngTuple => [y, x]; // LatLng == world units: lat = y, lng = x
 
@@ -128,9 +132,12 @@ export class ElementRenderer {
     const { L, renderer } = this;
     const color = safeColor(el.style.color);
     const width = el.style.width;
+    // F24: everything but the picked route fades back
+    const alpha = el.dim ? DIM_OPACITY : 1;
     const base: Leaflet.PathOptions = {
       renderer,
       color,
+      opacity: alpha,
       weight: width,
       dashArray: dashArray(width, el.style.dashed),
       lineCap: 'round',
@@ -153,7 +160,7 @@ export class ElementRenderer {
           dashArray: undefined,
           fill: true,
           fillColor: color,
-          fillOpacity: 1,
+          fillOpacity: alpha,
           weight: 1,
         };
         const parts: Leaflet.Layer[] = [line, L.polygon(this.arrowHead(pts, width), headStyle)];
@@ -169,7 +176,7 @@ export class ElementRenderer {
             radius: g.r ?? 0,
             fill: true,
             fillColor: color,
-            fillOpacity: el.style.fillOpacity,
+            fillOpacity: el.style.fillOpacity * alpha,
           }),
           vector: true,
         };
@@ -179,7 +186,7 @@ export class ElementRenderer {
             ...base,
             fill: true,
             fillColor: color,
-            fillOpacity: el.style.fillOpacity,
+            fillOpacity: el.style.fillOpacity * alpha,
           }),
           vector: true,
         };
@@ -194,6 +201,7 @@ export class ElementRenderer {
             icon,
             interactive: false,
             keyboard: false,
+            opacity: alpha,
             zIndexOffset: this.zOffset(el),
           }),
           vector: false,
@@ -215,6 +223,7 @@ export class ElementRenderer {
             icon,
             interactive: false,
             keyboard: false,
+            opacity: alpha,
             zIndexOffset: this.zOffset(el),
           }),
           vector: false,
