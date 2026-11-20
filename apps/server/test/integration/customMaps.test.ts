@@ -100,7 +100,8 @@ describe('custom maps', () => {
     for (const url of [
       bare,
       `${bare}?exp=9999999999&sig=AAAA`,
-      map.imageUrl.replace(/sig=./, 'sig=Z'),
+      // flip the first character (a fixed 'Z' left ~1 in 64 signatures unchanged)
+      map.imageUrl.replace(/sig=(.)/, (_m, c: string) => `sig=${c === 'Z' ? 'Y' : 'Z'}`),
       map.imageUrl.replace(/exp=\d+/, 'exp=1'),
     ])
       expect((await app.inject({ method: 'GET', url })).statusCode, url).toBe(404);
