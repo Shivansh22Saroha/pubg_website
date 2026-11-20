@@ -22,6 +22,7 @@ import { RecallControl } from './RecallControl';
 import { RECALL_PANE, RecallLayer } from './RecallLayer';
 import { VehicleControl } from './VehicleControl';
 import { VEHICLE_PANE, VehicleLayer } from './VehicleLayer';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 export type BaseVariant = 'labels' | 'clean';
 
@@ -114,8 +115,21 @@ export default function MapCanvas({
   const toggleGrid = useCallback(() => {
     setGrid((g) => !g);
   }, []);
+  // the first view fits the map inside the area the floating room chrome leaves clear
+  const [initialPadding] = useState(() => {
+    const c = useWorkspaceStore.getState().chrome;
+    return {
+      paddingTopLeft: [c.left, c.top] as [number, number],
+      paddingBottomRight: [c.right, c.bottom] as [number, number],
+    };
+  });
   const fit = useCallback(() => {
-    map?.fitBounds(bounds);
+    // fit inside the part of the screen the floating room chrome leaves clear
+    const c = useWorkspaceStore.getState().chrome;
+    map?.fitBounds(bounds, {
+      paddingTopLeft: [c.left, c.top],
+      paddingBottomRight: [c.right, c.bottom],
+    });
   }, [map, bounds]);
 
   // UI_UX_SPEC §8: N = labels, Shift+G = grid; never while typing.
@@ -163,6 +177,7 @@ export default function MapCanvas({
             ref={setMap}
             crs={crs}
             bounds={bounds}
+            boundsOptions={initialPadding}
             maxBounds={bounds.pad(0.1)}
             maxBoundsViscosity={1}
             minZoom={-1}

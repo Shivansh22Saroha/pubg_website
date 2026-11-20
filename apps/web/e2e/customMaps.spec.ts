@@ -93,14 +93,15 @@ test('E2E-C1: upload a custom map, plan on it, measure in its metres; a teammate
   // the cursor readout is in this map's metres: nowhere on it is beyond 2 040 m
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no map');
-  await a.mouse.move(box.x + box.width * 0.75, box.y + box.height * 0.5);
+  // right of centre but clear of the floating side panel (F22)
+  await a.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5);
   const readout = await a.getByTestId('hud-readout').innerText();
   const metres = [...readout.matchAll(/([\d\s\u00a0\u202f]+) m/g)].map((m) =>
     Number((m[1] ?? '').replace(/\D/g, '')),
   );
   expect(metres.length).toBe(2);
   for (const m of metres) expect(m).toBeLessThanOrEqual(2040);
-  expect(metres[0]).toBeGreaterThan(600); // three quarters across a 2 km map, not centimetres
+  expect(metres[0]).toBeGreaterThan(600); // well across a 2 km map, not centimetres
 
   // B sees the new board and the same image
   await b.getByRole('tab', { name: /Bermuda – Plan 1/ }).click();

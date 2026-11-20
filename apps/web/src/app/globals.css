@@ -154,6 +154,59 @@
   backdrop-filter: blur(14px) saturate(140%);
 }
 
+/* Floating room chrome (2026-11 redesign): frosted panels that float over a full-screen map. */
+@utility glass-panel {
+  background-color: rgba(10, 10, 10, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 60px -24px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* Panels slide in from their own edge when shown (Full map / ] bring them back). */
+@keyframes rl-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes rl-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes rl-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@utility animate-slide-in-right {
+  animation: rl-slide-in-right 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility animate-slide-in-left {
+  animation: rl-slide-in-left 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility animate-drop-in {
+  animation: rl-drop-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* App backdrop for non-map pages: the map grid, very faint, fading out from the top. */
 @utility app-backdrop {
   background-color: var(--bg);

@@ -100,6 +100,8 @@ Card showing room name, owner, member count, map thumbnails. If not logged in �
 
 ### 3.5 Room workspace `/rooms/[roomId]` ⭐ (main screen)
 
+**2026-11 redesign (desktop + compact, ≥ 1024 px):** the map fills the whole screen and the chrome floats over it as frosted glass (`glass-panel`: 74 % black, 18 px blur, 18 px radius, hairline edge): the top bar 12 px from the top and sides (48 px tall), the tool column 12 px from the left below it, the side panel 12 px from the right / bottom below it (it slides in when shown). **Full map** (header button or **H**) slides the top bar and side panel away for a clear view; the tools stay, and a small pill (room · board, **Show panels**) takes the top right; ] also brings the panels back. The map's own overlays (HUD, minimap, grid letters, style bar, follow pill) keep clear of the floating chrome through insets (`--chrome-*` CSS variables + `workspaceStore.chrome`), and the first view / Fit map fit the map inside the clear area. The Invite button carries the React Bits StarBorder (an orbiting light). Touch layouts (tablet, phone) keep the layout below; on a phone the room menu has **Full map view**, which hides the top bar. The original desktop wireframe:
+
 Desktop ≥ 1280 px:
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
@@ -233,6 +235,7 @@ Implementation notes (Phase 9):
 | ` (hold) | push to talk (in voice, when push-to-talk is on) |
 | / | focus chat input |
 | \] | toggle right panel |
+| H | full map view: hide the top bar and side panel (2026-11) |
 | ? | shortcut help dialog |
 
 Shortcuts disabled while focus is in an input, a dialog or a menu. On macOS the modifier is Cmd; Ctrl+Y (redo) works everywhere. While a drawing tool is busy, Enter / Esc / Backspace go to the tool first (finish, cancel, remove last polygon vertex).
