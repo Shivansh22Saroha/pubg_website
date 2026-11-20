@@ -41,7 +41,8 @@ Cursor-based: `?limit=50&before=<id>` → response `{ items: [...], nextCursor: 
 
 ### 1.5 Common objects
 ```ts
-PublicUser = { id, username, displayName, ign: string|null, avatarColor }
+PublicUser = { id, username, displayName, ign: string|null, avatarColor,
+               avatarUrl: string|null }   // F23: signed photo URL, valid ≥ 6 h; null → initials
 Me         = PublicUser & { email, emailVerified: boolean, createdAt }
 RoomSummary= { id, name, description, role: 'OWNER'|'EDITOR'|'VIEWER', memberCount, onlineCount,
                boardCount, lastActivityAt, thumbnailUrl: string|null /* Phase 11: the primaryMapId board's thumbnail */, hasPassword: boolean,
@@ -90,6 +91,9 @@ Validation: email RFC-ish ≤ 254; username `^[a-z0-9_]{3,20}$` (lower-cased); p
 | `GET /me` | – | `{ user: Me }` — `Me.prefs = { roomTourDone }` (Phase 9) |
 | `PATCH /me` | `{ displayName?, ign?, avatarColor? }` | `{ user: Me }` |
 | `PATCH /me/prefs` | `{ roomTourDone?: boolean }` (strict, ≥ 1 key) | `{ prefs }` — merged into `users.prefs` key by key (`prefs \|\| patch` in one statement), so two devices never overwrite each other. UI preferences that must follow the user across devices (the room coach-mark tour); per-device conveniences stay in localStorage |
+| `PUT /me/avatar` | raw `image/jpeg\|png\|webp` body ≤ 4 MB (the browser sends a 512 px centre square) | `{ user: Me }` — profile photo (FEATURES F23). Bytes sniffed, re-encoded to a 256 px WebP under `avatars/<userId>/<random>.webp`; the previous file is deleted. 10 / hour / user. Only ever the caller's own photo |
+| `DELETE /me/avatar` | – | `{ user: Me }` with `avatarUrl: null` (idempotent); the file is deleted |
+| `GET /assets/avatars/:userId/:file?exp=&sig=` | – | local storage backend only: the photo for a valid signed link, else `404` (on R2 / S3 the URL is a presigned GET) |
 | `POST /me/password` | `{ currentPassword, newPassword }` | `204`, other sessions revoked |
 | `GET /me/sessions` | – | `{ items: [{ id, userAgent, createdAt, current }] }` |
 | `DELETE /me/sessions/:id` | – | `204` |

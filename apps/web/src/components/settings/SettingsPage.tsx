@@ -9,9 +9,9 @@ import {
   type RoomSummary,
 } from '@rotationlab/shared';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Monitor } from 'lucide-react';
+import { Camera, Loader2, Monitor, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/auth/UserMenu';
 import { Button } from '@/components/ui/button';
@@ -22,8 +22,10 @@ import { useMe } from '@/hooks/useMe';
 import {
   deleteAccount,
   useChangePassword,
+  useRemoveAvatar,
   useRevokeSession,
   useSessions,
+  useSetAvatar,
   useUpdateMe,
 } from '@/lib/account';
 import { api, ApiError } from '@/lib/api';
@@ -113,12 +115,19 @@ function Profile({ me }: { me: Me }) {
           );
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Avatar
-            user={{ displayName: displayName || me.displayName, avatarColor: color }}
-            className="size-12 text-lg"
+            user={{
+              displayName: displayName || me.displayName,
+              avatarColor: color,
+              avatarUrl: me.avatarUrl,
+            }}
+            className="size-16 text-2xl"
           />
-          <p className="text-sm text-text-muted">@{me.username}</p>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-sm text-text-muted">@{me.username}</p>
+            <ProfilePhoto me={me} />
+          </div>
         </div>
         <Field label="Display name">
           <Input
@@ -141,6 +150,9 @@ function Profile({ me }: { me: Me }) {
         </Field>
         <fieldset className="flex flex-col gap-1.5 text-sm">
           <legend className="mb-1.5 font-medium">Avatar colour</legend>
+          <p className="-mt-1 mb-1 text-xs text-text-muted">
+            Shown behind your initial when you have no photo.
+          </p>
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Avatar colour">
             {PRESENCE_COLORS.map((c) => (
               <button
@@ -168,6 +180,68 @@ function Profile({ me }: { me: Me }) {
         </div>
       </form>
     </Section>
+  );
+}
+
+/**
+ * Profile photo (F23): pick a JPG / PNG / WebP; the browser crops it to the centre square and
+ * the server stores a private 256 px copy that only signed-in teammates' pages load.
+ */
+function ProfilePhoto({ me }: { me: Me }) {
+  const set = useSetAvatar();
+  const remove = useRemoveAvatar();
+  const input = useRef<HTMLInputElement>(null);
+  const busy = set.isPending || remove.isPending;
+  const failPhoto = (err: unknown) => {
+    toast.error(
+      err instanceof ApiError || err instanceof Error ? err.message : 'Something went wrong',
+    );
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        data-testid="avatar-file"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = ''; // picking the same file again still fires
+          if (!file) return;
+          set.mutate(file, {
+            onSuccess: () => toast.success('Profile photo updated'),
+            onError: failPhoto,
+          });
+        }}
+      />
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
+        {set.isPending ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+        ) : (
+          <Camera className="size-4" aria-hidden />
+        )}
+        {me.avatarUrl ? 'Change photo' : 'Upload photo'}
+      </Button>
+      {me.avatarUrl && (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() => {
+            remove.mutate(undefined, {
+              onSuccess: () => toast.success('Profile photo removed'),
+              onError: failPhoto,
+            });
+          }}
+        >
+          <Trash2 className="size-4" aria-hidden />
+          Remove photo
+        </Button>
+      )}
+    </div>
   );
 }
 

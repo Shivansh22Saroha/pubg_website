@@ -18,6 +18,8 @@ model User {
   displayName      String         @map("display_name") @db.VarChar(32)
   ign              String?        @db.VarChar(32)
   avatarColor      String         @default("#38BDF8") @map("avatar_color") @db.Char(7)
+  /// profile photo (F23): `avatars/<userId>/<random>.webp` in asset storage; null → initials
+  avatarKey        String?        @map("avatar_key")
   /// "!google" for accounts made with Google sign-in (nothing verifies against it)
   passwordHash     String         @map("password_hash")
   /// Google's stable subject id ("sub"), set when the account signs in with Google (F17)

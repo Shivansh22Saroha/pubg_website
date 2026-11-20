@@ -74,13 +74,15 @@ export interface AccountDeps {
   revocations: RevocationList;
   policy: RoomPolicy;
   events: RoomEvents;
+  /** best-effort delete of a stored file (the profile photo, F23) after the account goes */
+  removeAsset?: (key: string) => void;
 }
 
 /**
  * Delete account (AUTH-8) in ONE transaction: owned rooms transferred or soft-deleted, every
  * other membership left, chat kept with author = null, every refresh token revoked, the user
  * row anonymised (email → deleted+<id>@invalid, username → deleted_<short>) and marked
- * deleted, plus audit rows. After commit: revoked sessions drop their sockets, caches bust,
+ * deleted (profile photo cleared, its file deleted after commit), plus audit rows. After commit: revoked sessions drop their sockets, caches bust,
  * and the rooms hear about it.
  */
 export function createAccountService(d: AccountDeps) {
@@ -158,6 +160,7 @@ export function createAccountService(d: AccountDeps) {
             failedLoginCount: 0,
             lockedUntil: null,
             prefs: {},
+            avatarKey: null,
             deletedAt: now,
           },
         });
@@ -169,6 +172,7 @@ export function createAccountService(d: AccountDeps) {
 
       // after commit: kill every session (and its sockets), bust caches, tell the rooms
       await d.revocations.revoke([...new Set([...families, user.sid])]);
+      if (me.avatarKey) d.removeAsset?.(me.avatarKey);
       const transferred = new Set(plan.map((r) => r.roomId));
       for (const r of plan) {
         if (r.action === 'transfer') {

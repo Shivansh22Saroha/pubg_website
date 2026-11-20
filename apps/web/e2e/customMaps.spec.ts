@@ -1,56 +1,11 @@
 import { readFileSync } from 'node:fs';
-import { deflateSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
-import { twoUsersInRoom } from './fixtures';
+import { makePng, twoUsersInRoom } from './fixtures';
 
 /**
  * Custom maps (FEATURES F20): upload an image through the New board dialog, plan on it, and a
  * teammate sees the same map. Distances use the width the uploader entered.
  */
-
-/** a minimal RGB PNG: left half orange, right half teal (no image library in the web app) */
-function makePng(width: number, height: number): Buffer {
-  const crcTable = Array.from({ length: 256 }, (_, n) => {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    return c >>> 0;
-  });
-  const crc = (buf: Buffer) => {
-    let c = 0xffffffff;
-    for (const b of buf) c = (crcTable[(c ^ b) & 0xff] ?? 0) ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  };
-  const chunk = (type: string, data: Buffer) => {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length);
-    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
-    const sum = Buffer.alloc(4);
-    sum.writeUInt32BE(crc(body));
-    return Buffer.concat([len, body, sum]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // RGB
-  const rows = Buffer.alloc((width * 3 + 1) * height);
-  for (let y = 0; y < height; y++) {
-    const o = y * (width * 3 + 1);
-    for (let x = 0; x < width; x++) {
-      const p = o + 1 + x * 3;
-      const [r, g, b] = x < width / 2 ? [240, 140, 40] : [30, 160, 160];
-      rows[p] = r;
-      rows[p + 1] = g;
-      rows[p + 2] = b;
-    }
-  }
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(rows)),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
 
 const mapImageLoaded = (p: Page) =>
   p.evaluate(() => {

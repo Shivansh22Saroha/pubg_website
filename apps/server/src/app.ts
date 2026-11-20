@@ -56,6 +56,8 @@ import { createRoomPolicy } from './modules/rooms/policy.js';
 import { roomRoutes } from './modules/rooms/routes.js';
 import { createRoomService } from './modules/rooms/service.js';
 import { userRoutes } from './modules/users/routes.js';
+import { createAvatarService } from './modules/users/avatar.js';
+import { configureAvatarUrls } from './modules/rooms/mappers.js';
 import { registerCsrf } from './plugins/csrf.js';
 import { registerErrorHandler } from './plugins/errorHandler.js';
 import { registerMaintenance } from './plugins/maintenance.js';
@@ -260,7 +262,20 @@ export async function buildApp({
   app.decorate('assets', assets);
   const boardOps = createBoardOpsService({ prisma, redis, policy, events });
   const snapshots = createSnapshotService({ prisma, policy, events });
-  const account = createAccountService({ prisma, passwords, revocations, policy, events });
+  configureAvatarUrls(assets); // every serialised user carries a signed photo URL (F23)
+  const account = createAccountService({
+    prisma,
+    passwords,
+    revocations,
+    policy,
+    events,
+    removeAsset: (key) => {
+      assets.remove(key).catch((err: unknown) => {
+        app.log.warn({ err, key }, 'asset delete failed');
+      });
+    },
+  });
+  const avatars = createAvatarService({ prisma, storage: assets, log: app.log });
   const chat = createChatService({ prisma, policy, events });
   const systemMessages = registerSystemMessages(events, chat, prisma, app.log);
   app.decorate('chatIdle', systemMessages.idle);
@@ -320,7 +335,16 @@ export async function buildApp({
     tokens,
     tickets,
   });
-  await app.register(userRoutes, { prefix: '/api/v1', auth, account, cookies });
+  await app.register(userRoutes, {
+    prefix: '/api/v1',
+    auth,
+    account,
+    cookies,
+    avatars,
+    storage: assets,
+    redis,
+    rateLimits: config.RATE_LIMITS_ENABLED,
+  });
   app.get(
     '/api/v1/config',
     { config: { access: 'public' }, schema: { response: { 200: PublicConfigResponseSchema } } },

@@ -3,12 +3,13 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /**
- * Object storage for user assets — board thumbnails (Phase 11) and custom map images (F20).
+ * Object storage for user assets — board thumbnails (Phase 11), custom map images (F20) and
+ * profile photos (F23).
  * Two backends behind one interface: local disk (dev, tests, a single VM with a volume) and
  * S3-compatible storage (Cloudflare R2 / AWS S3) when the `S3_*` env vars are set. Keys are
  * generated server-side only (`assetKeyPattern`), never taken from a request.
  *
- * Custom map images are **private** (SECURITY F20): the browser only ever gets a signed URL
+ * Custom map images and profile photos are **private** (SECURITY F20 / F23): the browser only ever gets a signed URL
  * that expires (`signedUrl`) — a presigned S3 GET, or an HMAC-signed link to the API's own
  * asset route on local disk. Signatures are issued per 6 h window and stay valid 12 h, so
  * the same URL comes back for hours and the browser cache keeps working.
@@ -30,15 +31,16 @@ export interface AssetStorage {
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 /**
- * The only keys we ever write: `thumbnails/<boardId>/<22-char random>.jpg` and
- * `maps/<roomId>/<22-char random>.webp` (+ `-512.webp`, its preview)
+ * The only keys we ever write: `thumbnails/<boardId>/<22-char random>.jpg`,
+ * `maps/<roomId>/<22-char random>.webp` (+ `-512.webp`, its preview) and
+ * `avatars/<userId>/<22-char random>.webp` (profile photos, F23)
  */
 export const assetKeyPattern = new RegExp(
-  `^(?:thumbnails/${UUID}/[A-Za-z0-9_-]{22}\\.jpg|maps/${UUID}/[A-Za-z0-9_-]{22}(?:-512)?\\.webp)$`,
+  `^(?:thumbnails/${UUID}/[A-Za-z0-9_-]{22}\\.jpg|maps/${UUID}/[A-Za-z0-9_-]{22}(?:-512)?\\.webp|avatars/${UUID}/[A-Za-z0-9_-]{22}\\.webp)$`,
 );
 
 /** private assets are only reachable through a signed URL */
-export const isPrivateKey = (key: string) => key.startsWith('maps/');
+export const isPrivateKey = (key: string) => key.startsWith('maps/') || key.startsWith('avatars/');
 
 /** signatures are issued per window and live two windows (≥ 6 h left on any URL handed out) */
 export const SIGN_WINDOW_MS = 6 * 60 * 60 * 1000;

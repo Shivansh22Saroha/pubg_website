@@ -13,6 +13,7 @@ import {
 import type { z } from 'zod';
 import { AppError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
+import { avatarUrlOf } from '../rooms/mappers.js';
 import type { Lockout } from './lockout.js';
 import type { GoogleProfile } from './google.js';
 import { usernameSeed } from './google.js';
@@ -45,6 +46,7 @@ export function toMe(u: User): Me {
     displayName: u.displayName,
     ign: u.ign,
     avatarColor: u.avatarColor,
+    avatarUrl: avatarUrlOf(u.avatarKey),
     email: u.email,
     emailVerified: u.emailVerifiedAt !== null,
     createdAt: u.createdAt.toISOString(),

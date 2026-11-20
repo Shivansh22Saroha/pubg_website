@@ -68,7 +68,7 @@ Each map folder holds `preview.jpg` (1024 px, auth backdrop), `card.webp` (512 p
 1. Cloudflare → R2 → *Create bucket* `rotationlab-assets` (keep public access off).
 2. Bucket → *Settings* → *CORS policy*: `[{"AllowedOrigins":["https://<web domain>"],"AllowedMethods":["GET"],"AllowedHeaders":["*"],"MaxAgeSeconds":86400}]` — the map view loads images with `crossOrigin="anonymous"` (board thumbnails and Export PNG draw them into a canvas).
 3. R2 → *Manage API tokens* → an Object Read & Write token for that bucket only.
-4. Server: `S3_ENDPOINT=https://<account id>.r2.cloudflarestorage.com`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (`S3_REGION` defaults to `auto`); leave `PUBLIC_ASSETS_BASE_URL` unset so thumbnails are signed too. Web: `PUBLIC_ASSETS_BASE_URL` = the same `S3_ENDPOINT` (CSP `img-src`), then redeploy.
+4. (Also stores profile photos, F23 — `avatars/…`, private like custom maps; nothing extra to set.) Server: `S3_ENDPOINT=https://<account id>.r2.cloudflarestorage.com`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (`S3_REGION` defaults to `auto`); leave `PUBLIC_ASSETS_BASE_URL` unset so thumbnails are signed too. Web: `PUBLIC_ASSETS_BASE_URL` = the same `S3_ENDPOINT` (CSP `img-src`), then redeploy.
 Uploads are re-encoded server-side (sharp) and arrive as raw bodies ≤ 8 MB, so the API's proxy / platform body limit must allow that.
 
 Add the staging origin to `AllowedOrigins` too. Keep the CDN cache keyed on `Origin` (R2's public bucket does this) so a non-CORS response is never served to the app. In development and E2E the tiles are same-origin (`/tiles`), so no rule is needed.

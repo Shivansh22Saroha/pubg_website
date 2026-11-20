@@ -10,24 +10,46 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+/**
+ * A user's avatar: their profile photo (F23) when they set one, else the first letter of their
+ * name on their avatar colour. The photo URL is signed and expires; if it fails to load (an old
+ * tab, a removed photo) the initials show instead.
+ */
 export function Avatar({
   user,
   className,
 }: {
-  user: Pick<Me, 'displayName' | 'avatarColor'>;
+  user: Pick<Me, 'displayName' | 'avatarColor'> & { avatarUrl?: string | null | undefined };
   className?: string;
 }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const url = user.avatarUrl && user.avatarUrl !== failed ? user.avatarUrl : null;
   return (
     <span
       aria-hidden
+      data-photo={url ? 'true' : undefined}
       className={cn(
-        'flex size-8 items-center justify-center rounded-full font-display text-sm font-bold text-accent-fg',
+        'flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full font-display text-sm font-bold text-accent-fg',
         className,
       )}
       // avatarColor is validated as #RRGGBB on the server and in the shared schema (SECURITY V5)
       style={{ backgroundColor: user.avatarColor }}
     >
-      {Array.from(user.displayName)[0]?.toUpperCase() ?? '?'}
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- signed, expiring URL
+        <img
+          src={url}
+          alt=""
+          draggable={false}
+          referrerPolicy="no-referrer"
+          className="size-full object-cover"
+          onError={() => {
+            setFailed(url);
+          }}
+        />
+      ) : (
+        (Array.from(user.displayName)[0]?.toUpperCase() ?? '?')
+      )}
     </span>
   );
 }

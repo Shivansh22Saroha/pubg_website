@@ -7,10 +7,30 @@ import type {
   User,
 } from '@prisma/client';
 import type { Board, BoardMapId, Invite, Layer, Member, PublicUser } from '@rotationlab/shared';
+import type { AssetStorage } from '../../lib/storage.js';
 
 /** DB enum (ERANGEL, CUSTOM) ↔ API id (erangel, custom). */
 export const toMapId = (m: MapIdRow): BoardMapId => m.toLowerCase() as BoardMapId;
 export const fromMapId = (m: BoardMapId): MapIdRow => m.toUpperCase() as MapIdRow;
+
+/**
+ * Profile photos (F23) are private: every serialised user carries a signed URL for theirs. The
+ * signer is the app's asset storage, set once by `buildApp` (`configureAvatarUrls`) so every
+ * mapper below — rooms, chat, snapshots, /me — can sign without each service taking storage.
+ * Unconfigured (unit tests): no URLs, initials everywhere.
+ */
+let signAvatar: ((key: string) => string) | null = null;
+export function configureAvatarUrls(storage: Pick<AssetStorage, 'signedUrl'> | null): void {
+  signAvatar = storage ? (key) => storage.signedUrl(key).url : null;
+}
+export function avatarUrlOf(key: string | null): string | null {
+  if (!key || !signAvatar) return null;
+  try {
+    return signAvatar(key);
+  } catch {
+    return null; // a malformed stored key never breaks a response
+  }
+}
 
 export function toPublicUser(u: User): PublicUser {
   return {
@@ -19,6 +39,7 @@ export function toPublicUser(u: User): PublicUser {
     displayName: u.displayName,
     ign: u.ign,
     avatarColor: u.avatarColor,
+    avatarUrl: avatarUrlOf(u.avatarKey),
   };
 }
 

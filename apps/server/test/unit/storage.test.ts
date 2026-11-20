@@ -119,11 +119,21 @@ describe('local storage', () => {
     for (const bad of [
       'thumbnails/x/AbCdEfGhIjKlMnOpQr_-12.jpg',
       `${KEY}.png`,
-      KEY.replace('thumbnails', 'avatars'),
+      KEY.replace('thumbnails', 'uploads'),
+      KEY.replace('thumbnails', 'avatars'), // avatars are .webp only
+      AVATAR.replace('.webp', '-512.webp'),
     ])
       expect(assetKeyPattern.test(bad), bad).toBe(false);
   });
+
+  it('accepts avatar keys and keeps them private (F23)', () => {
+    expect(assetKeyPattern.test(AVATAR)).toBe(true);
+    expect(isPrivateKey(AVATAR)).toBe(true);
+    expect(isPrivateKey(KEY)).toBe(false);
+  });
 });
+
+const AVATAR = 'avatars/0192f7a1-0000-7000-8000-000000000002/AbCdEfGhIjKlMnOpQr_-12.webp';
 
 const MAP = 'maps/0192f7a1-0000-7000-8000-000000000001/AbCdEfGhIjKlMnOpQr_-12.webp';
 

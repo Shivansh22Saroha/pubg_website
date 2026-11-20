@@ -30,6 +30,7 @@ const user = (id: string, name: string) => ({
   displayName: name,
   ign: null,
   avatarColor: '#38BDF8',
+  avatarUrl: null,
 });
 let n = 0;
 /** ids sort by creation like UUIDv7 */
