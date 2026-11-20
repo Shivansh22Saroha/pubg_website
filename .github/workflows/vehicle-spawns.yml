@@ -38,24 +38,12 @@ jobs:
       - name: Build shared
         run: pnpm --filter @rotationlab/shared build
 
-      - name: Generate spawn files
+      - name: Probe recall telemetry
         env:
           PUBG_API_KEY: ${{ secrets.PUBG_API_KEY }}
-          MATCHES_PER_MAP: ${{ inputs.matches_per_map }}
-        run: |
-          case "$MATCHES_PER_MAP" in ''|*[!0-9]*) echo "matches_per_map must be a number"; exit 1;; esac
-          pnpm --filter vehicle-spawns generate | tee -a "$GITHUB_STEP_SUMMARY"
+          PROBE_MATCHES: '20'
+        working-directory: packages/vehicle-spawns
+        run: npx tsx scripts/probe.ts
 
-      - name: Push to a data branch
-        run: |
-          if git diff --quiet -- apps/web/public/spawns && [ -z "$(git ls-files --others -- apps/web/public/spawns)" ]; then
-            echo "No changes to the spawn files." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
-          fi
-          branch="data/vehicle-spawns-${GITHUB_RUN_ID}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git add apps/web/public/spawns
-          git commit -m "Vehicle spawns from PUBG API (run ${GITHUB_RUN_ID})"
-          git push origin "$branch"
-          echo "Pushed **$branch** — open a pull request from it." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with: { name: probe, path: packages/vehicle-spawns/probe.json }
