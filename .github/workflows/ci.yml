@@ -101,6 +101,10 @@ jobs:
       - name: E2E (fixture tiles, real API)
         run: pnpm test:e2e
 
+      - name: Print failed E2E page snapshots
+        if: failure()
+        run: find apps/web/test-results -name error-context.md -exec sh -c 'echo "::group::$1"; cat "$1"; echo "::endgroup::"' _ {} \;
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
