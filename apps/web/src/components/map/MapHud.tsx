@@ -20,7 +20,7 @@ interface MapHudProps {
   onToggleLabels?: () => void;
   onToggleGrid: () => void;
   onFit: () => void;
-  /** the Vehicles toggle + filter (MapCanvas owns its state) */
+  /** the Vehicles toggle + filter and the Recalls toggle (MapCanvas owns their state) */
   vehicles?: ReactNode;
 }
 

@@ -40,6 +40,8 @@ export const prefKeys = {
   minimapCollapsed: 'minimapCollapsed',
   /** vehicle spawn layer on + which kinds (2026-11) */
   vehicles: 'vehicles',
+  /** recall tower layer shown (2026-11; on unless switched off) */
+  recalls: 'recalls',
   /** voice chat: push-to-talk instead of an open mic (FEATURES F19) */
   voicePushToTalk: 'voicePushToTalk',
 } as const;

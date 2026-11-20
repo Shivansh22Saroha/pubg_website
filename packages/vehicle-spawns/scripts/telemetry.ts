@@ -1,4 +1,9 @@
-import { vehicleKindOf, type SpawnSighting, type VehicleKind } from '@rotationlab/shared';
+import {
+  vehicleKindOf,
+  type RecallSighting,
+  type SpawnSighting,
+  type VehicleKind,
+} from '@rotationlab/shared';
 
 type Loc = { x?: unknown; y?: unknown };
 
@@ -82,6 +87,25 @@ export function firstRides(events: unknown, matchId: string): SpawnSighting[] {
     if (!model && v?.vehicleType === 'FloatingVehicle') kind = 'boat';
     if (!kind) continue;
     out.push({ x: Math.round(p.x), y: Math.round(p.y), kind, matchId });
+  }
+  return out;
+}
+
+/**
+ * Recall towers: a Blue Chip (`Item_Bluechip_C`) can only be used at a recall tower, so every
+ * `LogItemUse` of one puts the player at a tower — one sighting per use. (`Item_Special_Bluechip_C`
+ * in equip events is the chip being carried, not a use.) Untrusted input: malformed events are
+ * ignored, never thrown.
+ */
+export function recallUses(events: unknown, matchId: string): RecallSighting[] {
+  if (!Array.isArray(events)) return [];
+  const out: RecallSighting[] = [];
+  for (const e of events) {
+    if (typeof e !== 'object' || e === null) continue;
+    const ev = e as { _T?: unknown; item?: { itemId?: unknown }; character?: { location?: Loc } };
+    if (ev._T !== 'LogItemUse' || ev.item?.itemId !== 'Item_Bluechip_C') continue;
+    const p = point(ev.character?.location);
+    if (p) out.push({ x: Math.round(p.x), y: Math.round(p.y), matchId });
   }
   return out;
 }

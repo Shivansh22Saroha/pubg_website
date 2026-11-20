@@ -1,15 +1,18 @@
 /**
- * Vehicle spawns from PUBG's official API (see packages/shared/src/vehicleSpawns.ts).
+ * Vehicle spawns and recall towers from PUBG's official API (packages/shared/src/vehicleSpawns.ts,
+ * packages/shared/src/recalls.ts).
  *
  *   PUBG_API_KEY=… pnpm --filter vehicle-spawns generate
  *
- * 1. GET /shards/<shard>/samples — a random sample of recent match ids (one request; that
- *    endpoint is rate-limited to 10 per minute, /matches is not).
+ * 1. GET /shards/<shard>/samples — a random sample of recent match ids, one request per day for
+ *    SAMPLE_DAYS days (that endpoint is rate-limited to 10 per minute, /matches is not).
  * 2. For each match: GET /matches/<id>, keep normal matches on our maps, download telemetry.
  * 3. First ride of every vehicle → sightings → clusterSpawns → apps/web/public/spawns/<map>.json
+ * 4. Every Blue Chip use → recall sightings → clusterRecalls → apps/web/public/recalls/<map>.json
  *
  * Env: PUBG_API_KEY (required), PUBG_SHARD (default steam), MATCHES_PER_MAP (default 250),
- * OUT_DIR (default ../../apps/web/public/spawns). The key is only sent to api.pubg.com — the
+ * SAMPLE_DAYS (default 1, max 14), OUT_DIR (default ../../apps/web/public/spawns), RECALL_DIR
+ * (default ../../apps/web/public/recalls). The key is only sent to api.pubg.com — the
  * telemetry CDN needs none — and is never logged.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -18,13 +21,16 @@ import { fileURLToPath } from 'node:url';
 import {
   MAPS,
   MAP_IDS,
+  RecallFileSchema,
   VehicleSpawnFileSchema,
+  clusterRecalls,
   clusterSpawns,
   mapIdForTelemetry,
   type MapId,
+  type RecallSighting,
   type SpawnSighting,
 } from '@rotationlab/shared';
-import { describeTelemetry, firstRides, NORMAL_MATCH_TYPES } from './telemetry.js';
+import { describeTelemetry, firstRides, NORMAL_MATCH_TYPES, recallUses } from './telemetry.js';
 
 const API = 'https://api.pubg.com';
 const KEY = process.env.PUBG_API_KEY ?? '';
@@ -32,6 +38,8 @@ const SHARD = process.env.PUBG_SHARD ?? 'steam';
 const PER_MAP = Number(process.env.MATCHES_PER_MAP ?? 250);
 const PKG_DIR = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const OUT_DIR = path.resolve(PKG_DIR, process.env.OUT_DIR ?? '../../apps/web/public/spawns');
+const RECALL_DIR = path.resolve(PKG_DIR, process.env.RECALL_DIR ?? '../../apps/web/public/recalls');
+const SAMPLE_DAYS = Math.min(14, Math.max(1, Number(process.env.SAMPLE_DAYS ?? 1) || 1));
 const CONCURRENCY = 4;
 
 if (!KEY) {
@@ -67,13 +75,24 @@ const telemetryNames = Object.fromEntries(
 ) as Record<MapId, readonly string[]>;
 
 async function main() {
-  const samples = await api<Samples>(`/shards/${SHARD}/samples`);
-  const ids = samples.data.relationships.matches.data
-    .map((m) => m.id)
-    .filter((id) => /^[0-9a-f-]{36}$/.test(id));
-  console.log(`${ids.length} sampled matches on ${SHARD}`);
+  const all = new Set<string>();
+  for (let day = 0; day < SAMPLE_DAYS; day++) {
+    // day 0: the latest sample; older days: the sample starting that many days back
+    const start = new Date(Date.now() - (day + 1) * 86_400_000).toISOString().slice(0, 19) + 'Z';
+    const q = day === 0 ? '' : `?filter[createdAt-start]=${encodeURIComponent(start)}`;
+    try {
+      const samples = await api<Samples>(`/shards/${SHARD}/samples${q}`);
+      for (const m of samples.data.relationships.matches.data)
+        if (/^[0-9a-f-]{36}$/.test(m.id)) all.add(m.id);
+    } catch (err) {
+      console.warn(`samples day ${day}: ${(err as Error).message}`);
+    }
+  }
+  const ids = [...all];
+  console.log(`${ids.length} sampled matches on ${SHARD} (${SAMPLE_DAYS} day(s))`);
 
   const sightings: Record<MapId, SpawnSighting[]> = { erangel: [], miramar: [], rondo: [] };
+  const recalls: Record<MapId, RecallSighting[]> = { erangel: [], miramar: [], rondo: [] };
   const used: Record<MapId, number> = { erangel: 0, miramar: 0, rondo: 0 };
   const full = () => MAP_IDS.every((m) => used[m] >= PER_MAP);
   let next = 0;
@@ -100,6 +119,7 @@ async function main() {
           console.log(`${mapId} telemetry sample: ${describeTelemetry(events)}`);
         }
         sightings[mapId].push(...firstRides(events, id));
+        recalls[mapId].push(...recallUses(events, id));
       } catch (err) {
         failures++;
         console.warn(`match ${id}: ${(err as Error).message}`);
@@ -138,6 +158,29 @@ async function main() {
     );
     console.log(
       `${mapId}: ${used[mapId]} matches, ${sightings[mapId].length} first rides → ${spawns.length} spawn points ${JSON.stringify(byKind)}`,
+    );
+  }
+  await mkdir(RECALL_DIR, { recursive: true });
+  for (const mapId of MAP_IDS) {
+    if (used[mapId] === 0) continue;
+    const towers = clusterRecalls(recalls[mapId], MAPS[mapId].worldSize);
+    if (towers.length === 0) {
+      console.log(
+        `${mapId}: ${recalls[mapId].length} Blue Chip uses → 0 recall towers — no file written`,
+      );
+      continue;
+    }
+    const file = RecallFileSchema.parse({
+      mapId,
+      source: 'pubg-api',
+      shard: SHARD,
+      generatedAt,
+      matches: used[mapId],
+      towers,
+    });
+    await writeFile(path.join(RECALL_DIR, `${mapId}.json`), `${JSON.stringify(file)}\n`);
+    console.log(
+      `${mapId}: ${recalls[mapId].length} Blue Chip uses → ${towers.length} recall towers`,
     );
   }
   if (failures) console.log(`${failures} matches failed (skipped)`);

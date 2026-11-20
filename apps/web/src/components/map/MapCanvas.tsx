@@ -9,6 +9,7 @@ import { env } from '@/env';
 import type { BoardMapInfo } from '@/lib/boardMap';
 import { createCrs, worldBounds } from '@/lib/coords';
 import { prefersReducedMotion } from '@/lib/motion';
+import { useRecallData, useRecallsOn } from '@/lib/recalls';
 import { useSpawnData, useVehiclePrefs } from '@/lib/vehicleSpawns';
 import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { BoardMapContext } from './boardMapContext';
@@ -17,6 +18,8 @@ import { GridLabels } from './GridLabels';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { MapHud } from './MapHud';
 import { Minimap } from './Minimap';
+import { RecallControl } from './RecallControl';
+import { RECALL_PANE, RecallLayer } from './RecallLayer';
 import { VehicleControl } from './VehicleControl';
 import { VEHICLE_PANE, VehicleLayer } from './VehicleLayer';
 
@@ -100,6 +103,10 @@ export default function MapCanvas({
     info.kind === 'pubg' ? info.mapId : 'erangel',
     vehicles.on && !custom,
   );
+  // recall towers: PUBG data too; the small file is what decides if the toggle shows at all
+  const [recalls, setRecalls] = useRecallsOn();
+  const recallData = useRecallData(info.kind === 'pubg' ? info.mapId : 'erangel', !custom);
+  const recallsShown = recalls && !custom && recallData.status === 'ready';
 
   const toggleLabels = useCallback(() => {
     setVariant((v) => (v === 'labels' ? 'clean' : 'labels'));
@@ -146,6 +153,7 @@ export default function MapCanvas({
         data-variant={variant}
         data-grid={grid ? 'on' : 'off'}
         data-vehicles={vehicles.on && !custom ? 'on' : 'off'}
+        data-recalls={recallsShown ? 'on' : 'off'}
         data-center={view.center}
         data-zoom={view.zoom}
         className="relative isolate h-full w-full overflow-hidden bg-bg"
@@ -221,6 +229,12 @@ export default function MapCanvas({
                 />
               )}
             </Pane>
+            {/* recall towers: above vehicle spawns, below drawings (400) */}
+            <Pane name={RECALL_PANE} style={{ zIndex: 365 }}>
+              {recallsShown && (
+                <RecallLayer towers={recallData.file.towers} tileWorld={tileWorld} />
+              )}
+            </Pane>
             {children}
           </MapContainer>
         </div>
@@ -238,7 +252,10 @@ export default function MapCanvas({
             onFit={fit}
             vehicles={
               custom ? undefined : (
-                <VehicleControl prefs={vehicles} onChange={setVehicles} data={spawnData} />
+                <>
+                  <VehicleControl prefs={vehicles} onChange={setVehicles} data={spawnData} />
+                  <RecallControl on={recalls} onChange={setRecalls} data={recallData} />
+                </>
               )
             }
           />
