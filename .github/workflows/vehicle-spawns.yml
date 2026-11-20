@@ -45,5 +45,11 @@ jobs:
         working-directory: packages/vehicle-spawns
         run: npx tsx scripts/probe.ts
 
-      - uses: actions/upload-artifact@v4
-        with: { name: probe, path: packages/vehicle-spawns/probe.json }
+      - name: Push probe data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "probe-data-${GITHUB_RUN_ID}"
+          git add -f packages/vehicle-spawns/probe.json
+          git commit -qm probe -n
+          git push origin "probe-data-${GITHUB_RUN_ID}"
