@@ -7,14 +7,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // BGMI gold plate: caps display face, clipped corner, halftone edge (UI_UX_SPEC §2.5)
+        // glass theme (UI_UX_SPEC §2.5): solid amber with a soft glow, rounded, normal case
         accent:
-          'bgmi-cut bgmi-halftone rounded-none pt-[3px] font-display text-[17px] leading-none font-semibold tracking-[0.03em] text-accent-fg uppercase hover:brightness-110 active:brightness-95 disabled:bg-surface-3 disabled:bg-none disabled:text-text-muted disabled:opacity-100',
-        // BGMI store-badge style: black, light hairline, caps
+          'rounded-[11px] bg-accent text-accent-fg shadow-[0_8px_24px_-10px_var(--accent-glow),inset_0_1px_0_rgba(255,255,255,0.3)] hover:bg-accent-hi active:brightness-95 disabled:bg-surface-3 disabled:text-text-muted disabled:shadow-none disabled:opacity-100',
+        // frosted glass with a light hairline
         outline:
-          'rounded-[8px] border-[1.5px] border-white/70 bg-black pt-[3px] font-display text-[17px] leading-none font-semibold tracking-[0.03em] text-text uppercase hover:border-accent hover:text-accent',
-        ghost: 'text-text hover:bg-surface-2 hover:shadow-[inset_0_1px_0_var(--highlight)]',
-        destructive: 'bg-danger-strong text-white hover:bg-danger-strong/90',
+          'rounded-[11px] border border-[var(--edge-strong)] bg-white/[0.04] text-text backdrop-blur-md hover:bg-white/[0.08] hover:border-white/25',
+        ghost: 'rounded-[10px] text-text hover:bg-white/[0.06]',
+        destructive: 'rounded-[11px] bg-danger-strong text-white hover:bg-danger-strong/90',
       },
       size: {
         // touch: ≥ 44 px targets (UI_UX_SPEC §7)

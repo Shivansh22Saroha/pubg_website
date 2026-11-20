@@ -141,7 +141,7 @@ export function SnapshotsDrawer({
                   )}
                   <span className="truncate">{s.name}</span>
                   {s.isAuto && (
-                    <span className="ml-auto rounded-full bg-surface-2 px-1.5 text-[10px] font-semibold tracking-wide text-text-muted uppercase">
+                    <span className="ml-auto rounded-full bg-surface-2 px-1.5 text-[11px] font-semibold text-text-muted">
                       auto
                     </span>
                   )}

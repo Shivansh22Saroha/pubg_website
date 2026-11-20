@@ -31,11 +31,10 @@ function useSignedIn(): boolean {
 }
 
 /** Logged in: "Go to dashboard"; otherwise (and while checking) Log in / Get started. */
-/** the header's call to action: a full-height gold block flush with the right edge */
-const BLOCK =
-  'bgmi-halftone flex items-center px-4 pt-[4px] font-display text-[20px] leading-none tracking-[0.03em] whitespace-nowrap text-accent-fg uppercase hover:brightness-110 sm:px-9 sm:text-[26px]';
+/** the header's call to action: the amber glass-theme button, centred in the bar */
+const BLOCK = buttonVariants({ variant: 'accent', className: 'my-auto h-10 px-4' });
 const LINK =
-  'flex items-center px-3 pt-[4px] font-display text-[20px] leading-none tracking-[0.03em] whitespace-nowrap text-text uppercase hover:text-accent sm:px-5 sm:text-[21px]';
+  'my-auto flex h-10 items-center rounded-[10px] px-3 text-sm font-semibold whitespace-nowrap text-text hover:bg-white/[0.06] sm:px-4';
 
 export function NavAuth() {
   if (useSignedIn()) {

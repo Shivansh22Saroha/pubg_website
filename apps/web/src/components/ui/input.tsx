@@ -5,8 +5,8 @@ export function Input({ className, ...props }: ComponentProps<'input'>) {
   return (
     <input
       className={cn(
-        'h-10 w-full rounded-control border bg-bg/70 px-3 text-sm text-text shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] placeholder:text-text-muted/80',
-        'transition-[border-color,box-shadow] duration-150 ease-hud hover:border-border-strong focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-glow)] focus-visible:outline-none',
+        'h-10 w-full rounded-[10px] border border-[var(--edge-strong)] bg-white/[0.04] px-3 text-sm text-text shadow-[inset_0_1px_2px_rgba(0,0,0,0.25)] placeholder:text-text-muted/80',
+        'transition-[border-color,box-shadow] duration-150 ease-hud hover:border-white/25 focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-glow)] focus-visible:outline-none',
         'aria-[invalid=true]:border-danger disabled:opacity-50',
         className,
       )}

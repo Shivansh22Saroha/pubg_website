@@ -25,7 +25,7 @@ export function DashboardView() {
     <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10">
       <div className="flex flex-wrap items-center gap-3">
         <h1
-          className="mr-auto font-display text-[40px] leading-none font-bold"
+          className="mr-auto font-display text-[30px] leading-none font-bold"
           data-testid="dashboard-greeting"
         >
           Welcome, {user.displayName}

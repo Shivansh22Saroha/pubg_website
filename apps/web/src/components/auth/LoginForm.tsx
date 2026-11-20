@@ -74,7 +74,7 @@ export function LoginForm({ redirectTo, error }: { redirectTo: string; error?: s
       noValidate
       className="flex flex-col gap-4"
     >
-      <h1 className="font-display text-[30px] leading-none font-bold">Log in</h1>
+      <h1 className="font-display text-[24px] leading-tight font-bold">Log in</h1>
       {error && GOOGLE_ERRORS[error] && (
         <p
           role="alert"

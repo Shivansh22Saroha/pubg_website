@@ -101,12 +101,19 @@ jobs:
       - name: E2E (fixture tiles, real API)
         run: pnpm test:e2e
 
+      - name: Print failed E2E page snapshots
+        if: failure()
+        run: find apps/web/test-results -name error-context.md -exec sh -c 'echo "::group::$1"; cat "$1"; echo "::endgroup::"' _ {} \;
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: apps/web/playwright-report
+          # traces / screenshots of failed tests live in test-results (no HTML report is built)
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
           retention-days: 7
 
   # A clean clone must install and boot: no pnpm cache, frozen lockfile, the *built* API against

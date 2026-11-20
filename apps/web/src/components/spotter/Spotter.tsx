@@ -37,14 +37,14 @@ export function Spotter() {
             setOpen(!open);
           }}
           className={cn(
-            'bgmi-cut fixed z-[900] flex items-center gap-2 bg-accent font-display text-accent-fg uppercase shadow-[0_10px_30px_-10px_rgba(0,0,0,0.9)] transition-[filter,transform] duration-150 hover:brightness-110 active:translate-y-px',
+            'fixed z-[900] flex items-center gap-2 rounded-full bg-accent font-semibold text-accent-fg shadow-[0_12px_32px_-10px_var(--accent-glow),0_10px_30px_-12px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.3)] transition-[background-color,transform] duration-150 hover:bg-accent-hi active:translate-y-px',
             onMap
-              ? 'top-[76px] right-4 h-11 px-3 text-[19px] leading-none'
-              : 'right-5 bottom-5 h-14 px-5 text-[22px] leading-none',
+              ? 'top-[76px] right-4 h-11 px-4 text-sm'
+              : 'right-5 bottom-5 h-12 px-5 text-[15px]',
           )}
         >
           <SpotterIcon className={onMap ? 'size-5' : 'size-6'} />
-          <span className={cn('pt-[3px]', onMap && 'max-sm:sr-only')}>
+          <span className={cn(onMap && 'max-sm:sr-only')}>
             {open ? 'Close Spotter' : 'Ask Spotter'}
           </span>
         </button>
