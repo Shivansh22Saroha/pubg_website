@@ -18,6 +18,12 @@ export default function PrivacyPage() {
           itself.
         </p>
         <p>
+          <strong>Your profile photo (optional):</strong> if you upload one, we keep a 256 px copy,
+          re-encoded so no location or camera details survive. It is private: only people in your
+          rooms see it, through links that expire. Replacing or removing it deletes the old file,
+          and deleting your account deletes it too.
+        </p>
+        <p>
           <strong>What you make:</strong> rooms, boards, layers, drawings, markers, snapshots and
           chat messages, plus which rooms you belong to and your role there.
         </p>

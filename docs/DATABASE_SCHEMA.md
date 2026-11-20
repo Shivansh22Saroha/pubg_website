@@ -37,6 +37,7 @@ users / rooms 1──* audit_logs
 | display_name | varchar(32) | NOT NULL |
 | ign | varchar(32) | NULL (in-game name) |
 | avatar_color | char(7) | NOT NULL default `'#38BDF8'`, CHECK hex |
+| avatar_key | text | NULL — profile photo (F23): `avatars/<id>/<random>.webp` in asset storage; cleared on account deletion (migration `20261120120000_avatar_key`) |
 | password_hash | text | NOT NULL (argon2id encoded string) |
 | email_verified_at | timestamptz | NULL |
 | failed_login_count | int | NOT NULL default 0 |
@@ -268,6 +269,7 @@ model User {
   displayName      String    @map("display_name") @db.VarChar(32)
   ign              String?   @db.VarChar(32)
   avatarColor      String    @default("#38BDF8") @map("avatar_color") @db.Char(7)
+  avatarKey        String?   @map("avatar_key")
   passwordHash     String    @map("password_hash")
   emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz
   failedLoginCount Int       @default(0) @map("failed_login_count")

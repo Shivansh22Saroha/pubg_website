@@ -278,7 +278,7 @@ describe('zone presets in the style bar (DRAW-8)', () => {
 
 describe('account deletion default per room', () => {
   const m = (id: string, role: 'EDITOR' | 'VIEWER', joinedAt: string) => ({
-    user: { id, username: id, displayName: id, ign: null, avatarColor: '#38BDF8' },
+    user: { id, username: id, displayName: id, ign: null, avatarColor: '#38BDF8', avatarUrl: null },
     role,
     joinedAt,
     online: false,

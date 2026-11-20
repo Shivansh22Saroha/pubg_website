@@ -70,6 +70,7 @@ Boundaries: browser ↔ proxy (untrusted input), proxy ↔ app (internal), app �
 | V7 **MUST** | Prisma parameterised queries only; any raw SQL uses `$queryRaw` tagged templates, never string concatenation. |
 | V8 | Uploaded images (board thumbnails, Phase 11): ≤ 100 KB raw `image/jpeg` only, JPEG magic bytes checked, decoded by sharp with `limitInputPixels` = 256², exactly 256×256, then **re-encoded** (no EXIF / ICC / trailing data survives) and stored under a server-generated random key — never a client-chosen name or path. |
 | V10 | Custom map images (F20): owners / editors only (`board.manage`), raw `image/jpeg|png|webp` body ≤ 8 MB parsed only on that route; the real type is sniffed from magic bytes, sharp decodes with `limitInputPixels` = 6000² (decompression bombs refused), then the image is **re-encoded** to WebP (EXIF rotation applied, metadata dropped) under server-generated random keys `maps/<roomId>/<128-bit>.webp`. Name and width are Zod-validated (width digits only). ≤ 10 per room under a row lock; 20 uploads / hour / user. |
+| V12 | Profile photos (F23): `PUT /me/avatar` acts only on the caller (`requireUser`); raw `image/jpeg\|png\|webp` body ≤ 4 MB parsed only on that route; magic bytes sniffed, sharp decode capped at 8000², EXIF rotation applied, centre-cropped and **re-encoded** to a 256 px WebP (location / camera metadata dropped) under `avatars/<userId>/<128-bit>.webp`; 10 uploads / hour / user. Photos are private like V11: only signed URLs, put in responses that already show that user (room members, chat authors, snapshots, `/me`), so only people who share a room with them see them; the old file is deleted on replace / remove and with the account. |
 | V11 | Private room assets (F20): map images are never public. Responses carry only **signed URLs** (S3 SigV4 presigned GET; local backend: HMAC-SHA256 over key + expiry with a key derived from `JWT_SECRET`, compared in constant time); a missing / expired / wrong signature → `404`. URLs live ≤ 12 h (a member who leaves keeps access until then — accepted). Map ids from another room → `404` on every route and on board create. |
 | V9 | Loot marker items (Phase 12): `props.item` is checked against the shared `LOOT_ITEMS` allow-list (Zod, both ends); the client builds the icon URL from the matched entry's id under the tiles base — no element ever carries a path or URL. |
 
@@ -117,8 +118,9 @@ Implemented (Phase 10):
 | `GET /public/demo-boards` | 30 / min / IP (Phase 9) |
 | `GET /public/share/:token` | 30 / min / IP (Phase 11) |
 | Custom map upload | 20 / hour / user, body ≤ 8 MB (F20) |
+| Profile photo upload | 10 / hour / user, body ≤ 4 MB (F23) |
 | Socket limits | see API_SPEC §7.4 |
-| Body size | REST 100 KB (snapshots restore via id, not body; custom map uploads 8 MB on that route only); socket 64 KB |
+| Body size | REST 100 KB (snapshots restore via id, not body; custom map uploads 8 MB and profile photos 4 MB on those routes only); socket 64 KB |
 
 Implement with `@fastify/rate-limit` (Redis store) and per-socket token buckets. Proxy also limits connections per IP (e.g. 50 concurrent).
 

@@ -51,6 +51,8 @@ interface Ctx {
   customMapId: string;
   png: Buffer;
   customMapImageUrl: string;
+  /** the owner's profile photo's signed URL (F23) */
+  avatarUrl: string;
 }
 
 interface Row {
@@ -190,6 +192,29 @@ const MATRIX: Row[] = [
     url: '/api/v1/me/prefs',
     request: () => ({ url: '/api/v1/me/prefs', payload: { roomTourDone: true } }),
     expect: authed(200),
+  },
+  {
+    method: 'PUT',
+    url: '/api/v1/me/avatar',
+    request: ({ png }) => ({
+      url: '/api/v1/me/avatar',
+      payload: png,
+      headers: { 'content-type': 'image/png' },
+    }),
+    expect: authed(200), // only ever the caller's own photo
+  },
+  {
+    method: 'DELETE',
+    url: '/api/v1/me/avatar',
+    request: () => ({ url: '/api/v1/me/avatar' }),
+    expect: authed(200),
+  },
+  {
+    method: 'GET',
+    url: '/api/v1/assets/avatars/:userId/:file',
+    request: ({ avatarUrl }) => ({ url: avatarUrl }),
+    // signed link, like custom maps (avatars.test.ts covers missing / expired / tampered links)
+    expect: everyone(200),
   },
   {
     method: 'POST',
@@ -625,9 +650,17 @@ async function context(): Promise<Ctx> {
     cookies: f.owner.jar.cookies,
     payload: jpeg,
   });
+  const avatar = await app.inject({
+    method: 'PUT',
+    url: '/api/v1/me/avatar',
+    headers: { ...CSRF, 'content-type': 'image/png' },
+    cookies: f.owner.jar.cookies,
+    payload: png,
+  });
   return {
     f,
     png,
+    avatarUrl: avatar.json<{ user: { avatarUrl: string } }>().user.avatarUrl,
     customMapId: customMap.id,
     customMapImageUrl: customMap.imageUrl,
     jpeg,

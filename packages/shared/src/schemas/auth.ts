@@ -76,6 +76,11 @@ export const PublicUserSchema = z.object({
   displayName: z.string(),
   ign: z.string().nullable(),
   avatarColor: HexColorSchema,
+  /**
+   * Profile photo (FEATURES F23): a signed URL that works for ≥ 6 h (the photo is private, like
+   * custom maps), or null for initials on the avatar colour. Defaulted for deploy skew.
+   */
+  avatarUrl: z.string().nullable().default(null),
 });
 export type PublicUser = z.infer<typeof PublicUserSchema>;
 
@@ -119,6 +124,27 @@ export const UpdateMeBodySchema = z
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to update' });
 export type UpdateMeBody = z.input<typeof UpdateMeBodySchema>;
+
+/** Profile photos (FEATURES F23): `PUT /me/avatar` takes the image as the raw body. */
+export const AVATAR_LIMITS = {
+  /** the file the user picks (the browser crops and shrinks it before upload) */
+  fileMaxBytes: 15 * 1024 * 1024,
+  /** what the server accepts */
+  uploadMaxBytes: 4 * 1024 * 1024,
+  /** the square the browser sends */
+  uploadPx: 512,
+  /** the square we store */
+  sizePx: 256,
+  /** shorter side of the picked image */
+  minSidePx: 64,
+} as const;
+export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+/** local storage backend: `GET /assets/avatars/:userId/:file?exp=&sig=` */
+export const AvatarAssetParamsSchema = z.strictObject({
+  userId: z.uuid(),
+  file: z.string().regex(/^[A-Za-z0-9_-]{22}\.webp$/),
+});
 
 export const ChangePasswordBodySchema = z.strictObject({
   /** required when the account has a password; omitted to set a first one (Google accounts) */

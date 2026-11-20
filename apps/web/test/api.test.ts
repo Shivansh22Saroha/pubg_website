@@ -10,6 +10,7 @@ const ME = {
     displayName: 'Alice',
     ign: null,
     avatarColor: '#38BDF8',
+    avatarUrl: null,
     email: 'alice@example.com',
     emailVerified: false,
     createdAt: '2026-10-25T07:10:00.000Z',
