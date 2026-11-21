@@ -552,7 +552,7 @@ function Shell({
   mode?: 'tool' | 'selection';
 }) {
   return (
-    <div className="pointer-events-none absolute right-[var(--chrome-right,0px)] bottom-[calc(var(--chrome-bottom,0px)+3rem)] left-[var(--chrome-left,0px)] z-[1000] flex justify-center px-4 pointer-coarse:bottom-16">
+    <div className="pointer-events-none absolute right-[var(--chrome-right,0px)] bottom-[calc(var(--chrome-bottom,0px)+3rem)] left-[var(--chrome-left,0px)] z-[1000] flex justify-center px-4 pointer-coarse:bottom-[calc(var(--chrome-bottom,0px)+4rem)]">
       <div
         role="toolbar"
         aria-label="Style"

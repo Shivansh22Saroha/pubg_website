@@ -56,7 +56,7 @@ async function touchDrag(cdp: CDPSession, from: [number, number], to: [number, n
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
-test('E2E-12: phone — every tool (six + More), chat sheet both ways, touch drawing and a tapped marker sync', async ({
+test('E2E-12: phone — every tool (six + More), docked sheet chat both ways, touch drawing and a tapped marker sync', async ({
   browser,
 }) => {
   const { ctxA, ctxB, a, b, nameB } = await twoUsersInRoom(browser, { a: PHONE });
@@ -103,12 +103,16 @@ test('E2E-12: phone — every tool (six + More), chat sheet both ways, touch dra
   );
   expect(small).toBe(0);
 
-  // chat: a full-screen sheet; send and receive
-  await a.getByTestId('chat-fab').tap();
-  const sheet = a.getByTestId('panel-sheet');
-  await expect(sheet).toBeVisible();
+  // chat lives in the docked glass sheet (exact room demo): Chat opens it to about half the
+  // screen, the map stays visible above; send and receive; tapping Chat again folds it
+  const sheet = a.getByTestId('phone-sheet');
+  await expect(sheet).toHaveAttribute('data-state', 'closed');
+  await a.getByTestId('phone-tab-chat').tap();
+  await expect(sheet).toHaveAttribute('data-state', 'open');
+  await expect(sheet.getByRole('textbox', { name: 'Message' })).toBeVisible();
   const box = await sheet.boundingBox();
-  expect(box?.height).toBeGreaterThan(600); // full screen
+  expect(box?.height).toBeGreaterThan(300);
+  expect(box?.height).toBeLessThan(844 * 0.75); // not full screen
   await sheet.getByRole('textbox', { name: 'Message' }).fill('rotating north');
   await sheet.getByRole('button', { name: 'Send' }).tap();
   // (the sr-only live region repeats the text — look in the message list)
@@ -117,8 +121,13 @@ test('E2E-12: phone — every tool (six + More), chat sheet both ways, touch dra
   await b.keyboard.press('Enter');
   await expect(sheet.getByText('copy that')).toBeVisible();
   await expect(sheet.getByText(nameB).first()).toBeVisible();
-  await sheet.getByRole('button', { name: 'Close panel' }).tap();
-  await expect(sheet).toHaveCount(0);
+  // the other sections: Routes, Squad, Replay
+  await a.getByTestId('phone-tab-plan').tap();
+  await expect(sheet.getByRole('heading', { name: 'Route options' })).toBeVisible();
+  await a.getByTestId('phone-tab-members').tap();
+  await expect(sheet.getByTestId('member-row').filter({ hasText: nameB })).toBeVisible();
+  await a.getByTestId('phone-tab-members').tap();
+  await expect(sheet).toHaveAttribute('data-state', 'closed');
 
   // one finger draws an arrow; the desktop user sees it; undo from the top bar removes it
   await a.getByTestId('tool-arrow').tap();
