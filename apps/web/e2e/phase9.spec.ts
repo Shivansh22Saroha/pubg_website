@@ -10,6 +10,7 @@ import {
 import {
   debugCount,
   debugPending,
+  openLeftPanel,
   pageApi,
   PASSWORD,
   registerViaUi,
@@ -312,11 +313,13 @@ test.describe('E2E-13: axe — 0 serious / critical violations', () => {
   }) => {
     const { ctxA, ctxB, a } = await twoUsersInRoom(browser);
     await scan(a, 'room');
-    for (const tab of ['Layers', 'Members']) {
+    for (const tab of ['Members', 'Replay']) {
       await a.getByRole('tab', { name: tab }).click();
       await scan(a, `room · ${tab}`);
     }
-    await a.getByRole('tab', { name: 'Layers' }).click();
+    // desktop: layers + route options in the left panel
+    await openLeftPanel(a);
+    await scan(a, 'room · plan panel');
     await a.getByTestId('layers-view-list').click();
     await scan(a, 'room · element list');
     await a.getByRole('button', { name: 'Invite' }).click();

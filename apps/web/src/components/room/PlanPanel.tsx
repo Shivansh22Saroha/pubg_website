@@ -45,7 +45,8 @@ function useNames(members: Member[], meId: string) {
   }, [members, meId]);
 }
 
-function Routes({ members, meId }: { members: Member[]; meId: string }) {
+/** Route options (F24): the left panel on desktop, the Plan tab in touch sheets. */
+export function Routes({ members, meId }: { members: Member[]; meId: string }) {
   const elements = useBoardStore((s) => s.view.elements);
   const layers = useBoardStore((s) => s.view.layers);
   const hidden = useSelectionStore((s) => s.hiddenLayers);
@@ -135,7 +136,8 @@ function useReplayOrder() {
   return useMemo(() => Object.values(elements).sort(byCreation), [elements]);
 }
 
-function Replay({ members, meId }: { members: Member[]; meId: string }) {
+/** Plan replay (F24): the right panel's Replay tab on desktop, the Plan tab in touch sheets. */
+export function Replay({ members, meId }: { members: Member[]; meId: string }) {
   const order = useReplayOrder();
   const step = usePlanStore((s) => s.replayStep);
   const playing = usePlanStore((s) => s.playing);

@@ -122,8 +122,25 @@ export async function twoUsersInRoom(
     await p.goto(`/rooms/${room.id}`);
     await p.waitForFunction(() => window.__rlDebug?.ready() === true);
     await p.waitForSelector('[data-testid="sync-indicator"][data-state="synced"]');
+    await foldLeftPanel(p);
   }
   return { ctxA, ctxB, a, b, nameA, nameB, roomId: room.id, boardId: board.id };
+}
+
+/**
+ * Desktop glass layout: the left panel (route options + layers) opens by default and covers
+ * the map's left third. Most specs click around the map, so rooms start with it folded; specs
+ * about routes / layers call `openLeftPanel`.
+ */
+export async function foldLeftPanel(p: Page) {
+  const fold = p.getByTestId('left-panel-collapse');
+  if (await fold.isVisible()) await fold.click();
+}
+
+export async function openLeftPanel(p: Page) {
+  const open = p.getByTestId('left-panel-open');
+  if (await open.isVisible()) await open.click();
+  await p.getByRole('complementary', { name: 'Plan panel' }).waitFor();
 }
 
 export const debugCount = (p: Page) => p.evaluate(() => window.__rlDebug?.count() ?? -1);

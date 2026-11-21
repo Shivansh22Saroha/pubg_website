@@ -32,7 +32,7 @@ test.describe('with motion', () => {
     await expect.poll(() => debugCount(b)).toBe(1);
 
     await a.keyboard.press('m'); // default marker kind: enemy squad
-    await a.mouse.click(...at(0.6, 0.6));
+    await a.mouse.click(...at(0.55, 0.45)); // clear of the minimap above the dock
     await expect(b.locator('.rl-marker-icon.rl-enter-alert')).toHaveCount(1);
     await expect(a.locator('.rl-marker-icon.rl-enter-alert')).toHaveCount(1); // markers: everyone
     await expect.poll(() => debugPending(a)).toBe(0);

@@ -47,7 +47,7 @@ test('E2E-7: save → modify → restore; both contexts equal the snapshot and u
   await expect(a.getByTestId('snapshots-drawer')).toHaveCount(0);
 
   // modify on both sides (each leaves an undo step)
-  await placeMarker(a, await at(a, 0.6, 0.6));
+  await placeMarker(a, await at(a, 0.55, 0.3)); // clear of the minimap above the dock
   await placeMarker(b, await at(b, 0.65, 0.5));
   await expect.poll(() => debugCount(a)).toBe(5);
   await expect(a.getByTestId('undo')).not.toHaveAttribute('aria-disabled', 'true');

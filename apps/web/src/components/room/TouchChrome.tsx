@@ -26,7 +26,7 @@ export function HalfSheet({ onClose, children }: { onClose: () => void; children
     <aside
       aria-label="Room panel"
       data-testid="panel-sheet"
-      className="fixed inset-x-0 bottom-14 z-[1200] flex h-[50dvh] flex-col rounded-t-panel border-t bg-surface shadow-panel pointer-coarse:bottom-16"
+      className="fixed inset-x-0 bottom-14 z-[1200] flex h-[50dvh] flex-col rounded-t-[22px] border-t border-[var(--edge-strong)] bg-[var(--glass)] shadow-panel backdrop-blur-2xl backdrop-saturate-150 pointer-coarse:bottom-16"
     >
       <SheetClose onClose={onClose} />
       <div className="min-h-0 flex-1">{children}</div>
@@ -55,13 +55,13 @@ export function FullSheet({
         <DialogPrimitive.Content
           aria-describedby={undefined}
           data-testid="panel-sheet"
-          className="fixed inset-0 z-[1500] flex flex-col bg-surface"
+          className="fixed inset-0 z-[1500] flex flex-col bg-[var(--overlay)] backdrop-blur-2xl backdrop-saturate-150"
           // the chat input focuses itself; don't jump to the close button first
           onOpenAutoFocus={(e) => {
             e.preventDefault();
           }}
         >
-          <div className="flex h-12 shrink-0 items-center justify-between border-b px-2">
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--edge)] px-2">
             <DialogPrimitive.Title className="px-2 font-display text-lg font-bold">
               Room
             </DialogPrimitive.Title>
@@ -87,7 +87,7 @@ function SheetClose({ onClose }: { onClose: () => void }) {
         onClick={onClose}
         className="flex h-6 w-full items-center justify-center pointer-coarse:h-11"
       >
-        <span aria-hidden className="h-1 w-10 rounded-full bg-border" />
+        <span aria-hidden className="h-1 w-10 rounded-full bg-white/25" />
       </button>
     </div>
   );
@@ -101,7 +101,7 @@ export function ChatButton({ unread, onClick }: { unread: number; onClick: () =>
       data-testid="chat-fab"
       aria-label={unread > 0 ? `Open chat, ${unread} unread` : 'Open chat'}
       onClick={onClick}
-      className="fixed top-15 right-3 z-[1100] flex size-12 items-center justify-center rounded-full border bg-surface text-text shadow-panel hover:bg-surface-2"
+      className="fixed top-15 right-3 z-[1100] flex size-12 items-center justify-center rounded-full border border-[var(--edge-strong)] bg-[var(--glass)] text-text shadow-panel backdrop-blur-xl hover:bg-white/10"
     >
       <MessageSquare className="size-5" aria-hidden />
       {unread > 0 && (

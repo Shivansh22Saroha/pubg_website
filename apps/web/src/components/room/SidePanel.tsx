@@ -14,7 +14,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoleBadge } from '@/components/rooms/bits';
 import { ElementList } from '@/components/tools/ElementList';
 import { LayersPanel } from '@/components/tools/LayersPanel';
-import { PlanPanel } from './PlanPanel';
+import { PlanPanel, Replay } from './PlanPanel';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
@@ -27,7 +27,59 @@ import { useChatStore } from '@/stores/chatStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useWorkspaceStore, type PanelTab } from '@/stores/workspaceStore';
 
-/** Right panel (UI_UX_SPEC §3.5): Chat · Layers · Members · Plan (F24). */
+/**
+ * Layers (and the same board as a table, UI_UX_SPEC §10): the desktop left panel, or the Layers
+ * tab in touch sheets.
+ */
+export function LayersSection({
+  role,
+  session,
+  members,
+  meId,
+  boards,
+}: {
+  role: RoomRole;
+  session: RoomSession | null;
+  members: Member[];
+  meId: string;
+  boards: Board[];
+}) {
+  const [layersView, setLayersView] = useState<'layers' | 'list'>('layers');
+  return (
+    <>
+      <div role="group" aria-label="Layers view" className="mb-2 flex gap-1">
+        {(['layers', 'list'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={layersView === v}
+            data-testid={`layers-view-${v}`}
+            onClick={() => {
+              setLayersView(v);
+            }}
+            className={cn(
+              'h-7 rounded-control px-2 text-xs text-text-muted hover:bg-white/[0.06] hover:text-text pointer-coarse:h-11',
+              layersView === v && 'bg-white/10 text-text',
+            )}
+          >
+            {v === 'layers' ? 'Layers' : 'List'}
+          </button>
+        ))}
+      </div>
+      {layersView === 'layers' ? (
+        <LayersPanel role={role} session={session} />
+      ) : (
+        <ElementList role={role} session={session} members={members} meId={meId} boards={boards} />
+      )}
+    </>
+  );
+}
+
+/**
+ * Room panel (UI_UX_SPEC §3.5). Desktop (`split`, glass layout 2026-11-21): the right panel —
+ * Chat · Members · Replay, with route options + layers in the left panel. Touch sheets: Chat ·
+ * Layers · Members · Plan.
+ */
 export function SidePanel({
   roomId,
   role,
@@ -35,6 +87,7 @@ export function SidePanel({
   members,
   boards,
   session,
+  split = false,
 }: {
   roomId: string;
   role: RoomRole;
@@ -42,11 +95,16 @@ export function SidePanel({
   members: Member[];
   boards: Board[];
   session: RoomSession | null;
+  split?: boolean;
 }) {
-  const tab = useWorkspaceStore((s) => s.tab);
+  const stored = useWorkspaceStore((s) => s.tab);
   const setTab = useWorkspaceStore((s) => s.setTab);
   const unread = useChatStore((s) => s.unread);
-  const [layersView, setLayersView] = useState<'layers' | 'list'>('layers');
+  // a tab that lives elsewhere in this layout shows chat instead
+  const here: readonly PanelTab[] = split
+    ? ['chat', 'members', 'replay']
+    : ['chat', 'layers', 'members', 'plan'];
+  const tab: PanelTab = here.includes(stored) ? stored : stored === 'replay' ? 'plan' : 'chat';
   return (
     <Tabs
       value={tab}
@@ -60,11 +118,17 @@ export function SidePanel({
           Chat
           {unread > 0 && tab !== 'chat' && <UnreadBadge count={unread} />}
         </TabsTrigger>
-        <TabsTrigger value="layers">Layers</TabsTrigger>
+        {!split && <TabsTrigger value="layers">Layers</TabsTrigger>}
         <TabsTrigger value="members">Members</TabsTrigger>
-        <TabsTrigger value="plan" data-testid="tab-plan">
-          Plan
-        </TabsTrigger>
+        {split ? (
+          <TabsTrigger value="replay" data-testid="tab-replay">
+            Replay
+          </TabsTrigger>
+        ) : (
+          <TabsTrigger value="plan" data-testid="tab-plan">
+            Plan
+          </TabsTrigger>
+        )}
       </TabsList>
       {/* forceMount keeps the chat (scroll position, draft) alive while another tab shows */}
       <TabsContent value="chat" forceMount className="min-h-0 flex-1 data-[state=inactive]:hidden">
@@ -77,50 +141,38 @@ export function SidePanel({
           session={session}
         />
       </TabsContent>
-      <TabsContent value="layers" className="overflow-y-auto p-2">
-        {/* UI_UX_SPEC §10: the same board as a table, for keyboard / screen-reader users */}
-        <div role="group" aria-label="Layers view" className="mb-2 flex gap-1">
-          {(['layers', 'list'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={layersView === v}
-              data-testid={`layers-view-${v}`}
-              onClick={() => {
-                setLayersView(v);
-              }}
-              className={cn(
-                'h-7 rounded-control px-2 text-xs text-text-muted hover:bg-surface-2 hover:text-text pointer-coarse:h-11',
-                layersView === v && 'bg-surface-2 text-text',
-              )}
-            >
-              {v === 'layers' ? 'Layers' : 'List'}
-            </button>
-          ))}
-        </div>
-        {layersView === 'layers' ? (
-          <LayersPanel role={role} session={session} />
-        ) : (
-          <ElementList
+      {!split && (
+        <TabsContent value="layers" className="overflow-y-auto p-2">
+          <LayersSection
             role={role}
             session={session}
             members={members}
             meId={meId}
             boards={boards}
           />
-        )}
-      </TabsContent>
+        </TabsContent>
+      )}
       <TabsContent value="members" className="overflow-y-auto p-2">
         <MembersList roomId={roomId} role={role} meId={meId} members={members} />
       </TabsContent>
       {/* forceMount: a replay keeps playing while another tab shows */}
-      <TabsContent
-        value="plan"
-        forceMount
-        className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden"
-      >
-        <PlanPanel members={members} meId={meId} />
-      </TabsContent>
+      {split ? (
+        <TabsContent
+          value="replay"
+          forceMount
+          className="min-h-0 flex-1 overflow-y-auto p-3 data-[state=inactive]:hidden"
+        >
+          <Replay members={members} meId={meId} />
+        </TabsContent>
+      ) : (
+        <TabsContent
+          value="plan"
+          forceMount
+          className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden"
+        >
+          <PlanPanel members={members} meId={meId} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { debugCount, debugPending, twoUsersInRoom } from './fixtures';
+import { debugCount, debugPending, openLeftPanel, twoUsersInRoom } from './fixtures';
 
 /**
  * Plan tools (FEATURES F24, room redesign release 3): the quick marker drop ring, route options
@@ -30,8 +30,8 @@ test('E2E-R4: quick marker drop, route options + compass, plan replay', async ({
 
   // two routes: one heading east, one heading north
   await a.keyboard.press('a');
-  await drag(a, await at(a, 0.2, 0.42), await at(a, 0.45, 0.42));
-  await drag(a, await at(a, 0.3, 0.8), await at(a, 0.3, 0.55));
+  await drag(a, await at(a, 0.3, 0.42), await at(a, 0.55, 0.42));
+  await drag(a, await at(a, 0.4, 0.8), await at(a, 0.4, 0.55));
   await a.keyboard.press('v');
 
   // right-click an empty spot → the ring → Enemy squad lands there, for the teammate too
@@ -54,8 +54,8 @@ test('E2E-R4: quick marker drop, route options + compass, plan replay', async ({
   await expect(ring).toHaveCount(0);
   expect(await debugCount(a)).toBe(3);
 
-  // Plan tab: two route options, oldest first
-  await a.getByTestId('tab-plan').click();
+  // the left panel (desktop): two route options, oldest first
+  await openLeftPanel(a);
   const options = a.getByTestId('route-option');
   await expect(options).toHaveCount(2);
   await expect(options.nth(0)).toContainText('Plan A');
@@ -76,6 +76,7 @@ test('E2E-R4: quick marker drop, route options + compass, plan replay', async ({
 
   // replay: scrub to the first drawing — the marker (made last) leaves the map, then comes back
   expect(await markersOnMap(a)).toBe(1);
+  await a.getByTestId('tab-replay').click();
   await a.getByTestId('replay-scrub').fill('1');
   await expect(a.getByTestId('replay-banner')).toBeVisible();
   await expect(a.getByTestId('replay-count')).toHaveText('1/3');

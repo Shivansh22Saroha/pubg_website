@@ -53,6 +53,7 @@ describe('resolveShortcut (UI_UX_SPEC §8)', () => {
     expect(resolveShortcut(key('0'), false)).toBeNull();
     expect(resolveShortcut(key(']'), false)).toEqual({ kind: 'panel' });
     expect(resolveShortcut(key('h'), false)).toEqual({ kind: 'fullMap' });
+    expect(resolveShortcut(key('['), false)).toEqual({ kind: 'leftPanel' });
     expect(resolveShortcut(key('H'), false)).toEqual({ kind: 'fullMap' });
     expect(resolveShortcut(key('/'), false)).toEqual({ kind: 'chat' });
     expect(resolveShortcut(key('?', { shiftKey: true }), false)).toEqual({ kind: 'help' });

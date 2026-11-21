@@ -179,11 +179,14 @@ export function UndoRedo({
   session,
   nameOf,
   size = 'md',
+  side = 'right',
 }: {
   role: RoomRole;
   session: EditSink | null;
   nameOf: (userId: string | null) => string;
   size?: 'md' | 'sm';
+  /** where the hint bubble goes (the bottom dock wants it above) */
+  side?: 'right' | 'top';
 }) {
   const undoCount = useBoardStore((s) =>
     s.boardId ? (s.history[s.boardId]?.undo.length ?? 0) : 0,
@@ -199,7 +202,7 @@ export function UndoRedo({
         label="Undo"
         shortcut="Ctrl+Z"
         hint="Undo your last change"
-        hintSide={size === 'sm' ? 'bottom' : 'right'}
+        hintSide={size === 'sm' ? 'bottom' : side}
         icon={Undo2}
         disabled={undoCount === 0}
         testId="undo"
@@ -212,7 +215,7 @@ export function UndoRedo({
         label="Redo"
         shortcut="Ctrl+Shift+Z"
         hint="Redo what you undid"
-        hintSide={size === 'sm' ? 'bottom' : 'right'}
+        hintSide={size === 'sm' ? 'bottom' : side}
         icon={Redo2}
         disabled={redoCount === 0}
         testId="redo"
@@ -247,7 +250,7 @@ export function Toolbar({
   breakpoint?: Breakpoint;
   orientation?: 'vertical' | 'horizontal';
   compact?: boolean;
-  /** desktop redesign: a frosted column floating over the full-screen map */
+  /** desktop: frosted glass floating over the full-screen map (a bottom dock when horizontal) */
   floating?: boolean;
 }) {
   const tool = useToolStore((s) => s.tool);
@@ -282,11 +285,14 @@ export function Toolbar({
       data-orientation={orientation}
       className={cn(
         'flex shrink-0 items-center gap-1',
-        floating
-          ? 'glass-panel max-h-full w-14 flex-col overflow-y-auto py-2'
-          : horizontal
-            ? 'h-14 w-full flex-row overflow-x-auto overscroll-x-contain border-t bg-[linear-gradient(90deg,var(--surface),var(--bg))] px-2 pointer-coarse:h-16'
-            : 'w-14 flex-col overflow-y-auto border-r bg-[linear-gradient(90deg,var(--surface),var(--bg))] py-2',
+        floating && horizontal
+          ? // glass layout (2026-11-21): the bottom tool dock from the approved demo
+            'glass-panel h-14 max-w-full flex-row overflow-x-auto overscroll-x-contain rounded-[18px] px-2 [scrollbar-width:none]'
+          : floating
+            ? 'glass-panel max-h-full w-14 flex-col overflow-y-auto py-2'
+            : horizontal
+              ? 'h-14 w-full flex-row overflow-x-auto overscroll-x-contain border-t border-[var(--edge)] bg-[var(--glass)] px-2 backdrop-blur-xl backdrop-saturate-150 pointer-coarse:h-16'
+              : 'w-14 flex-col overflow-y-auto border-r border-[var(--edge)] bg-[var(--glass)] py-2 backdrop-blur-xl backdrop-saturate-150',
         // phone: the bar's buttons spread across the width, clear of the home indicator
         compact &&
           horizontal &&
@@ -462,7 +468,7 @@ export function Toolbar({
             aria-hidden
             className={cn('shrink-0 bg-border', horizontal ? 'mx-1 h-8 w-px' : 'my-1 h-px w-8')}
           />
-          <UndoRedo role={role} session={session} nameOf={nameOf} />
+          <UndoRedo role={role} session={session} nameOf={nameOf} side={hintSide} />
         </>
       )}
     </nav>
