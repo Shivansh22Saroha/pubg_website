@@ -34,6 +34,28 @@ test('E2E-R1: full-screen map, Full map hides the panels, H brings them back', a
   await expect(panel).toBeVisible();
   await expect(page.getByTestId('toolbar')).toBeVisible();
 
+  // glass layout (2026-11-21): tools in a bottom dock, route options + layers on the left
+  const dock = page.getByTestId('toolbar');
+  await expect(dock).toHaveAttribute('data-orientation', 'horizontal');
+  const dockBox = await dock.boundingBox();
+  expect((dockBox?.y ?? 0) + (dockBox?.height ?? 0)).toBeGreaterThan(880);
+  expect(Math.abs((dockBox?.x ?? 0) + (dockBox?.width ?? 0) / 2 - 720)).toBeLessThan(4);
+  const left = page.getByRole('complementary', { name: 'Plan panel' });
+  await expect(left).toBeVisible();
+  await expect(left.getByRole('heading', { name: 'Route options' })).toBeVisible();
+  await expect(left.getByTestId('layer-row').first()).toBeVisible();
+  await expect(page.getByTestId('board-title')).toHaveText('Erangel – Plan 1');
+  // the HUD sits right of the left panel and above the dock
+  const leftBox = await left.boundingBox();
+  const hud = await page.getByTestId('map-hud').boundingBox();
+  expect(hud?.x ?? 0).toBeGreaterThanOrEqual((leftBox?.x ?? 0) + (leftBox?.width ?? 0));
+  expect((hud?.y ?? 0) + (hud?.height ?? 0)).toBeLessThanOrEqual(dockBox?.y ?? 0);
+  // [ folds the left panel away (a tab stays to bring it back), and back
+  await page.locator('body').press('[');
+  await expect(left).toHaveCount(0);
+  await page.getByTestId('left-panel-open').click();
+  await expect(left).toBeVisible();
+
   // the HUD's right end stays left of the side panel
   const panelBox = await panel.boundingBox();
   expect(await right(page, 'map-hud')).toBeLessThanOrEqual((panelBox?.x ?? 0) + 1);
@@ -42,9 +64,10 @@ test('E2E-R1: full-screen map, Full map hides the panels, H brings them back', a
   expect(firstCol?.y ?? 0).toBeGreaterThanOrEqual(72);
   expect(firstCol?.x ?? 0).toBeGreaterThanOrEqual(80);
 
-  // Full map: top bar and side panel go, tools stay, the pill takes the corner
+  // Full map: top bar and side panels go, tools stay, the pill takes the corner
   await page.getByTestId('fullmap-toggle').click();
   await expect(panel).toHaveCount(0);
+  await expect(left).toHaveCount(0);
   await expect(page.getByTestId('room-name')).toBeHidden();
   await expect(page.getByTestId('toolbar')).toBeVisible();
   await expect(page.getByTestId('fullmap-exit')).toBeVisible();

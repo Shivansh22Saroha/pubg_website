@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { debugCount, debugPending, pageApi, twoUsersInRoom } from './fixtures';
+import { debugCount, debugPending, openLeftPanel, pageApi, twoUsersInRoom } from './fixtures';
 
 /**
  * Drawing tools (Phase 6; FEATURES F5/F6, UI_UX_SPEC §3.5/§6/§8) with two browser contexts
@@ -47,8 +47,9 @@ const selection = (p: Page) => p.evaluate(() => window.__rlDebug?.selection() ??
 const layerRows = (p: Page) =>
   p.getByTestId('layer-row').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-layer')));
 
+/** desktop (glass layout): layers sit in the left panel, open by default */
 async function openLayers(p: Page) {
-  await p.getByRole('tab', { name: 'Layers' }).click();
+  await openLeftPanel(p);
   await expect(p.getByTestId('layer-row').first()).toBeVisible();
 }
 

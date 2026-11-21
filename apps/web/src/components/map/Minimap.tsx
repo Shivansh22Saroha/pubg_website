@@ -84,7 +84,7 @@ export function Minimap({ map, info }: { map: L.Map; info: BoardMapInfo }) {
     <div
       data-testid="minimap"
       data-collapsed={collapsed ? 'true' : 'false'}
-      className="pointer-events-auto absolute right-[calc(var(--chrome-right,0px)+0.75rem)] bottom-16 z-20 glass overflow-hidden rounded-panel transition-[right] duration-300"
+      className="pointer-events-auto absolute right-[calc(var(--chrome-right,0px)+0.75rem)] bottom-[calc(var(--chrome-bottom,0px)+4rem)] z-20 glass overflow-hidden rounded-panel transition-[right] duration-300"
     >
       <button
         type="button"

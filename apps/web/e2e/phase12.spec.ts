@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { debugCount, debugPending, pageApi, twoUsersInRoom } from './fixtures';
+import { debugCount, debugPending, openLeftPanel, pageApi, twoUsersInRoom } from './fixtures';
 
 /** Phase 12 (P2 batch): element list location / Show, linked players, curved arrows, loot. */
 
@@ -47,7 +47,8 @@ test('element list: location column and Show — viewers too', async ({ browser 
   });
   await expect.poll(() => debugCount(b)).toBe(1);
 
-  await b.getByRole('tab', { name: 'Layers' }).click();
+  // desktop: layers (and the element list) live in the left panel
+  await openLeftPanel(b);
   await b.getByTestId('layers-view-list').click();
   const list = b.getByTestId('element-list');
   await expect(list.getByTestId('element-location')).toHaveText('G-K 0,0');
@@ -88,7 +89,7 @@ test('linked own-player marker: pick a member in the style bar, everyone sees th
   await expect.poll(() => debugCount(a)).toBe(1);
 
   // select it from the element list, then link it in the style bar
-  await a.getByRole('tab', { name: 'Layers' }).click();
+  await openLeftPanel(a);
   await a.getByTestId('layers-view-list').click();
   await a.getByRole('button', { name: /^Select Marker Own player 2/ }).click();
   const picker = a.getByTestId('player-link');

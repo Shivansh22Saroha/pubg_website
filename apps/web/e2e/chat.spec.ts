@@ -156,7 +156,7 @@ test('E2E-4: B pings a spot on another board; A clicks the chip, switches board,
 
   // Alt+click attaches a ping too, and focuses the input
   await a.keyboard.down('Alt');
-  await a.mouse.click(...(await at(a, 0.6, 0.6)));
+  await a.mouse.click(...(await at(a, 0.5, 0.45)));
   await a.keyboard.up('Alt');
   await expect(a.getByTestId('draft-ping')).toBeVisible();
   await expect(a.getByRole('textbox', { name: 'Message' })).toBeFocused();

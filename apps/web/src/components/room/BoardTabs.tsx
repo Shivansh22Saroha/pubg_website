@@ -93,11 +93,12 @@ export function BoardTabs({
     <>
       {/* a tablist may only own tabs (axe aria-required-children): the actions of the active
           board and "New board" sit right after it */}
-      <div data-tour="board-tabs" className="flex min-w-0 items-stretch">
+      {/* glass layout (2026-11-21): a pill of rounded board chips, the active one amber */}
+      <div data-tour="board-tabs" className="flex min-w-0 items-center gap-0.5">
         <div
           role="tablist"
           aria-label="Boards"
-          className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+          className="flex min-w-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
         >
           {boards.map((b, i) => {
             const active = b.id === activeId;
@@ -105,11 +106,11 @@ export function BoardTabs({
               <div
                 key={b.id}
                 className={cn(
-                  'group flex shrink-0 items-center border-r',
+                  'group flex shrink-0 items-center rounded-full transition-colors',
                   active
-                    ? 'bg-[linear-gradient(180deg,rgba(245,179,1,0.1),rgba(245,179,1,0.02))] shadow-[inset_0_-2px_0_var(--accent)]'
-                    : 'hover:bg-surface-2/60',
-                  dragId && dragId !== b.id && 'data-[over=true]:bg-surface-2',
+                    ? 'bg-accent text-accent-fg shadow-[0_6px_18px_-8px_var(--accent-glow)]'
+                    : 'hover:bg-white/[0.06]',
+                  dragId && dragId !== b.id && 'data-[over=true]:bg-white/10',
                 )}
                 draggable={canManage}
                 onDragStart={(e) => {
@@ -139,8 +140,8 @@ export function BoardTabs({
                     onSelect(b.id);
                   }}
                   className={cn(
-                    'flex h-12 items-center gap-2 px-3.5 text-[13px] font-medium transition-colors',
-                    active ? 'text-text [&>svg]:text-accent' : 'text-text-muted hover:text-text',
+                    'flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-semibold transition-colors',
+                    active ? 'text-accent-fg' : 'text-text-muted hover:text-text',
                   )}
                 >
                   <MapIcon className="size-3.5" aria-hidden />
@@ -155,7 +156,7 @@ export function BoardTabs({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={`Board actions for ${current.name}`}
-              className="flex w-8 shrink-0 items-center justify-center text-text-muted hover:bg-surface hover:text-text pointer-coarse:w-11"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-white/[0.06] hover:text-text pointer-coarse:size-11"
             >
               <MoreVertical className="size-4" aria-hidden />
             </DropdownMenuTrigger>
@@ -250,7 +251,7 @@ export function BoardTabs({
               setName(defaultName(first, MAPS.erangel.name, boards));
               setDialog({ kind: 'new' });
             }}
-            className="flex h-12 shrink-0 items-center px-3 text-text-muted hover:bg-surface hover:text-text"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-white/[0.06] hover:text-text"
           >
             <Plus className="size-4" />
           </button>
