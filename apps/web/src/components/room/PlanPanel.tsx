@@ -2,7 +2,9 @@
 
 import { formatMetres, type MarkerKind, type Member } from '@rotationlab/shared';
 import { Pause, Play, Route as RouteIcon, RotateCcw, X } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import CountUp from '@/components/fx/CountUp/CountUp';
+import SpotlightCard from '@/components/fx/SpotlightCard/SpotlightCard';
 import { MARKER_LABELS } from '@/components/tools/Toolbar';
 import {
   byCreation,
@@ -19,6 +21,12 @@ import { useBoardStore } from '@/stores/boardStore';
 import { usePlanStore } from '@/stores/planStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 
+/** SpotlightCard's own dark surface swapped for the room's glass */
+const ROUTE_CARD_SKIN = {
+  '--spotlight-card-surface': 'rgba(255,255,255,0.035)',
+  '--spotlight-card-border': 'var(--edge)',
+  '--spotlight-card-shadow': 'none',
+} as CSSProperties;
 const TYPE_LABEL = { LINE: 'Line', ARROW: 'Arrow', STROKE: 'Pen path' } as const;
 /** replay list: how many finished steps stay listed above the current one */
 const LIST_BEHIND = 60;
@@ -78,44 +86,59 @@ export function Routes({ members, meId }: { members: Member[]; meId: string }) {
           with their length, travel time and heading, so the squad can compare them.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5" aria-label="Route options" data-testid="route-list">
+        <ul className="flex flex-col gap-2" aria-label="Route options" data-testid="route-list">
           {routes.map((r) => {
             const on = r.id === focusId;
             return (
               <li key={r.id}>
-                <button
-                  type="button"
-                  aria-pressed={on}
-                  data-testid="route-option"
-                  onClick={() => {
-                    focusRoute(on ? null : r.id, !on);
-                  }}
+                <SpotlightCard
+                  spotlightColor="rgba(245,185,66,0.22)"
+                  style={ROUTE_CARD_SKIN}
                   className={cn(
-                    'flex w-full flex-col gap-1 rounded-panel border border-white/10 bg-surface-2/40 p-2.5 text-left transition-colors hover:border-white/25 hover:bg-surface-2',
+                    'rl-route-card !rounded-[14px] !p-0 transition-shadow',
                     on &&
-                      'border-accent/70 bg-surface-2 shadow-[inset_0_0_0_1px_var(--color-accent)]',
+                      'shadow-[inset_0_0_0_1px_var(--color-accent),0_0_24px_-8px_var(--color-accent)]',
                   )}
                 >
-                  <span className="flex items-center gap-2">
-                    <span
-                      aria-hidden
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: r.color }}
-                    />
-                    <b className="text-sm">{r.name}</b>
-                    <span className="ml-auto font-mono text-sm tabular-nums">
-                      {formatMetres(r.summary.total)}
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    data-testid="route-option"
+                    onClick={() => {
+                      focusRoute(on ? null : r.id, !on);
+                    }}
+                    className="relative z-[2] flex w-full flex-col gap-1.5 p-3 text-left"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'grid size-[26px] shrink-0 place-items-center rounded-[8px] font-display text-sm font-bold transition-colors',
+                          on ? 'bg-accent text-accent-fg' : 'bg-white/[0.07] text-text',
+                        )}
+                        style={on ? undefined : { boxShadow: `inset 0 0 0 1.5px ${r.color}` }}
+                      >
+                        {r.name.slice(-1)}
+                      </span>
+                      <b className="min-w-0 truncate text-sm">{r.name}</b>
+                      <span className="ml-auto font-display text-[20px] leading-none font-bold tabular-nums">
+                        <span className="sr-only">{formatMetres(r.summary.total)}</span>
+                        <span aria-hidden>
+                          <CountUp to={Math.round(r.summary.total)} separator=" " duration={0.9} />
+                          <span className="ml-0.5 text-xs font-semibold text-text-muted">m</span>
+                        </span>
+                      </span>
                     </span>
-                  </span>
-                  <span className="text-xs text-text-muted">
-                    ~{r.summary.footMin} min on foot · ~{r.summary.vehicleMin} min by vehicle ·
-                    heads {r.bearing}° {compassPoint(r.bearing)}
-                  </span>
-                  <span className="truncate text-[11px] text-text-muted">
-                    {TYPE_LABEL[r.type]}
-                    {r.layerName ? ` on ${r.layerName}` : ''} · {nameOf(r.createdBy)}
-                  </span>
-                </button>
+                    <span className="text-xs text-text-muted">
+                      ~{r.summary.footMin} min on foot · ~{r.summary.vehicleMin} min by vehicle ·
+                      heads {r.bearing}° {compassPoint(r.bearing)}
+                    </span>
+                    <span className="truncate text-[11px] text-text-muted">
+                      {TYPE_LABEL[r.type]}
+                      {r.layerName ? ` on ${r.layerName}` : ''} · {nameOf(r.createdBy)}
+                    </span>
+                  </button>
+                </SpotlightCard>
               </li>
             );
           })}
@@ -210,7 +233,7 @@ export function Replay({ members, meId }: { members: Member[]; meId: string }) {
                 if (step === null || step >= total) setStep(0);
                 setPlaying(true);
               }}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg hover:brightness-110 pointer-coarse:size-11"
+              className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg shadow-[0_0_20px_-2px_rgba(245,185,66,0.6)] transition-transform hover:scale-105 hover:brightness-110 active:scale-95 pointer-coarse:size-11"
             >
               {playing ? (
                 <Pause className="size-4" aria-hidden />
@@ -226,7 +249,7 @@ export function Replay({ members, meId }: { members: Member[]; meId: string }) {
               aria-label="Replay position"
               aria-valuetext={`${shown} of ${total} drawings`}
               data-testid="replay-scrub"
-              className="h-9 min-w-0 flex-1 accent-[var(--color-accent)]"
+              className="rl-scrub h-9 min-w-0 flex-1 accent-[var(--color-accent)]"
               onChange={(e) => {
                 const v = Number(e.target.value);
                 setPlaying(false);
@@ -270,7 +293,9 @@ export function Replay({ members, meId }: { members: Member[]; meId: string }) {
                   key={el.id}
                   className={cn(
                     'flex gap-2 border-l-2 py-0.5 pl-2',
-                    i < shown ? 'border-accent text-text' : 'border-white/10 text-text-muted',
+                    i < shown
+                      ? 'border-accent text-text'
+                      : 'border-white/10 text-text-muted opacity-40',
                     i === shown - 1 && step !== null && 'font-semibold',
                   )}
                 >

@@ -68,6 +68,7 @@ export default function BoardMap({
   return (
     <MapCanvas
       minimap
+      room
       map={map}
       onCursor={onCursor}
       overlay={

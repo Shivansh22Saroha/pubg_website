@@ -9,6 +9,7 @@ import {
   type RoomRole,
 } from '@rotationlab/shared';
 import { MapIcon, MoreVertical, Plus } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,8 @@ export function BoardTabs({
   onSnapshots: (board: Board) => void;
 }) {
   const [dialog, setDialog] = useState<DialogState>(null);
+  /** bumps on each board switch to replay the particle burst */
+  const [burst, setBurst] = useState(0);
   const [name, setName] = useState('');
   const [choice, setChoice] = useState<MapChoice>({ kind: 'pubg', mapId: 'erangel' });
   const [mapName, setMapName] = useState(MAPS.erangel.name);
@@ -106,10 +109,8 @@ export function BoardTabs({
               <div
                 key={b.id}
                 className={cn(
-                  'group flex shrink-0 items-center rounded-full transition-colors',
-                  active
-                    ? 'bg-accent text-accent-fg shadow-[0_6px_18px_-8px_var(--accent-glow)]'
-                    : 'hover:bg-white/[0.06]',
+                  'group relative flex shrink-0 items-center rounded-full transition-colors',
+                  !active && 'hover:bg-white/[0.06]',
                   dragId && dragId !== b.id && 'data-[over=true]:bg-white/10',
                 )}
                 draggable={canManage}
@@ -131,16 +132,28 @@ export function BoardTabs({
                   setDragId(null);
                 }}
               >
+                {/* exact demo: the amber blob flows to the picked board (motion layout) and
+                    a little burst of particles goes off */}
+                {active && (
+                  <motion.span
+                    aria-hidden
+                    layoutId={`board-blob-${roomId}`}
+                    className="absolute inset-0 rounded-full bg-accent shadow-[0_6px_18px_-8px_var(--accent-glow)]"
+                    transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.8 }}
+                  />
+                )}
+                {active && burst > 0 && <Burst key={burst} />}
                 <button
                   type="button"
                   role="tab"
                   aria-selected={active}
                   title={`${b.name} (${boardMapName(b, customMaps.data)}) — ${i < 9 ? `press ${i + 1}` : ''}`}
                   onClick={() => {
+                    if (!active) setBurst((n) => n + 1);
                     onSelect(b.id);
                   }}
                   className={cn(
-                    'flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-semibold transition-colors',
+                    'relative flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-semibold transition-colors duration-300',
                     active ? 'text-accent-fg' : 'text-text-muted hover:text-text',
                   )}
                 >
@@ -462,3 +475,44 @@ function BoardPresenceDots({ boardId }: { boardId: string }) {
     </span>
   );
 }
+
+/** amber + white particles flying out of the newly picked board (exact demo's gooey nav) */
+function Burst() {
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0 z-10 motion-reduce:hidden">
+      {BURST.map((p, i) => (
+        <motion.span
+          key={i}
+          className="absolute top-1/2 left-1/2 rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            background: p.color,
+            marginLeft: -p.size / 2,
+            marginTop: -p.size / 2,
+          }}
+          initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+          animate={{ x: p.dx, y: p.dy, scale: 0, opacity: 0 }}
+          transition={{ duration: 0.6, delay: p.delay, ease: [0.22, 1, 0.36, 1] }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** a fixed spray (a hashed jitter per particle, so renders stay pure) */
+const jitter = (i: number, k: number) => {
+  const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+};
+const BURST = Array.from({ length: 12 }, (_, i) => {
+  const a = (i / 12) * Math.PI * 2 + jitter(i, 1) * 0.5;
+  const d = 22 + jitter(i, 2) * 18;
+  return {
+    dx: Math.cos(a) * d,
+    dy: Math.sin(a) * d * 0.6,
+    size: 4 + jitter(i, 3) * 4,
+    color: i % 3 === 0 ? '#ffffff' : '#f5b942',
+    delay: jitter(i, 4) * 0.06,
+  };
+});

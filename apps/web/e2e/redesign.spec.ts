@@ -3,7 +3,7 @@ import { pageApi, registerViaUi, serveFixtureTiles, uniqueName } from './fixture
 
 /**
  * Room redesign, release 1 (FEATURES F22): the map fills the screen, the chrome floats over it,
- * and Full map (button or H) hides the top bar and side panel. The map's own overlays keep clear
+ * and Full map (button or H) hides the side panels, compass and board switcher (exact room demo). The map's own overlays keep clear
  * of whatever chrome is showing.
  */
 async function openRoom(page: Page) {
@@ -64,24 +64,49 @@ test('E2E-R1: full-screen map, Full map hides the panels, H brings them back', a
   expect(firstCol?.y ?? 0).toBeGreaterThanOrEqual(72);
   expect(firstCol?.x ?? 0).toBeGreaterThanOrEqual(80);
 
-  // Full map: top bar and side panels go, tools stay, the pill takes the corner
+  // exact room demo: the compass box sits top centre, the board switcher under it
+  await expect(page.getByTestId('compass-bar')).toBeVisible();
+  await expect(page.getByTestId('compass-bar')).toContainText('Pick a route');
+  // it takes the room between the room card and the actions, never overlapping either
+  const compassBox = await page.getByTestId('compass-bar').boundingBox();
+  const cardBox = await page
+    .getByTestId('room-name')
+    .locator('xpath=ancestor::div[contains(@class,"glass-panel")][1]')
+    .boundingBox();
+  const moreBox = await page.getByTestId('profile-button').boundingBox();
+  expect(compassBox?.x ?? 0).toBeGreaterThanOrEqual((cardBox?.x ?? 0) + (cardBox?.width ?? 0));
+  expect((compassBox?.x ?? 0) + (compassBox?.width ?? 0)).toBeLessThanOrEqual(moreBox?.x ?? 0);
+  expect(compassBox?.width ?? 0).toBeGreaterThan(300);
+  await expect(page.getByTestId('dock-hint')).toBeVisible();
+
+  // Full map (the demo's focus mode): compass, board switcher, hint and side panels go; the room
+  // card, the actions and the tools stay, and the button now reads Show panels
   await page.getByTestId('fullmap-toggle').click();
   await expect(panel).toHaveCount(0);
   await expect(left).toHaveCount(0);
-  await expect(page.getByTestId('room-name')).toBeHidden();
+  await expect(page.getByTestId('compass-bar')).toBeHidden();
+  await expect(page.getByTestId('dock-hint')).toBeHidden();
+  await expect(page.getByTestId('room-name')).toBeVisible();
   await expect(page.getByTestId('toolbar')).toBeVisible();
-  await expect(page.getByTestId('fullmap-exit')).toBeVisible();
+  await expect(page.getByTestId('fullmap-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('fullmap-toggle')).toHaveAccessibleName('Show panels');
   await expect.poll(() => right(page, 'map-hud')).toBeGreaterThan(1400);
 
   // H toggles it back; ] also returns from Full map
   await page.locator('body').press('h');
   await expect(panel).toBeVisible();
-  await expect(page.getByTestId('room-name')).toBeVisible();
+  await expect(page.getByTestId('compass-bar')).toBeVisible();
   await page.locator('body').press('h');
   await expect(panel).toHaveCount(0);
   await page.locator('body').press(']');
   await expect(panel).toBeVisible();
-  await expect(page.getByTestId('fullmap-exit')).toHaveCount(0);
+  await expect(page.getByTestId('fullmap-toggle')).toHaveAttribute('aria-pressed', 'false');
+
+  // ] folds the right panel to a vertical edge tab; the tab brings it back
+  await page.locator('body').press(']');
+  await expect(panel).toHaveCount(0);
+  await page.getByTestId('panel-toggle').click();
+  await expect(panel).toBeVisible();
 });
 
 test('E2E-R2: phone — Full map view hides the top bar and comes back', async ({ browser }) => {

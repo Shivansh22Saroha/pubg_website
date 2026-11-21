@@ -6,17 +6,25 @@ import {
   ChevronDown,
   Loader2,
   Maximize2,
+  ChevronLeft,
+  ChevronRight,
   Minimize2,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
   Settings,
   UserPlus,
   MoreHorizontal,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { preload } from 'react-dom';
 import { toast } from 'sonner';
 import { BoardMapView } from '@/components/map/BoardMapView';
@@ -24,6 +32,7 @@ import { SnapshotsDrawer } from '@/components/snapshots/SnapshotsDrawer';
 import { ShortcutsDialog } from '@/components/tools/ShortcutsDialog';
 import { Toolbar, UndoRedo } from '@/components/tools/Toolbar';
 import StarBorder from '@/components/fx/StarBorder/StarBorder';
+import DecryptedText from '@/components/fx/DecryptedText/DecryptedText';
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -47,6 +56,8 @@ import { prefKeys, readPref, writePref } from '@/lib/prefs';
 import { useLeaveRoom, useRoom } from '@/lib/rooms';
 import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { BoardTabs } from './BoardTabs';
+import { CompassBox } from './CompassBox';
+import { ProfileCard } from './ProfileCard';
 import { InviteDialog } from './InviteDialog';
 import { RoomSettingsDialog } from './RoomSettingsDialog';
 import {
@@ -85,6 +96,8 @@ import { useWorkspaceStore } from '@/stores/workspaceStore';
 /** how the floating chrome slides away for Full map */
 const CHROME_MOTION =
   'transition-[opacity,transform,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]';
+/** the side panels slide in and out like the room demo (0.5 s, ease-out-expo) */
+const PANEL_SPRING = { duration: 0.5, ease: [0.22, 1, 0.36, 1] } as const;
 
 export function RoomWorkspace({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -115,18 +128,23 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   // layers on the left, chat · members · replay on the right, the tools in a bottom dock. The
   // map's own overlays (HUD, minimap, grid letters, style bar, follow pill, compass) keep clear
   // of that chrome through these insets — CSS variables + the store.
-  const panelWidth = breakpoint === 'desktop' ? 340 : 300;
-  const leftWidth = breakpoint === 'desktop' ? 300 : 280;
-  const chromeTop = touch || fullMap ? 0 : 72;
+  const panelWidth = breakpoint === 'desktop' ? 300 : 280;
+  const leftWidth = breakpoint === 'desktop' ? 312 : 280;
+  const chromeTop = touch ? 0 : fullMap ? 76 : 156;
   const chromeLeft = !touch && leftOpen && !fullMap ? leftWidth + 24 : 0;
   const chromeRight = !touch && panelOpen && !fullMap ? panelWidth + 24 : 0;
   // the dock: 56 px + its 12 px gap + 12 px breathing room
   const chromeBottom = touch ? 0 : 80;
+  // fitting the map (first view, Fit map, a picked route) and the grid letters only keep clear of
+  // the top row and the dock: the board switcher and the hint pill may overlap the art's edge,
+  // which keeps the map a zoom level bigger
+  const fitTop = touch ? 0 : 84;
+  const fitBottom = touch ? 0 : 80;
   useLayoutEffect(() => {
     useWorkspaceStore
       .getState()
-      .setChrome({ top: chromeTop, left: chromeLeft, right: chromeRight, bottom: chromeBottom });
-  }, [chromeTop, chromeLeft, chromeRight, chromeBottom]);
+      .setChrome({ top: fitTop, left: chromeLeft, right: chromeRight, bottom: fitBottom });
+  }, [fitTop, chromeLeft, chromeRight, fitBottom]);
   // leaving the room screen brings the panels back next time
   useEffect(
     () => () => {
@@ -529,17 +547,11 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           <PhoneRoomMenu items={phoneMenu} />
         </header>
       ) : (
-        // one row so the three groups never overlap: the board pill takes what's left and
-        // scrolls when the window is tight
-        <header
-          className={cn(
-            'pointer-events-none absolute inset-x-3 top-3 z-30 flex items-start gap-3 [&>*]:pointer-events-auto',
-            CHROME_MOTION,
-            fullMap && 'invisible -translate-y-4 opacity-0',
-          )}
-        >
-          {/* top left: the room card — live dot · room name (menu), the board below */}
-          <div className="glass-panel flex h-[60px] max-w-[min(340px,26vw)] shrink-0 items-stretch overflow-hidden rounded-[16px]">
+        // exact room demo: room card · compass box · actions in one floating row (never
+        // overlapping); the board switcher sits under the compass
+        <header className="pointer-events-none absolute inset-x-3 top-3 z-30 flex items-start gap-3 [&>*]:pointer-events-auto">
+          {/* top left: the room card — live dot · room name (menu), the board decoding in */}
+          <div className="glass-panel flex min-w-0 shrink-0 items-stretch overflow-hidden xl:max-w-[340px] max-xl:max-w-[26vw]">
             <Link
               href="/dashboard"
               aria-label="Back to dashboard"
@@ -547,10 +559,13 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             >
               <ArrowLeft className="size-4" />
             </Link>
-            <div className="flex min-w-0 flex-col justify-center py-1.5 pr-3 pl-3">
+            <div className="flex min-w-0 flex-col justify-center py-2.5 pr-4 pl-3">
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex min-w-0 items-center gap-1.5 self-start rounded-[6px] text-xs text-text-muted hover:text-text">
-                  <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-success" />
+                  <span
+                    aria-hidden
+                    className="size-[7px] shrink-0 rounded-full bg-[#3ddc84] shadow-[0_0_10px_#3ddc84]"
+                  />
                   <span className="truncate" data-testid="room-name">
                     {room.name}
                   </span>
@@ -585,34 +600,38 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <span
-                className="truncate font-display text-[19px] leading-tight font-bold"
-                data-testid="board-title"
-              >
-                {active?.name ?? 'No board yet'}
+              <span className="truncate font-display text-[19px] leading-tight font-bold whitespace-nowrap">
+                <span className="sr-only" data-testid="board-title">
+                  {active?.name ?? 'No board yet'}
+                </span>
+                <span aria-hidden>
+                  <DecryptedText
+                    key={active?.id ?? 'none'}
+                    text={active?.name ?? 'No board yet'}
+                    animateOn="view"
+                    sequential
+                    speed={40}
+                  />
+                </span>
               </span>
             </div>
           </div>
 
-          {/* top centre: the board switcher pill (the demo's "Zone 1–5"); below the card row
-              when the window is too narrow for both */}
-          <div className="!pointer-events-none flex min-w-0 flex-1 justify-center pt-1.5">
-            <div className="glass-panel pointer-events-auto flex h-12 max-w-full min-w-0 items-stretch overflow-hidden rounded-full px-1.5">
-              <BoardTabs
-                roomId={roomId}
-                role={role}
-                boards={boards}
-                activeId={active?.id}
-                onSelect={select}
-                onSnapshots={(b) => {
-                  setSnapshotsFor(b);
-                }}
-              />
+          {/* top centre: the compass box (fades away in Full map) */}
+          <div
+            className={cn(
+              '!pointer-events-none flex min-w-0 flex-1 justify-center',
+              CHROME_MOTION,
+              fullMap && 'invisible -translate-y-2.5 opacity-0',
+            )}
+          >
+            <div className="pointer-events-auto w-full max-w-[520px] min-w-0">
+              <CompassBox />
             </div>
           </div>
 
-          {/* top right: voice, who's here, actions */}
-          <div className="glass-panel flex h-[60px] shrink-0 items-center gap-1.5 rounded-[16px] px-2.5">
+          {/* top right: voice, who's here, you, actions */}
+          <div className="glass-panel flex shrink-0 items-center gap-2 p-1.5">
             <SyncIndicator />
             <VoiceControls voice={voice} members={members} variant="header" />
             <PresenceStack
@@ -623,20 +642,26 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               onGoToBoard={select}
               onSummon={summon}
             />
+            <ProfileCard me={me.data} role={role} roomName={room.name} />
             <Button
               variant="outline"
-              size="sm"
-              className="h-9 gap-1.5 px-3"
+              className="h-[38px] gap-2 px-3.5"
               data-testid="fullmap-toggle"
-              aria-label="Full map view"
-              title="Full map view (H)"
+              aria-pressed={fullMap}
+              aria-label={fullMap ? 'Show panels' : 'Full map view'}
+              title={fullMap ? 'Show panels (H)' : 'Full map view (H)'}
               onClick={() => {
-                setFullMap(true);
+                setFullMap(!fullMap);
               }}
+              data-on={fullMap}
             >
-              <Maximize2 className="size-4" aria-hidden />
-              <span aria-hidden className="max-[1439px]:hidden">
-                Full map
+              {fullMap ? (
+                <Minimize2 className="size-[18px] text-accent" aria-hidden />
+              ) : (
+                <Maximize2 className="size-[18px]" aria-hidden />
+              )}
+              <span aria-hidden className={cn('max-[1279px]:hidden', fullMap && 'text-accent')}>
+                {fullMap ? 'Show panels' : 'Full map'}
               </span>
             </Button>
             {can(role, 'invite.create') && (
@@ -645,10 +670,10 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                 type="button"
                 data-tour="invite"
                 color="#f5b942"
-                duration={5}
+                duration={4}
                 radius={11}
                 thickness={1}
-                className="flex h-9 items-center gap-1.5 px-3 text-sm font-semibold"
+                className="flex h-[38px] items-center gap-1.5 px-3.5 text-[13px] font-bold"
                 onClick={() => {
                   setDialog('invite');
                 }}
@@ -660,7 +685,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               <DropdownMenuTrigger
                 aria-label="More"
                 data-testid="more-menu"
-                className="flex size-9 items-center justify-center rounded-[10px] text-text-muted hover:bg-white/[0.06] hover:text-text"
+                className="flex size-[38px] items-center justify-center rounded-[11px] text-text-muted hover:bg-white/[0.06] hover:text-text"
               >
                 <MoreHorizontal className="size-4" aria-hidden />
               </DropdownMenuTrigger>
@@ -695,7 +720,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             <Button
               variant="ghost"
               size="icon"
-              className="size-9"
+              className="size-[38px]"
               aria-label="Ask Spotter"
               title="Ask Spotter — site help & BGMI tactics"
               data-testid="spotter-room-button"
@@ -710,7 +735,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-9"
+                className="size-[38px]"
                 aria-label="Room settings"
                 onClick={() => {
                   setDialog('settings');
@@ -719,52 +744,35 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                 <Settings className="size-4" />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative size-9"
-              data-testid="panel-toggle"
-              aria-label={panelOpen ? 'Hide side panel' : 'Show side panel'}
-              aria-pressed={panelOpen}
-              title="Toggle panel (])"
-              onClick={() => {
-                setPanelOpen((o) => !o);
-              }}
-            >
-              {panelOpen ? (
-                <PanelRightClose className="size-4" />
-              ) : (
-                <PanelRightOpen className="size-4" />
-              )}
-              {!panelOpen && unread > 0 && (
-                <span className="absolute -top-1 -right-1">
-                  <UnreadBadge count={unread} />
-                </span>
-              )}
-            </Button>
           </div>
         </header>
       )}
 
-      {!touch && fullMap && (
-        <div className="animate-drop-in absolute top-3 right-3 z-30 flex items-center gap-2">
-          <span className="glass-panel flex h-10 max-w-72 items-center truncate rounded-xl px-3 text-sm font-semibold">
-            {room.name}
-            {active && (
-              <span className="ml-1.5 truncate font-normal text-text-muted">· {active.name}</span>
-            )}
-          </span>
-          <button
-            type="button"
-            data-testid="fullmap-exit"
-            className="glass-panel flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold hover:text-accent"
-            title="Show panels (H)"
-            onClick={() => {
-              setFullMap(false);
-            }}
-          >
-            <Minimize2 className="size-4" aria-hidden /> Show panels
-          </button>
+      {/* under the compass: the board switcher (the demo's zone pill) */}
+      {!touch && (
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-x-0 top-[104px] z-20 flex justify-center',
+            CHROME_MOTION,
+            fullMap && 'invisible -translate-y-2.5 opacity-0',
+          )}
+          style={{
+            paddingLeft: (leftOpen ? leftWidth : 0) + 24,
+            paddingRight: (panelOpen ? panelWidth : 0) + 24,
+          }}
+        >
+          <div className="glass-panel pointer-events-auto flex h-12 max-w-full min-w-0 items-stretch overflow-hidden rounded-full px-1.5">
+            <BoardTabs
+              roomId={roomId}
+              role={role}
+              boards={boards}
+              activeId={active?.id}
+              onSelect={select}
+              onSnapshots={(b) => {
+                setSnapshotsFor(b);
+              }}
+            />
+          </div>
         </div>
       )}
       {touch && fullMap && (
@@ -782,7 +790,18 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       <div className={touch ? 'flex min-h-0 flex-1' : 'contents'}>
         {!touch ? (
           // bottom centre: the tool dock (stays in Full map)
-          <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex justify-center [&>nav]:pointer-events-auto">
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex flex-col items-center gap-5 [&>nav]:pointer-events-auto">
+            {/* the demo's hint pill above the dock (hidden in Full map) */}
+            <p
+              data-testid="dock-hint"
+              className={cn(
+                'glass-panel flex h-8 items-center gap-1.5 rounded-full px-3.5 text-xs whitespace-nowrap text-text-muted max-[1439px]:hidden',
+                CHROME_MOTION,
+                fullMap && 'invisible translate-y-2 opacity-0',
+              )}
+            >
+              Right-click: drop a marker · <Kbd>H</Kbd> full map
+            </p>
             {toolbar}
           </div>
         ) : (
@@ -825,46 +844,86 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
             />
           )}
         </main>
-        {!touch && !fullMap && leftOpen && (
-          <aside
-            className="glass-panel animate-slide-in-left absolute top-[84px] bottom-[80px] left-3 z-30 overflow-hidden"
-            style={{ width: leftWidth }}
-            aria-label="Plan panel"
-          >
-            <LeftPanel
-              role={role}
-              session={session}
-              members={members}
-              meId={me.data.id}
-              boards={boards}
-              onCollapse={() => {
-                setLeftOpen(false);
-              }}
-            />
-          </aside>
+        {/* side panels slide in and out (exact demo); a folded panel leaves an edge tab */}
+        {!touch && (
+          <AnimatePresence initial={false}>
+            {!fullMap && leftOpen && (
+              <motion.aside
+                key="left"
+                initial={{ x: -(leftWidth + 28), opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -(leftWidth + 28), opacity: 0 }}
+                transition={PANEL_SPRING}
+                className="glass-panel absolute top-[96px] bottom-[80px] left-3 z-30 overflow-hidden"
+                style={{ width: leftWidth }}
+                aria-label="Plan panel"
+              >
+                <LeftPanel
+                  role={role}
+                  session={session}
+                  members={members}
+                  meId={me.data.id}
+                  boards={boards}
+                  onCollapse={() => {
+                    setLeftOpen(false);
+                  }}
+                />
+              </motion.aside>
+            )}
+            {!fullMap && panelOpen && (
+              <motion.aside
+                key="right"
+                initial={{ x: panelWidth + 28, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: panelWidth + 28, opacity: 0 }}
+                transition={PANEL_SPRING}
+                className="glass-panel absolute top-[96px] right-3 bottom-[80px] z-30 flex flex-col overflow-hidden"
+                style={{ width: panelWidth }}
+                aria-label="Room panel"
+              >
+                <div className="flex shrink-0 items-center gap-2 pt-3 pr-3 pl-3">
+                  <button
+                    type="button"
+                    data-testid="panel-toggle"
+                    aria-label="Hide side panel"
+                    aria-pressed
+                    title="Hide panel (])"
+                    onClick={() => {
+                      setPanelOpen(false);
+                    }}
+                    className="flex size-[26px] shrink-0 items-center justify-center rounded-[8px] border border-[var(--edge)] bg-white/[0.04] text-text-muted hover:text-text"
+                  >
+                    <ChevronRight className="size-4" aria-hidden />
+                  </button>
+                  <span className="font-display text-base font-semibold">Squad room</span>
+                </div>
+                <div className="min-h-0 flex-1">{sidePanel}</div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
         )}
         {!touch && !fullMap && !leftOpen && (
-          <button
-            type="button"
-            data-testid="left-panel-open"
-            aria-label="Show left panel"
-            title="Routes & layers ([)"
-            className="glass-panel animate-slide-in-left absolute top-[84px] left-3 z-30 flex h-10 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold text-text-muted hover:text-text"
+          <EdgeTab
+            side="left"
+            label="Routes"
+            testId="left-panel-open"
+            ariaLabel="Show left panel"
             onClick={() => {
               setLeftOpen(true);
             }}
-          >
-            <PanelLeftOpen className="size-4" aria-hidden /> Plan
-          </button>
+          />
         )}
-        {panelOpen && !touch && !fullMap && (
-          <aside
-            className="glass-panel animate-slide-in-right absolute top-[84px] right-3 bottom-[80px] z-30 overflow-hidden"
-            style={{ width: panelWidth }}
-            aria-label="Room panel"
-          >
-            {sidePanel}
-          </aside>
+        {!touch && !fullMap && !panelOpen && (
+          <EdgeTab
+            side="right"
+            label="Squad"
+            testId="panel-toggle"
+            ariaLabel="Show side panel"
+            badge={unread > 0 ? <UnreadBadge count={unread} /> : null}
+            onClick={() => {
+              setPanelOpen(true);
+            }}
+          />
         )}
       </div>
       {touch && !landscape && toolbar}
@@ -938,5 +997,53 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A folded side panel leaves a slim vertical tab at the middle of its edge (exact room demo);
+ * clicking it slides the panel back.
+ */
+function EdgeTab({
+  side,
+  label,
+  testId,
+  ariaLabel,
+  badge,
+  onClick,
+}: {
+  side: 'left' | 'right';
+  label: string;
+  testId: string;
+  ariaLabel: string;
+  badge?: ReactNode;
+  onClick: () => void;
+}) {
+  const Icon = side === 'left' ? ChevronRight : ChevronLeft;
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      aria-label={ariaLabel}
+      aria-pressed={false}
+      title={side === 'left' ? 'Show routes & layers ([)' : 'Show squad panel (])'}
+      onClick={onClick}
+      className={cn(
+        'glass-panel rl-fade-in absolute top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2 px-2 py-3.5 text-xs font-semibold text-text-muted hover:text-accent',
+        side === 'left' ? 'left-0 rounded-l-none border-l-0' : 'right-0 rounded-r-none border-r-0',
+      )}
+    >
+      <Icon className="size-4" aria-hidden />
+      <span className="[writing-mode:vertical-rl]">{label}</span>
+      {badge && <span className="absolute -top-2 left-1/2 -translate-x-1/2">{badge}</span>}
+    </button>
+  );
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="rounded-[5px] border border-[var(--edge-strong)] bg-white/[0.06] px-1.5 font-sans text-[11px] leading-[18px] font-semibold text-text">
+      {children}
+    </kbd>
   );
 }

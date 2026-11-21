@@ -7,7 +7,7 @@ import { useMap } from 'react-leaflet';
 import { MEASURE_PANE } from '@/components/tools/MeasureLayer';
 import { safeColor } from '@/components/map/markerDom';
 import { toLatLng } from '@/lib/coords';
-import { routesOf, type RouteOption } from '@/lib/plans';
+import { focusedRoute } from '@/lib/focusedRoute';
 import { useBoardStore } from '@/stores/boardStore';
 import { usePlanStore } from '@/stores/planStore';
 import { useSelectionStore } from '@/stores/selectionStore';
@@ -15,22 +15,6 @@ import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useMetresPerUnit } from './boardMapContext';
 
 export const ROUTE_PANE = 'route-focus';
-
-/** the focused route with the board's current data, or null (gone, hidden, or none picked) */
-export function focusedRoute(): RouteOption | null {
-  const { focusRouteId, metresPerUnit } = usePlanStore.getState();
-  if (!focusRouteId) return null;
-  const { view } = useBoardStore.getState();
-  if (!(focusRouteId in view.elements)) return null;
-  return (
-    routesOf(
-      view.elements,
-      view.layers,
-      metresPerUnit,
-      useSelectionStore.getState().hiddenLayers,
-    ).find((r) => r.id === focusRouteId) ?? null
-  );
-}
 
 function tag(text: string, className: string): L.DivIcon {
   const el = document.createElement('span');
@@ -65,11 +49,15 @@ export function RouteLayer() {
     const renderer = L.svg({ pane: ROUTE_PANE, padding: 0.5 });
     const group = L.layerGroup().addTo(map);
     let lastFit = usePlanStore.getState().fitRequest;
+    let lastDrawn: string | null = null;
 
     const render = () => {
       group.clearLayers();
       const route = focusedRoute();
-      if (!route) return;
+      if (!route) {
+        lastDrawn = null;
+        return;
+      }
       const latlngs = route.points.map(toLatLng);
       const color = safeColor(route.color);
       const base = { renderer, pane: ROUTE_PANE, interactive: false } as const;
@@ -82,6 +70,18 @@ export function RouteLayer() {
         lineJoin: 'round',
         className: 'rl-route-glow',
       }).addTo(group);
+      // exact room demo: a newly picked route draws itself over its glow (once per pick)
+      const core = L.polyline(latlngs, {
+        ...base,
+        color,
+        weight: 4,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round',
+        className: lastDrawn === route.id ? 'rl-route-core' : 'rl-route-core rl-draw-in',
+      }).addTo(group);
+      core.getElement()?.setAttribute('pathLength', '1');
+      lastDrawn = route.id;
       const ends = [route.points[0], route.points.at(-1)];
       for (const p of ends)
         if (p)
@@ -96,7 +96,10 @@ export function RouteLayer() {
       const end = route.points.at(-1);
       if (end)
         L.marker(toLatLng(end), {
-          icon: tag(`${route.name} · ${formatMetres(route.summary.total)}`, 'rl-measure-total'),
+          icon: tag(
+            `${route.name} · ${formatMetres(route.summary.total)}`,
+            'rl-measure-total rl-glass-tag',
+          ),
           interactive: false,
           keyboard: false,
           pane: MEASURE_PANE,

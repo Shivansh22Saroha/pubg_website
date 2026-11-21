@@ -1,11 +1,11 @@
 'use client';
 
-import { CompassBar } from './CompassBar';
 import { RouteLayer } from './RouteLayer';
 import 'leaflet/dist/leaflet.css';
 import type { Pt } from '@rotationlab/shared';
 import type L from 'leaflet';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 import { ImageOverlay, MapContainer, Pane, TileLayer } from 'react-leaflet';
 import { env } from '@/env';
 import type { BoardMapInfo } from '@/lib/boardMap';
@@ -44,6 +44,7 @@ export default function MapCanvas({
   overlay,
   onCursor,
   minimap = false,
+  room = false,
 }: {
   map: BoardMapInfo;
   /** board layers (elements, cursors…) rendered inside the Leaflet map */
@@ -54,6 +55,8 @@ export default function MapCanvas({
   onCursor?: (pt: Pt | null) => void;
   /** Phase 11: the collapsible minimap (never on phones) */
   minimap?: boolean;
+  /** a room's map: the demo's colour grade on the art and a soft vignette over it */
+  room?: boolean;
 }) {
   const phone = useBreakpoint() === 'phone';
   const { config, worldSize, gridCells, maxNativeZoom, mapId, tileWorld } = info;
@@ -172,7 +175,10 @@ export default function MapCanvas({
         data-recalls={recallsShown ? 'on' : 'off'}
         data-center={view.center}
         data-zoom={view.zoom}
-        className="relative isolate h-full w-full overflow-hidden bg-bg"
+        className={cn(
+          'relative isolate h-full w-full overflow-hidden bg-bg',
+          room && 'rl-room-map',
+        )}
       >
         <div className="absolute inset-0 isolate">
           <MapContainer
@@ -256,10 +262,10 @@ export default function MapCanvas({
             {children}
           </MapContainer>
         </div>
+        {room && <div aria-hidden className="rl-vignette" />}
         {map && grid && <GridLabels map={map} worldSize={worldSize} cells={gridCells} />}
         {overlay}
         {map && minimap && !phone && <Minimap map={map} info={info} />}
-        <CompassBar />
         {map && (
           <MapHud
             map={map}

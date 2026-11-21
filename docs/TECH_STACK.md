@@ -29,6 +29,7 @@
 | react-hook-form + @hookform/resolvers | 7.x | forms with Zod |
 | zod | 3.x (or 4.x — pick one for whole monorepo) | validation (from `packages/shared`) |
 | sonner | latest | toasts |
+| motion | 12.x (user-approved 2026-11-21) | animation for the room's React Bits pieces (decoding board name, count-up metres) and the board switcher's sliding blob; `motion/react` only, client components |
 | simplify-js | 1.x | stroke point simplification |
 | uuid | 10.x+ (`v7`) | client element/op ids |
 | html-to-image or leaflet-image alternative | latest | PNG export (render tiles + vector canvas to one canvas) |

@@ -25,6 +25,8 @@ import type { RoomSession } from '@/lib/realtime/roomSession';
 import { useKickMember, useSetMemberRole } from '@/lib/rooms';
 import { useChatStore } from '@/stores/chatStore';
 import { usePresenceStore } from '@/stores/presenceStore';
+import ElectricBorder from '@/components/fx/ElectricBorder/ElectricBorder';
+import { useVoiceStore } from '@/stores/voiceStore';
 import { useWorkspaceStore, type PanelTab } from '@/stores/workspaceStore';
 
 /**
@@ -198,73 +200,103 @@ function MembersList({
   // online first (presence arrives in Phase 5), then by join order
   // online first (live presence), then join order
   const online = usePresenceStore((st) => st.users);
+  const speaking = useVoiceStore((st) => st.speaking);
   const sorted = [...members].sort(
     (a, b) => Number(b.user.id in online) - Number(a.user.id in online),
   );
 
   return (
     <>
-      <ul className="flex flex-col" aria-label="Members">
-        {sorted.map((m) => (
-          <li
-            key={m.user.id}
-            className="flex items-center gap-2 rounded-control px-2 py-2 hover:bg-surface-2"
-            data-testid="member-row"
-          >
-            <span className="relative">
-              <Avatar user={m.user} className="size-7 text-xs" />
-              <span
-                role="img"
-                aria-label={m.user.id in online ? 'online' : 'offline'}
-                data-testid="member-online"
-                data-online={m.user.id in online}
-                className={cn(
-                  'absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-surface',
-                  m.user.id in online ? 'bg-success' : 'bg-border',
-                )}
-              />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {m.user.displayName}
-                {m.user.id === meId && <span className="text-text-muted"> (you)</span>}
-              </p>
-              <p className="truncate text-xs text-text-muted">@{m.user.username}</p>
+      <ul className="flex flex-col gap-2" aria-label="Members">
+        {sorted.map((m) => {
+          const talking = Boolean(speaking[m.user.id]);
+          const row = (
+            <div
+              className={cn(
+                'flex items-center gap-2.5 rounded-[12px] border border-[var(--edge)] bg-white/[0.03] px-2.5 py-2 transition-colors hover:bg-white/[0.06]',
+                talking && 'border-transparent bg-[rgba(94,234,212,0.06)]',
+              )}
+            >
+              <span className="relative">
+                <Avatar user={m.user} className="size-7 text-xs" />
+                <span
+                  role="img"
+                  aria-label={m.user.id in online ? 'online' : 'offline'}
+                  data-testid="member-online"
+                  data-online={m.user.id in online}
+                  className={cn(
+                    'absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-surface',
+                    m.user.id in online ? 'bg-success' : 'bg-border',
+                  )}
+                />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  {m.user.displayName}
+                  {m.user.id === meId && <span className="text-text-muted"> (you)</span>}
+                </p>
+                <p className="truncate text-xs text-text-muted">@{m.user.username}</p>
+              </div>
+              {talking && (
+                <span className="rl-eq shrink-0" role="img" aria-label="talking">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              )}
+              {manage && m.role !== 'OWNER' ? (
+                <>
+                  <NativeSelect
+                    aria-label={`Role of ${m.user.displayName}`}
+                    className="h-8 w-24 px-2 text-xs"
+                    value={m.role}
+                    disabled={setRole.isPending}
+                    onChange={(e) => {
+                      setRole.mutate(
+                        { userId: m.user.id, role: e.target.value as AssignableRole },
+                        { onError: fail },
+                      );
+                    }}
+                  >
+                    <option value="EDITOR">Editor</option>
+                    <option value="VIEWER">Viewer</option>
+                  </NativeSelect>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-danger"
+                    onClick={() => {
+                      setBan(false);
+                      setKickTarget(m);
+                    }}
+                  >
+                    Kick
+                  </Button>
+                </>
+              ) : (
+                <RoleBadge role={m.role} />
+              )}
             </div>
-            {manage && m.role !== 'OWNER' ? (
-              <>
-                <NativeSelect
-                  aria-label={`Role of ${m.user.displayName}`}
-                  className="h-8 w-24 px-2 text-xs"
-                  value={m.role}
-                  disabled={setRole.isPending}
-                  onChange={(e) => {
-                    setRole.mutate(
-                      { userId: m.user.id, role: e.target.value as AssignableRole },
-                      { onError: fail },
-                    );
-                  }}
+          );
+          return (
+            <li key={m.user.id} data-testid="member-row" data-talking={talking || undefined}>
+              {talking ? (
+                <ElectricBorder
+                  color="#5eead4"
+                  speed={0.9}
+                  chaos={0.35}
+                  borderRadius={12}
+                  thickness={1.5}
                 >
-                  <option value="EDITOR">Editor</option>
-                  <option value="VIEWER">Viewer</option>
-                </NativeSelect>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-danger"
-                  onClick={() => {
-                    setBan(false);
-                    setKickTarget(m);
-                  }}
-                >
-                  Kick
-                </Button>
-              </>
-            ) : (
-              <RoleBadge role={m.role} />
-            )}
-          </li>
-        ))}
+                  {row}
+                </ElectricBorder>
+              ) : (
+                row
+              )}
+            </li>
+          );
+        })}
       </ul>
       <Dialog
         open={kickTarget !== null}
