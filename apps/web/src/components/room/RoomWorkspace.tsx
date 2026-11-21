@@ -884,7 +884,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
                 <div className="flex shrink-0 items-center gap-2 pt-3 pr-3 pl-3">
                   <button
                     type="button"
-                    data-testid="panel-toggle"
+                    data-testid="panel-collapse"
                     aria-label="Hide side panel"
                     aria-pressed
                     title="Hide panel (])"

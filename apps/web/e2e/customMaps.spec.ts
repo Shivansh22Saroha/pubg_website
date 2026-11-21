@@ -68,7 +68,8 @@ test('E2E-C1: upload a custom map, plan on it, measure in its metres; a teammate
   await a.getByRole('menuitem', { name: /Map name & size/ }).click();
   await a.getByLabel(/Width in metres/).fill('4080');
   await a.getByRole('button', { name: 'Save' }).click();
-  await a.mouse.move(box.x + box.width * 0.75 + 1, box.y + box.height * 0.5);
+  // still on the art (it sits between the panels), right of where we read before
+  await a.mouse.move(box.x + box.width * 0.66 + 1, box.y + box.height * 0.5);
   await expect
     .poll(async () => {
       const t = await a.getByTestId('hud-readout').innerText();
