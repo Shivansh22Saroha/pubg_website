@@ -57,6 +57,7 @@ import { useLeaveRoom, useRoom } from '@/lib/rooms';
 import { isMacPlatform, resolveShortcut } from '@/lib/shortcuts';
 import { BoardTabs } from './BoardTabs';
 import { CompassBox } from './CompassBox';
+import { PhoneSheet, phoneTab } from './PhoneSheet';
 import { ProfileCard } from './ProfileCard';
 import { InviteDialog } from './InviteDialog';
 import { RoomSettingsDialog } from './RoomSettingsDialog';
@@ -68,7 +69,7 @@ import {
 } from './RealtimeStatus';
 import { RoomTour } from './RoomTour';
 import { LeftPanel } from './LeftPanel';
-import { SidePanel, UnreadBadge } from './SidePanel';
+import { PhonePanels, SidePanel, UnreadBadge } from './SidePanel';
 import { VoiceControls } from './VoiceControls';
 import {
   BoardSelect,
@@ -114,6 +115,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const fullMap = useWorkspaceStore((s) => s.fullMap);
   const setFullMap = useWorkspaceStore((s) => s.setFullMap);
   const unread = useChatStore((s) => s.unread);
+  const panelTab = useWorkspaceStore((s) => s.tab);
   const [dialog, setDialog] = useState<'invite' | 'settings' | 'help' | null>(null);
   const [gone, setGone] = useState<'kicked' | 'deleted' | null>(null);
   const [snapshotsFor, setSnapshotsFor] = useState<Board | null>(null);
@@ -122,6 +124,11 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   const phone = breakpoint === 'phone';
   // a phone held sideways: tools in a left column so the map keeps its height
   const landscape = useLandscapePhone() && phone;
+  // a phone held upright (exact room demo): full-screen map, floating top row, docked sheet
+  const phoneSheet = phone && !landscape;
+  // the sheet + dock height (open), and the folded height the map fits around
+  const [sheetH, setSheetH] = useState(150);
+  const [peekH, setPeekH] = useState(150);
 
   // Glass layout (2026-11-21, from the approved room demo): on desktop / compact the map fills
   // the screen; the room card, board pill and actions float along the top, route options +
@@ -130,16 +137,16 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
   // of that chrome through these insets — CSS variables + the store.
   const panelWidth = breakpoint === 'desktop' ? 300 : 280;
   const leftWidth = breakpoint === 'desktop' ? 312 : 280;
-  const chromeTop = touch ? 0 : fullMap ? 76 : 156;
+  const chromeTop = phoneSheet ? (fullMap ? 0 : 64) : touch ? 0 : fullMap ? 76 : 156;
   const chromeLeft = !touch && leftOpen && !fullMap ? leftWidth + 24 : 0;
   const chromeRight = !touch && panelOpen && !fullMap ? panelWidth + 24 : 0;
   // the dock: 56 px + its 12 px gap + 12 px breathing room
-  const chromeBottom = touch ? 0 : 80;
+  const chromeBottom = phoneSheet ? (fullMap ? 72 : sheetH) : touch ? 0 : 80;
   // fitting the map (first view, Fit map, a picked route) and the grid letters only keep clear of
   // the top row and the dock: the board switcher and the hint pill may overlap the art's edge,
   // which keeps the map a zoom level bigger
-  const fitTop = touch ? 0 : 84;
-  const fitBottom = touch ? 0 : 80;
+  const fitTop = phoneSheet ? 64 : touch ? 0 : 84;
+  const fitBottom = phoneSheet ? peekH : touch ? 0 : 80;
   useLayoutEffect(() => {
     useWorkspaceStore
       .getState()
@@ -433,7 +440,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
       breakpoint={breakpoint}
       orientation={touch && landscape ? 'vertical' : 'horizontal'}
       compact={phone}
-      floating={!touch}
+      floating={!touch || phoneSheet}
     />
   );
   const phoneMenu: PhoneMenuItem[] = [
@@ -516,12 +523,40 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
 
   return (
     <div
-      className={cn('relative h-dvh', touch ? 'flex flex-col' : 'overflow-hidden')}
+      className={cn('relative h-dvh', touch && !phoneSheet ? 'flex flex-col' : 'overflow-hidden')}
       data-layout={breakpoint}
       data-fullmap={fullMap ? 'on' : 'off'}
       style={chromeVars}
     >
-      {phone ? (
+      {phoneSheet ? (
+        // exact room demo, phone: a floating glass row over the full-screen map
+        <header
+          className={cn(
+            'pointer-events-none absolute inset-x-2 top-[max(0.5rem,env(safe-area-inset-top))] z-30 flex items-center gap-2 [&>*]:pointer-events-auto',
+            CHROME_MOTION,
+            fullMap && 'invisible -translate-y-3 opacity-0',
+          )}
+        >
+          <div className="glass-panel flex h-12 min-w-0 flex-1 items-center gap-0.5 rounded-[14px] pr-1">
+            <Link
+              href="/dashboard"
+              aria-label="Back to dashboard"
+              className="flex size-11 shrink-0 items-center justify-center text-text-muted hover:text-text"
+            >
+              <ArrowLeft className="size-4" />
+            </Link>
+            <span className="sr-only" data-testid="room-name">
+              {room.name}
+            </span>
+            <BoardSelect boards={boards} activeId={active?.id} onSelect={select} />
+            <SyncIndicator />
+          </div>
+          <div className="glass-panel flex h-12 shrink-0 items-center rounded-[14px] px-0.5">
+            <UndoRedo role={role} session={session} nameOf={nameOf} size="sm" />
+            <PhoneRoomMenu items={phoneMenu} />
+          </div>
+        </header>
+      ) : phone ? (
         <header
           className={cn(
             'relative z-30 flex shrink-0 items-center gap-1 border-b border-[var(--edge)] bg-[var(--glass)] pr-1 backdrop-blur-xl backdrop-saturate-150',
@@ -787,7 +822,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           <Minimize2 className="size-4" aria-hidden /> Show top bar
         </button>
       )}
-      <div className={touch ? 'flex min-h-0 flex-1' : 'contents'}>
+      <div className={touch && !phoneSheet ? 'flex min-h-0 flex-1' : 'contents'}>
         {!touch ? (
           // bottom centre: the tool dock (stays in Full map)
           <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex flex-col items-center gap-5 [&>nav]:pointer-events-auto">
@@ -807,9 +842,17 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
         ) : (
           landscape && toolbar
         )}
-        <main className={touch ? 'relative min-w-0 flex-1' : 'absolute inset-0'} aria-label="Map">
+        <main
+          className={touch && !phoneSheet ? 'relative min-w-0 flex-1' : 'absolute inset-0'}
+          aria-label="Map"
+        >
           {phone && (
-            <div className="absolute top-2 left-2 z-[1100]">
+            <div
+              className={cn(
+                'absolute left-2 z-[1100]',
+                phoneSheet ? 'top-[calc(max(0.5rem,env(safe-area-inset-top))+3.75rem)]' : 'top-2',
+              )}
+            >
               <VoiceControls voice={voice} members={members} variant="dock" />
             </div>
           )}
@@ -926,8 +969,35 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           />
         )}
       </div>
-      {touch && !landscape && toolbar}
-      {touch && !panelOpen && (
+      {touch && !landscape && !phoneSheet && toolbar}
+      {phoneSheet && (
+        <PhoneSheet
+          open={panelOpen && !fullMap}
+          onOpenChange={setPanelOpen}
+          tab={phoneTab(panelTab)}
+          onTab={(t) => {
+            useWorkspaceStore.getState().setTab(t);
+          }}
+          unread={unread}
+          hidden={fullMap}
+          dock={toolbar}
+          onHeight={(px, open) => {
+            setSheetH(px);
+            if (!open) setPeekH(px);
+          }}
+        >
+          <PhonePanels
+            tab={phoneTab(panelTab)}
+            roomId={roomId}
+            role={role}
+            meId={me.data.id}
+            members={members}
+            boards={boards}
+            session={session}
+          />
+        </PhoneSheet>
+      )}
+      {touch && !phoneSheet && !panelOpen && (
         <ChatButton
           unread={unread}
           onClick={() => {
@@ -944,7 +1014,7 @@ export function RoomWorkspace({ roomId }: { roomId: string }) {
           {sidePanel}
         </HalfSheet>
       )}
-      {phone && (
+      {phone && landscape && (
         <FullSheet
           open={panelOpen}
           onClose={() => {

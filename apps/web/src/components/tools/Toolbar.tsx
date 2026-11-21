@@ -323,6 +323,7 @@ export function Toolbar({
         // phone: the bar's buttons spread across the width, clear of the home indicator
         compact &&
           horizontal &&
+          !floating &&
           'justify-around pb-[env(safe-area-inset-bottom)] pointer-coarse:h-[calc(4rem+env(safe-area-inset-bottom))]',
         // phone held sideways: a short column — tighter buttons so all seven fit
         compact && !horizontal && 'gap-0 py-1 pl-[env(safe-area-inset-left)] [&_button]:!size-10',

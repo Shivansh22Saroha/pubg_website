@@ -14,7 +14,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoleBadge } from '@/components/rooms/bits';
 import { ElementList } from '@/components/tools/ElementList';
 import { LayersPanel } from '@/components/tools/LayersPanel';
-import { PlanPanel, Replay } from './PlanPanel';
+import { PlanPanel, Replay, Routes } from './PlanPanel';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { NativeSelect } from '@/components/ui/select';
@@ -176,6 +176,68 @@ export function SidePanel({
         </TabsContent>
       )}
     </Tabs>
+  );
+}
+
+/**
+ * The phone sheet's sections (exact room demo): Routes (route options + layers) · Chat · Squad ·
+ * Replay. Chat and Replay stay mounted so a draft or a playing replay survive switching.
+ */
+export function PhonePanels({
+  tab,
+  roomId,
+  role,
+  meId,
+  members,
+  boards,
+  session,
+}: {
+  tab: PanelTab;
+  roomId: string;
+  role: RoomRole;
+  meId: string;
+  members: Member[];
+  boards: Board[];
+  session: RoomSession | null;
+}) {
+  return (
+    <div className="h-full pt-2">
+      {tab === 'plan' && (
+        <div className="flex h-full flex-col gap-4 overflow-y-auto overscroll-contain pb-2">
+          <Routes members={members} meId={meId} />
+          <LayersSection
+            role={role}
+            session={session}
+            members={members}
+            meId={meId}
+            boards={boards}
+          />
+        </div>
+      )}
+      <div className={cn('h-full', tab !== 'chat' && 'hidden')}>
+        <ChatPanel
+          roomId={roomId}
+          meId={meId}
+          role={role}
+          members={members}
+          boards={boards}
+          session={session}
+        />
+      </div>
+      {tab === 'members' && (
+        <div className="h-full overflow-y-auto overscroll-contain pb-2">
+          <MembersList roomId={roomId} role={role} meId={meId} members={members} />
+        </div>
+      )}
+      <div
+        className={cn(
+          'h-full overflow-y-auto overscroll-contain pb-2',
+          tab !== 'replay' && 'hidden',
+        )}
+      >
+        <Replay members={members} meId={meId} />
+      </div>
+    </div>
   );
 }
 
