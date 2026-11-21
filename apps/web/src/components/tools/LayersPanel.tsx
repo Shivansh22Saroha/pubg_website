@@ -7,16 +7,7 @@ import {
   type LayerInput,
   type RoomRole,
 } from '@rotationlab/shared';
-import {
-  EllipsisVertical,
-  Eye,
-  EyeClosed,
-  EyeOff,
-  GripVertical,
-  Lock,
-  LockOpen,
-  Plus,
-} from 'lucide-react';
+import { EllipsisVertical, GripVertical, Lock, LockOpen, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { v7 as uuid } from 'uuid';
@@ -213,8 +204,7 @@ export function LayersPanel({ role, session }: { role: RoomRole; session: LayerS
                       : `${l.visible ? 'Hide' : 'Show'} for everyone · Alt+click: hide for me only`
                   }
                   className={cn(
-                    'rounded-control p-1 text-text-muted hover:bg-bg hover:text-text',
-                    localHidden && 'text-accent',
+                    'rounded-control p-1 text-text-muted hover:bg-white/[0.06] hover:text-text',
                   )}
                   onClick={(e) => {
                     if (e.altKey || localHidden) {
@@ -232,13 +222,12 @@ export function LayersPanel({ role, session }: { role: RoomRole; session: LayerS
                     upsert(l, { visible: !l.visible });
                   }}
                 >
-                  {localHidden ? (
-                    <EyeClosed className="size-4" aria-hidden />
-                  ) : l.visible ? (
-                    <Eye className="size-4" aria-hidden />
-                  ) : (
-                    <EyeOff className="size-4" aria-hidden />
-                  )}
+                  {/* the room demo's toggle switch; amber ring = hidden for you only */}
+                  <span
+                    aria-hidden
+                    className={cn('rl-switch block', localHidden && 'ring-1 ring-accent')}
+                    data-on={l.visible && !localHidden}
+                  />
                 </button>
                 {perm.toggleLock ? (
                   <button

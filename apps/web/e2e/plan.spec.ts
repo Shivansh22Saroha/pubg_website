@@ -31,7 +31,8 @@ test('E2E-R4: quick marker drop, route options + compass, plan replay', async ({
   // two routes: one heading east, one heading north
   await a.keyboard.press('a');
   await drag(a, await at(a, 0.3, 0.42), await at(a, 0.55, 0.42));
-  await drag(a, await at(a, 0.4, 0.8), await at(a, 0.4, 0.55));
+  // (inside the art: the map's first fit leaves the bottom of the screen to the dock and hint)
+  await drag(a, await at(a, 0.4, 0.62), await at(a, 0.4, 0.46));
   await a.keyboard.press('v');
 
   // right-click an empty spot → the ring → Enemy squad lands there, for the teammate too
@@ -72,7 +73,9 @@ test('E2E-R4: quick marker drop, route options + compass, plan replay', async ({
   await options.nth(0).click();
   await expect(compass).toHaveAttribute('data-bearing', '90');
   await compass.getByRole('button', { name: 'Clear route' }).click();
-  await expect(compass).toHaveCount(0);
+  // the compass box stays (exact room demo) but points nowhere in particular
+  await expect(compass).not.toHaveAttribute('data-bearing');
+  await expect(compass).toContainText('Pick a route');
 
   // replay: scrub to the first drawing — the marker (made last) leaves the map, then comes back
   expect(await markersOnMap(a)).toBe(1);

@@ -123,59 +123,68 @@ export function MapHud({
       >
         {readout}
       </output>
-      <div ref={controlsRef} className={cn(panel, 'flex items-center gap-0.5 p-1')}>
-        {onToggleLabels && (
+      {/* exact room demo: the zoom stack stands vertical at the bottom right, the map toggles
+          under it */}
+      <div ref={controlsRef} className="flex flex-col items-end gap-2">
+        <div
+          role="group"
+          aria-label="Zoom"
+          className={cn(panel, 'flex flex-col items-center gap-0.5 p-1')}
+        >
           <HudButton
-            label="Map labels"
-            shortcut="N"
-            hint="Show or hide place names"
-            pressed={labels}
-            onClick={onToggleLabels}
+            label="Zoom in"
+            shortcut="+"
+            onClick={() => {
+              window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
+              map.zoomIn();
+            }}
           >
-            <MapLabelsIcon className="size-[18px]" />
+            <Plus className="size-[18px]" />
           </HudButton>
-        )}
-        <HudButton
-          label="Grid"
-          shortcut="Shift+G"
-          hint="Show or hide the A–H / I–P grid"
-          pressed={grid}
-          onClick={onToggleGrid}
-        >
-          <Grid3x3 className="size-[18px]" />
-        </HudButton>
-        {vehicles}
-        <span aria-hidden className="mx-1 h-5 w-px bg-border" />
-        <HudButton
-          label="Zoom out"
-          shortcut="−"
-          onClick={() => {
-            window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
-            map.zoomOut();
-          }}
-        >
-          <Minus className="size-[18px]" />
-        </HudButton>
-        <HudButton
-          label="Zoom in"
-          shortcut="+"
-          onClick={() => {
-            window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
-            map.zoomIn();
-          }}
-        >
-          <Plus className="size-[18px]" />
-        </HudButton>
-        <HudButton
-          label="Fit map"
-          hint="Show the whole map"
-          onClick={() => {
-            window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
-            onFit();
-          }}
-        >
-          <Maximize2 className="size-[18px]" />
-        </HudButton>
+          <HudButton
+            label="Zoom out"
+            shortcut="−"
+            onClick={() => {
+              window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
+              map.zoomOut();
+            }}
+          >
+            <Minus className="size-[18px]" />
+          </HudButton>
+          <HudButton
+            label="Fit map"
+            hint="Show the whole map"
+            onClick={() => {
+              window.dispatchEvent(new Event(MANUAL_VIEW_EVENT));
+              onFit();
+            }}
+          >
+            <Maximize2 className="size-[18px]" />
+          </HudButton>
+        </div>
+        <div className={cn(panel, 'flex items-center gap-0.5 p-1')}>
+          {onToggleLabels && (
+            <HudButton
+              label="Map labels"
+              shortcut="N"
+              hint="Show or hide place names"
+              pressed={labels}
+              onClick={onToggleLabels}
+            >
+              <MapLabelsIcon className="size-[18px]" />
+            </HudButton>
+          )}
+          <HudButton
+            label="Grid"
+            shortcut="Shift+G"
+            hint="Show or hide the A–H / I–P grid"
+            pressed={grid}
+            onClick={onToggleGrid}
+          >
+            <Grid3x3 className="size-[18px]" />
+          </HudButton>
+          {vehicles}
+        </div>
       </div>
     </div>
   );

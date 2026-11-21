@@ -94,7 +94,7 @@ test('unread badge appears while the panel is collapsed and clears when the chat
   browser,
 }) => {
   const { ctxA, ctxB, a, b } = await twoUsersInRoom(browser);
-  await b.getByTestId('panel-toggle').click(); // collapse
+  await b.getByTestId('panel-collapse').click(); // collapse to the edge tab
   await say(a, 'one');
   await say(a, 'two');
   await expect(b.getByTestId('panel-toggle').getByTestId('unread-badge')).toHaveText('2');

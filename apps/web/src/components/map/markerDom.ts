@@ -185,6 +185,17 @@ export function markerElement(
   const label = typeof props.label === 'string' ? props.label.slice(0, 24) : undefined;
   const root = document.createElement('div');
   root.className = 'rl-marker';
+  // exact room demo: drops and enemy reads keep a soft radar pulse (two staggered rings);
+  // Export PNG copies only the glyph's SVG and label, so the rings never land in a picture
+  if (kind === 'drop' || kind === 'enemy_squad') {
+    for (const delay of ['', ' d2']) {
+      const ring = document.createElement('span');
+      ring.className = `rl-marker-pulse${delay}`;
+      ring.setAttribute('aria-hidden', 'true');
+      ring.style.boxShadow = `0 0 0 2px ${safeColor(color)}`;
+      root.append(ring);
+    }
+  }
   root.append(glyph(kind, safeColor(color), number, label));
   const iconUrl =
     kind === 'loot' && typeof props.item === 'string' ? (lootIconUrl?.(props.item) ?? null) : null;

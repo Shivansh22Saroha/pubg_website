@@ -9,7 +9,8 @@ import {
 } from '@rotationlab/shared';
 import { MoreHorizontal, Redo2, Undo2 } from 'lucide-react';
 import { Popover } from 'radix-ui';
-import { useState } from 'react';
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { prefersReducedMotion } from '@/lib/motion';
 import { safeColor } from '@/components/map/markerDom';
 import { Hint } from '@/components/ui/hint';
 import { editorActions, type EditSink } from '@/lib/editing';
@@ -164,6 +165,12 @@ function ToolButton({
 }
 
 /** Phones (UI_UX_SPEC §7): these sit in the bar; the rest live behind "More tools". */
+/** dock magnification: how much the button under the pointer grows (42 → 62 px) and how far */
+const DOCK_GROW = 0.48;
+const DOCK_REACH = 110;
+/** the dock's tool buttons (some sit in a tooltip wrapper), not its separators */
+const DOCK_ITEMS = ':scope > :not(.bg-border)';
+
 export const PHONE_PRIMARY: readonly ToolId[] = [
   'select',
   'pen',
@@ -269,6 +276,23 @@ export function Toolbar({
   const overflowActive = overflow.find((t) => t.id === tool);
   const hintSide = horizontal ? 'top' : 'right';
 
+  // exact room demo: the bottom dock magnifies under the pointer (42 → 62 px, macOS-style)
+  const dock = floating && horizontal;
+  const navRef = useRef<HTMLElement>(null);
+  const magnify = (e: ReactPointerEvent<HTMLElement>) => {
+    if (!dock || e.pointerType !== 'mouse' || prefersReducedMotion()) return;
+    for (const b of navRef.current?.querySelectorAll<HTMLElement>(DOCK_ITEMS) ?? []) {
+      const r = b.getBoundingClientRect();
+      const d = Math.abs(e.clientX - (r.left + r.width / 2));
+      const k = 1 + DOCK_GROW * Math.max(0, 1 - d / DOCK_REACH);
+      b.style.transform = k > 1.001 ? `translateY(${-(k - 1) * 10}px) scale(${k})` : '';
+    }
+  };
+  const settle = () => {
+    for (const b of navRef.current?.querySelectorAll<HTMLElement>(DOCK_ITEMS) ?? [])
+      b.style.transform = '';
+  };
+
   const pickMarker = (kind: MarkerKind) => {
     const { view } = useBoardStore.getState();
     const layer = resolveActiveLayer(view.layers, useToolStore.getState().activeLayerId);
@@ -279,6 +303,9 @@ export function Toolbar({
 
   return (
     <nav
+      ref={navRef}
+      onPointerMove={dock ? magnify : undefined}
+      onPointerLeave={dock ? settle : undefined}
       aria-label="Drawing tools"
       data-testid="toolbar"
       data-tour="toolbar"
@@ -287,7 +314,7 @@ export function Toolbar({
         'flex shrink-0 items-center gap-1',
         floating && horizontal
           ? // glass layout (2026-11-21): the bottom tool dock from the approved demo
-            'glass-panel h-14 max-w-full flex-row overflow-x-auto overscroll-x-contain rounded-[18px] px-2 [scrollbar-width:none]'
+            'rl-dock glass-panel h-14 max-w-full flex-row overflow-visible rounded-[18px] px-2'
           : floating
             ? 'glass-panel max-h-full w-14 flex-col overflow-y-auto py-2'
             : horizontal

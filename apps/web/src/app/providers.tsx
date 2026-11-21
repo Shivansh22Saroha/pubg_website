@@ -33,7 +33,7 @@ export function Providers({ children }: { children: ReactNode }) {
         toastOptions={{
           classNames: {
             toast:
-              '!rounded-[14px] !border !border-[var(--edge-strong)] !bg-[var(--glass)] !text-text !backdrop-blur-xl !shadow-[0_18px_40px_-18px_rgba(0,0,0,0.8)]',
+              'rl-toast !rounded-[14px] !border !border-[var(--edge-strong)] !bg-[var(--glass)] !text-text !backdrop-blur-xl !shadow-[0_18px_40px_-18px_rgba(0,0,0,0.8)]',
             description: '!text-text-muted',
           },
         }}

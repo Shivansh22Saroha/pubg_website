@@ -1,7 +1,7 @@
 'use client';
 
 import { MARKER_DEFAULT_COLORS, type MarkerKind, type Pt } from '@rotationlab/shared';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { markerElement } from '@/components/map/markerDom';
 import { prefersReducedMotion } from '@/lib/motion';
@@ -17,6 +17,16 @@ export const RADIAL_KINDS: readonly MarkerKind[] = [
   'pin',
 ];
 
+/** short labels for the round chips */
+const SHORT: Partial<Record<MarkerKind, string>> = {
+  enemy_squad: 'Enemy',
+  hold: 'Hold',
+  danger: 'Danger',
+  vehicle: 'Vehicle',
+  drop: 'Drop',
+  pin: 'Pin',
+};
+
 export interface RadialAt {
   /** client px of the press / right-click */
   x: number;
@@ -25,9 +35,9 @@ export interface RadialAt {
   at: Pt;
 }
 
-const RADIUS = 76;
+const RADIUS = 78;
 /** keep the whole ring on screen */
-const MARGIN = RADIUS + 44;
+const MARGIN = RADIUS + 34;
 
 /** a marker glyph, drawn by the same DOM builder as the map (no HTML strings) */
 function Glyph({ kind }: { kind: MarkerKind }) {
@@ -109,10 +119,7 @@ export function RadialMenu({
         e.preventDefault();
       }}
     >
-      <span
-        aria-hidden
-        className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow-[0_0_0_4px_rgba(0,0,0,0.45)]"
-      />
+      <span aria-hidden className="rl-radial-hub" />
       {RADIAL_KINDS.map((kind, i) => {
         const a = ((-90 + (i * 360) / RADIAL_KINDS.length) * Math.PI) / 180;
         const tx = Math.round(Math.cos(a) * RADIUS);
@@ -122,21 +129,23 @@ export function RadialMenu({
             key={kind}
             type="button"
             role="menuitem"
+            aria-label={MARKER_LABELS[kind]}
             data-kind={kind}
             onClick={() => {
               onPick(kind, menu.at);
             }}
-            className="glass-panel absolute flex w-[84px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-[14px] px-1.5 py-1.5 text-[11px] leading-tight text-text hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent"
-            style={{
-              left: tx,
-              top: ty,
-              ...(animate && {
-                animation: `rl-radial-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2) ${i * 25}ms backwards`,
-              }),
-            }}
+            className="rl-radial-chip flex flex-col items-center justify-center gap-0.5 text-[10px] leading-none font-semibold text-text focus-visible:outline-none"
+            style={
+              {
+                '--tx': `${tx}px`,
+                '--ty': `${ty}px`,
+                animationDelay: animate ? `${i * 30}ms` : undefined,
+                animationDuration: animate ? undefined : '1ms',
+              } as CSSProperties
+            }
           >
             <Glyph kind={kind} />
-            {MARKER_LABELS[kind]}
+            <span className="max-w-[52px] truncate">{SHORT[kind] ?? MARKER_LABELS[kind]}</span>
           </button>
         );
       })}
