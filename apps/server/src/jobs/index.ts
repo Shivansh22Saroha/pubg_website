@@ -56,14 +56,18 @@ export function startJobs(deps: {
         deps.log.error({ err, job: name }, 'job failed');
       });
     });
+  // every maintenance job shares one slot every 3 h (and the token cleanup one nightly slot), so
+  // the free Neon database wakes ~9 times a day instead of every 15 min — it only counts compute
+  // while awake, and it sleeps after 5 idle minutes. Expired invites / links are refused on use
+  // anyway; these jobs only tidy up.
   const tasks = [
-    job('prune-board-ops', '*/15 * * * *', () => pruneBoardOps(deps.prisma)),
-    job('purge-deleted-rooms', '7 * * * *', () =>
+    job('prune-board-ops', '7 */3 * * *', () => pruneBoardOps(deps.prisma)),
+    job('purge-deleted-rooms', '7 */3 * * *', () =>
       purgeDeletedRooms(deps.prisma, new Date(), deps.assets),
     ),
-    job('expire-invites', '17 * * * *', () => expireInvites(deps.prisma)),
-    job('expire-share-links', '19 * * * *', () => expireShareLinks(deps.prisma)),
-    job('cleanup-tokens', '27 3 * * *', () => cleanupTokens(deps.prisma)),
+    job('expire-invites', '7 */3 * * *', () => expireInvites(deps.prisma)),
+    job('expire-share-links', '7 */3 * * *', () => expireShareLinks(deps.prisma)),
+    job('cleanup-tokens', '8 3 * * *', () => cleanupTokens(deps.prisma)),
   ];
   return () => {
     for (const t of tasks) t.stop();

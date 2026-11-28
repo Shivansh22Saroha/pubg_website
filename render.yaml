@@ -11,7 +11,9 @@ services:
     # free instances have no pre-deploy step: migrate on start (fast no-op when up to date).
     # Render runs this without a shell, hence a script rather than `sh -c "… && …"`.
     dockerCommand: sh scripts/start.sh
-    healthCheckPath: /api/health
+    # liveness only — /api/health queries Postgres, and Render calls this every few seconds, which
+    # kept the free Neon database from ever scaling to zero (it ran out of compute hours)
+    healthCheckPath: /api/live
     autoDeployTrigger: commit
     envVars:
       - key: NODE_ENV

@@ -272,7 +272,10 @@ REST `POST /boards/:id/snapshots/:sid/restore` → service creates auto-snapshot
 ## 11. Background jobs (node-cron inside server, single leader via Redis lock)
 | Job | Schedule | Action |
 |---|---|---|
-| purgeDeletedRooms | hourly | hard-delete rooms soft-deleted > 7 days |
-| pruneOpLog | every 15 min | delete `board_ops` older than 24 h, keep last 1 000 per board |
-| expireInvites | hourly | mark expired invites |
-| cleanupRefreshTokens | daily | delete expired/revoked tokens > 30 days |
+| purgeDeletedRooms | every 3 h (:07) | hard-delete rooms soft-deleted > 7 days |
+| pruneOpLog | every 3 h (:07) | delete `board_ops` older than 24 h, keep last 1 000 per board |
+| expireInvites | every 3 h (:07) | mark expired invites (an expired invite is refused on use regardless) |
+| expireShareLinks | every 3 h (:07) | delete expired share links (refused on use regardless) |
+| cleanupRefreshTokens | daily (03:08) | delete expired/revoked tokens > 30 days |
+
+All jobs share slots on purpose (2026-11-28): the free Neon database counts compute only while awake and sleeps after 5 idle minutes, so one wake-up every 3 h beats a query every 15 min.
